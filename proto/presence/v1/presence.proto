@@ -1,0 +1,28 @@
+syntax = "proto3";
+
+package presence.v1;
+
+option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1;presencev1";
+
+service PresenceService {
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+  rpc GetLiveCounts(GetLiveCountsRequest) returns (LiveCounts);
+}
+
+message HeartbeatRequest {
+  string account_id = 1;
+  bool badge_verified = 2;
+  int32 gender = 3;
+}
+
+message HeartbeatResponse {
+  bool ok = 1;
+}
+
+message GetLiveCountsRequest {}
+
+message LiveCounts {
+  int64 unverified = 1;
+  int64 male = 2;
+  int64 female = 3;
+}

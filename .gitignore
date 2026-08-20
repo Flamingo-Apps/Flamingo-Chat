@@ -1,0 +1,30 @@
+# Binaries
+/bin/
+*.exe
+*.test
+# stray `go build` output when run without -o (repo root or any service dir)
+/chat
+/gateway
+/identity
+/matching
+/presence
+/moderation
+/persistence-worker
+services/*/chat
+services/*/gateway
+services/*/identity
+services/*/matching
+services/*/presence
+services/*/moderation
+services/*/persistence-worker
+
+# Env
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
