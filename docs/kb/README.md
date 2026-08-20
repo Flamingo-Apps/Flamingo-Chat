@@ -16,6 +16,7 @@ Running notes on distributed-systems concepts as we hit them while building Flam
 - [02-01-protobuf-and-buf.md](02-protobuf-and-grpc/02-01-protobuf-and-buf.md) - Protocol Buffers, gRPC contracts, buf codegen
 - [02-02-grpc-error-codes.md](02-protobuf-and-grpc/02-02-grpc-error-codes.md) - status/codes, mapping domain errors to wire errors
 - [02-03-grpcurl.md](02-protobuf-and-grpc/02-03-grpcurl.md) - calling a gRPC service by hand via reflection
+- [02-04-interceptors-and-structured-logging.md](02-protobuf-and-grpc/02-04-interceptors-and-structured-logging.md) - gRPC middleware, log/slog, the shared `pkg/grpclog` package
 
 ## 03. Databases
 
