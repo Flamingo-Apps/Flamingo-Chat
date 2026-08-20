@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package moderation.v1;
+
+option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/moderation/v1;moderationv1";
+
+service ModerationService {
+  rpc FileReport(FileReportRequest) returns (FileReportResponse);
+  rpc BlockUser(BlockUserRequest) returns (BlockUserResponse);
+}
+
+message FileReportRequest {
+  string reporter_account_id = 1;
+  string reported_account_id = 2;
+  string room_id = 3;
+  string reason = 4;
+}
+
+message FileReportResponse {
+  string report_id = 1;
+}
+
+message BlockUserRequest {
+  string account_id = 1;
+  string blocked_account_id = 2;
+}
+
+message BlockUserResponse {
+  bool blocked = 1;
+}
