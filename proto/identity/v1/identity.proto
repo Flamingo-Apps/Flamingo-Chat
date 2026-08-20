@@ -31,7 +31,10 @@ message CreateAccountRequest {
 
 message VerifyBadgeRequest {
   string account_id = 1;
-  string college_email = 2;
+  // OAuth ID token (JWT) from the client's college-email login, e.g. Google
+  // Sign-In. Identity verifies this itself rather than trusting a bare
+  // email string, since a bare string can't prove ownership.
+  string id_token = 2;
   Gender gender = 3;
 }
 
