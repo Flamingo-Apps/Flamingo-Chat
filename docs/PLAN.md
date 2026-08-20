@@ -5,7 +5,7 @@ Priority list, phase by phase. Edit freely - insert/reorder items if priority ch
 ## Phase 0 - Setup
 
 - [x] Monorepo scaffold (go.work, services/, proto/, buf config)
-- [ ] docker-compose for local dev (Postgres, Redis, RabbitMQ)
+- [x] docker-compose for local dev (Postgres, Redis, RabbitMQ)
 - [ ] Basic CI (build + test on push)
 
 ## Phase 1 - Core walking skeleton (real-time path only, no durability yet)
