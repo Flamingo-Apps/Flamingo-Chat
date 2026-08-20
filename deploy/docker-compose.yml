@@ -1,0 +1,55 @@
+name: flamingo-chat
+
+# Local dev only. Ports are published to localhost so services running via
+# `go run` on the host (not yet containerized - no Dockerfiles exist yet)
+# can reach these directly. Jaeger and per-service containers get added
+# here in later phases (observability / infra), per SYSTEM_DESIGN.md §7-8.
+# Production Postgres is a managed instance, not this container - see
+# SYSTEM_DESIGN.md §7.
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: flamingo
+      POSTGRES_PASSWORD: flamingo
+      POSTGRES_DB: flamingo
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U flamingo -d flamingo"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  rabbitmq:
+    image: rabbitmq:3.13-management-alpine
+    environment:
+      RABBITMQ_DEFAULT_USER: flamingo
+      RABBITMQ_DEFAULT_PASS: flamingo
+    ports:
+      - "5672:5672"   # AMQP
+      - "15672:15672" # management UI - http://localhost:15672
+    volumes:
+      - rabbitmq-data:/var/lib/rabbitmq
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  postgres-data:
+  rabbitmq-data:
