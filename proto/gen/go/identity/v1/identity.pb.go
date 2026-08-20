@@ -191,10 +191,13 @@ func (x *CreateAccountRequest) GetPseudonym() string {
 }
 
 type VerifyBadgeRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	CollegeEmail  string                 `protobuf:"bytes,2,opt,name=college_email,json=collegeEmail,proto3" json:"college_email,omitempty"`
-	Gender        Gender                 `protobuf:"varint,3,opt,name=gender,proto3,enum=identity.v1.Gender" json:"gender,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// OAuth ID token (JWT) from the client's college-email login, e.g. Google
+	// Sign-In. Identity verifies this itself rather than trusting a bare
+	// email string, since a bare string can't prove ownership.
+	IdToken       string `protobuf:"bytes,2,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`
+	Gender        Gender `protobuf:"varint,3,opt,name=gender,proto3,enum=identity.v1.Gender" json:"gender,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -236,9 +239,9 @@ func (x *VerifyBadgeRequest) GetAccountId() string {
 	return ""
 }
 
-func (x *VerifyBadgeRequest) GetCollegeEmail() string {
+func (x *VerifyBadgeRequest) GetIdToken() string {
 	if x != nil {
-		return x.CollegeEmail
+		return x.IdToken
 	}
 	return ""
 }
@@ -358,11 +361,11 @@ const file_identity_v1_identity_proto_rawDesc = "" +
 	"\x06gender\x18\x04 \x01(\x0e2\x13.identity.v1.GenderR\x06gender\x12&\n" +
 	"\x0fcreated_at_unix\x18\x05 \x01(\x03R\rcreatedAtUnix\"4\n" +
 	"\x14CreateAccountRequest\x12\x1c\n" +
-	"\tpseudonym\x18\x01 \x01(\tR\tpseudonym\"\x85\x01\n" +
+	"\tpseudonym\x18\x01 \x01(\tR\tpseudonym\"{\n" +
 	"\x12VerifyBadgeRequest\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\tR\taccountId\x12#\n" +
-	"\rcollege_email\x18\x02 \x01(\tR\fcollegeEmail\x12+\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
+	"\bid_token\x18\x02 \x01(\tR\aidToken\x12+\n" +
 	"\x06gender\x18\x03 \x01(\x0e2\x13.identity.v1.GenderR\x06gender\"2\n" +
 	"\x11GetAccountRequest\x12\x1d\n" +
 	"\n" +
