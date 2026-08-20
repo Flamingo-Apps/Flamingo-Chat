@@ -1,0 +1,45 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+    branches: [main]
+
+env:
+  # Use exactly the Go version setup-go installs below - never auto-download
+  # a newer toolchain mid-run. See docs/kb/go-modules-and-toolchains.md.
+  GOTOOLCHAIN: local
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        # go.work ties these together for local dev, but `go build ./...`
+        # from the repo root doesn't reliably expand across nested workspace
+        # modules (see docs/kb/go-workspaces.md) - so build/test each module
+        # explicitly instead, same as CI would do per-service later anyway.
+        module:
+          - pkg
+          - proto/gen/go
+          - services/gateway
+          - services/identity
+          - services/matching
+          - services/chat
+          - services/presence
+          - services/moderation
+          - services/persistence-worker
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.24.3"
+
+      - name: Build
+        working-directory: ${{ matrix.module }}
+        run: go build ./...
+
+      - name: Test
+        working-directory: ${{ matrix.module }}
+        run: go test ./...

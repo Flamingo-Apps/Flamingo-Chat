@@ -10,3 +10,4 @@ Add a new file per topic (not per session). If a later session deepens an existi
 - [go-workspaces.md](go-workspaces.md) - multi-module monorepos with `go.work`
 - [go-modules-and-toolchains.md](go-modules-and-toolchains.md) - MVS, the `go` directive vs. toolchain, pinning dependency versions
 - [docker-compose-for-local-dev.md](docker-compose-for-local-dev.md) - healthchecks, named volumes, published ports vs. service-name networking
+- [github-actions-ci.md](github-actions-ci.md) - workflow/job/step/action, matrix strategy, why per-module builds
