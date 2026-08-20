@@ -22,15 +22,16 @@ The person building this is explicitly learning distributed systems through it (
 
 ## Current state (check this is still accurate - update this section if it drifts)
 
-- `main` has one commit: the planning docs under `docs/`.
-- Branch `phase-0-scaffold` (uncommitted as of this writing) has the Phase 0 monorepo skeleton: `go.work`, one Go module per service under `services/` (gateway, identity, matching, chat, presence, moderation, persistence-worker), each with a minimal `main.go`. Non-gateway services start a gRPC server with health-check + reflection registered and a `TODO: register the <name> service implementation` - no business logic yet. Gateway starts a plain HTTP server with `/healthz` and a TODO for WebSocket/JWT/gRPC routing.
+- **Phase 0 is complete and merged to `main`** (PR #1, `phase-0-scaffold` → `main`). CI passed on all 9 module jobs before and after merge. That branch can be deleted locally/remotely whenever - nothing else depends on it.
+- Monorepo skeleton: `go.work`, one Go module per service under `services/` (gateway, identity, matching, chat, presence, moderation, persistence-worker), each with a minimal `main.go`. Non-gateway services start a gRPC server with health-check + reflection registered and a `TODO: register the <name> service implementation` - no business logic yet. Gateway starts a plain HTTP server with `/healthz` and a TODO for WebSocket/JWT/gRPC routing.
 - Real `.proto` files exist for identity, chat, matching, presence, moderation under `proto/*/v1/`, already `buf generate`-d into `proto/gen/go/`. Treat these as the current source of truth for inter-service contracts, but they're still early - expect fields to change as services get built out.
 - `pkg/config` has a tiny env-var config loader (`config.String`, `config.Int`). Use it rather than reading `os.Getenv` directly, for consistency.
 - `scripts/scaffold-service.sh <name> <port>` generates the same minimal gRPC skeleton for a brand new service. It refuses to overwrite an existing service directory - don't re-run it against a service that already has real code.
+- `deploy/docker-compose.yml` runs Postgres, Redis, RabbitMQ for local dev (`cd deploy && docker compose up -d`). No service reads their connection env vars yet - that wiring happens as each service gets built out. Jaeger and per-service containers are deliberately not in there yet (later phases).
+- `.github/workflows/ci.yml` builds + tests every module on push/PR, one matrix job per module.
 - All modules (`pkg`, `proto/gen/go`, every `services/*`) pin `google.golang.org/grpc` to `v1.71.1` (not `@latest`) - `@latest` pulled in a version requiring Go 1.25, and the toolchain download for that failed repeatedly on this network. See [docs/kb/go-modules-and-toolchains.md](docs/kb/go-modules-and-toolchains.md) before bumping grpc or other deps. Also note: `go build ./...` from the repo root doesn't expand across nested workspace modules on this Go version - build per-service (`cd services/chat && go build ./...`) instead; see [docs/kb/go-workspaces.md](docs/kb/go-workspaces.md).
-- `docs/kb/` exists with notes on protobuf/buf, Go workspaces, and Go modules/toolchains so far.
-- Not started yet: `docker-compose.yml` for local dev (Postgres/Redis/RabbitMQ/Jaeger), any actual service logic, tests, CI, moderation/persistence-worker services (deliberately last per PLAN.md).
-- **First thing to do if you're the first session picking this up**: get `phase-0-scaffold` committed and merged to `main` so everyone branches from the same known-good baseline, and finish Phase 0's remaining items (docker-compose for local dev, basic CI) before Phase 1 service logic goes in.
+- `docs/kb/` has notes on protobuf/buf, Go workspaces, Go modules/toolchains, docker-compose, and GitHub Actions so far.
+- Not started yet: any actual service logic, tests, moderation/persistence-worker business logic (deliberately last per PLAN.md). **Next up per PLAN.md: Phase 1** - Identity, Gateway, Chat, Matching, Presence, real-time path only, no durable history yet.
 
 ## Working across multiple concurrent sessions
 
