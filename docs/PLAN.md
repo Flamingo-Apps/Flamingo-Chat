@@ -10,7 +10,7 @@ Priority list, phase by phase. Edit freely - insert/reorder items if priority ch
 
 ## Phase 1 - Core walking skeleton (real-time path only, no durability yet)
 
-- [ ] Identity Service (accounts, badge verification, pseudonym)
+- [x] Identity Service (accounts, badge verification, pseudonym)
 - [ ] API Gateway (HTTP/WebSocket, JWT, routing)
 - [ ] Chat Service (rooms, messages, invite codes)
 - [ ] Matching Service (gender-wise queue + pairing)
