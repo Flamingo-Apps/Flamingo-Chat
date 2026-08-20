@@ -1,0 +1,23 @@
+# Binaries
+/bin/
+*.exe
+*.test
+# stray `go build` output if run from repo root instead of a service dir
+/chat
+/gateway
+/identity
+/matching
+/presence
+/moderation
+/persistence-worker
+
+# Env
+.env
+.env.*
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
