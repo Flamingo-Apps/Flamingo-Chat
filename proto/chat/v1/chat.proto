@@ -1,0 +1,58 @@
+syntax = "proto3";
+
+package chat.v1;
+
+option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1;chatv1";
+
+service ChatService {
+  rpc CreateRoom(CreateRoomRequest) returns (Room);
+  rpc JoinRoomByCode(JoinRoomByCodeRequest) returns (Room);
+  rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
+  rpc StreamRoomEvents(StreamRoomEventsRequest) returns (stream RoomEvent);
+}
+
+enum RoomType {
+  ROOM_TYPE_UNSPECIFIED = 0;
+  ROOM_TYPE_DIRECT = 1;
+  ROOM_TYPE_GROUP = 2;
+}
+
+message Room {
+  string id = 1;
+  RoomType type = 2;
+  string invite_code = 3;
+  repeated string member_account_ids = 4;
+}
+
+message CreateRoomRequest {
+  RoomType type = 1;
+  repeated string member_account_ids = 2;
+}
+
+message JoinRoomByCodeRequest {
+  string account_id = 1;
+  string invite_code = 2;
+}
+
+message SendMessageRequest {
+  string room_id = 1;
+  string sender_account_id = 2;
+  string body = 3;
+}
+
+message SendMessageResponse {
+  string message_id = 1;
+  int64 sent_at_unix = 2;
+}
+
+message StreamRoomEventsRequest {
+  string room_id = 1;
+}
+
+message RoomEvent {
+  string message_id = 1;
+  string room_id = 2;
+  string sender_account_id = 3;
+  string body = 4;
+  int64 sent_at_unix = 5;
+}

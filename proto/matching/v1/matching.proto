@@ -1,0 +1,34 @@
+syntax = "proto3";
+
+package matching.v1;
+
+option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1;matchingv1";
+
+service MatchingService {
+  rpc RequestMatch(RequestMatchRequest) returns (stream MatchEvent);
+  rpc CancelMatch(CancelMatchRequest) returns (CancelMatchResponse);
+}
+
+enum MatchStatus {
+  MATCH_STATUS_UNSPECIFIED = 0;
+  MATCH_STATUS_QUEUED = 1;
+  MATCH_STATUS_MATCHED = 2;
+}
+
+message RequestMatchRequest {
+  string account_id = 1;
+}
+
+message MatchEvent {
+  MatchStatus status = 1;
+  string room_id = 2;
+  string matched_account_id = 3;
+}
+
+message CancelMatchRequest {
+  string account_id = 1;
+}
+
+message CancelMatchResponse {
+  bool cancelled = 1;
+}
