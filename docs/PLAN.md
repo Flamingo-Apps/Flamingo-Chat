@@ -27,7 +27,7 @@ Note: no durable chat history until Phase 2 - messages only flow live (Redis pub
 
 - [ ] Prometheus + Grafana
 - [ ] OpenTelemetry + Jaeger/Tempo tracing, end to end
-- [ ] Structured logging (+ Loki, optional)
+- [ ] Structured logging (+ Loki, optional) - foundation already in place: `pkg/grpclog`'s unary interceptor logs structured request lines via `log/slog`, built during Identity Service so later services don't reinvent it. This phase extends it (real output destination, trace spans, metrics) rather than starting it - see `SYSTEM_DESIGN.md` §6 and `docs/kb/02-protobuf-and-grpc/02-04-interceptors-and-structured-logging.md`.
 
 ## Phase 4 - Infra / deployment
 
