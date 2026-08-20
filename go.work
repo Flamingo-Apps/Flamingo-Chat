@@ -1,0 +1,13 @@
+go 1.24.3
+
+use (
+	./pkg
+	./proto/gen/go
+	./services/chat
+	./services/gateway
+	./services/identity
+	./services/matching
+	./services/moderation
+	./services/persistence-worker
+	./services/presence
+)

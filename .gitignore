@@ -2,7 +2,7 @@
 /bin/
 *.exe
 *.test
-# stray `go build` output if run from repo root instead of a service dir
+# stray `go build` output when run without -o (repo root or any service dir)
 /chat
 /gateway
 /identity
@@ -10,6 +10,13 @@
 /presence
 /moderation
 /persistence-worker
+services/*/chat
+services/*/gateway
+services/*/identity
+services/*/matching
+services/*/presence
+services/*/moderation
+services/*/persistence-worker
 
 # Env
 .env
