@@ -3,7 +3,9 @@ package main
 import (
 	"context"
 	"log"
+	"log/slog"
 	"net"
+	"os"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -14,6 +16,7 @@ import (
 	"google.golang.org/grpc/reflection"
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/config"
+	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/grpclog"
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/identity/internal/server"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/identity/internal/store"
@@ -66,7 +69,8 @@ func main() {
 		log.Fatalf("failed to listen: %v", err)
 	}
 
-	srv := grpc.NewServer()
+	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	srv := grpc.NewServer(grpc.UnaryInterceptor(grpclog.UnaryServerInterceptor(logger)))
 
 	healthSrv := health.NewServer()
 	healthpb.RegisterHealthServer(srv, healthSrv)
