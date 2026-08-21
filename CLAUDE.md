@@ -13,6 +13,7 @@ A campus-wide anonymous chat app (gender-wise matching, group chat), rebuilt fro
 - [docs/PLAN.md](docs/PLAN.md) - build order, phase by phase, checklist style. **Check this before picking up work** - it says what's next and what's deliberately deferred.
 - [docs/CONCEPT.md](docs/CONCEPT.md) - original pitch and the longer-term (phase 2, dating-mechanic) direction, not being built yet
 - [docs/kb/](docs/kb/README.md) - running knowledge base, one `.md` file per distributed-systems topic learned along the way (protobuf/buf, Go workspaces, etc.). Add to this as new concepts come up - don't just explain something once and let it evaporate.
+- [docs/architecture/](docs/architecture) - per-service design deep-dives with diagrams, written before that service gets built, not after. Different purpose from `docs/kb/`: the KB is reusable concepts, this is "how this specific service works and why," one file per service.
 
 If something you're about to build contradicts one of these docs, stop and flag it rather than silently deviating - either the doc is stale and needs updating, or you're about to redo a decision that was already made for a reason.
 
