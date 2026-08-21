@@ -18,6 +18,8 @@ Primary language: **Go**, across all services, the gateway, and the workers.
 
 Not a service: the frontend (web/app) - it only ever talks to the API Gateway.
 
+**Gateway detail**: see [docs/architecture/gateway.md](architecture/gateway.md) for the full walkthrough (protocol translation, the two-token auth model, cross-instance real-time delivery via Redis pub/sub) - this table row is the summary, that doc is the design.
+
 ## 2. Architecture overview
 
 ```mermaid
