@@ -30,7 +30,7 @@ These are decided before the related work starts. (DEC-0016)
 - [ ] Architecture: how the services talk to each other, Kafka topics, what Redis holds
 - [ ] Infrastructure: cluster layout, cost against the trial credit, deploy pipeline
 - [ ] Monitoring design
-- [ ] License
+- [x] License: Apache 2.0 (DEC-0035)
 - [ ] Domain name
 - [ ] `docs/ARCHITECTURE.md`, replacing `SYSTEM_DESIGN.md` and `architecture/gateway.md`
 
