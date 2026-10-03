@@ -68,4 +68,4 @@ To report a security problem, follow [SECURITY.md](SECURITY.md). Please do not o
 
 ## License
 
-A license has not been chosen yet. Until a `LICENSE` file is added, please ask before reusing the code.
+Flamingo Chat is licensed under the [Apache License, Version 2.0](LICENSE).

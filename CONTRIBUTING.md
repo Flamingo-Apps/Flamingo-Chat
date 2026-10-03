@@ -8,6 +8,7 @@ This guide covers how to set up the project, how changes get merged, and the few
 - For anything larger than a small fix, open an issue first and describe what you want to change. Design changes are discussed and agreed before they are built.
 - Taking part in this project means following the [Code of Conduct](CODE_OF_CONDUCT.md).
 - Report security problems privately, as described in [SECURITY.md](SECURITY.md). Never open a public issue for one.
+- The project is licensed under the [Apache License, Version 2.0](LICENSE). Under section 5 of that license, a contribution you submit is licensed under the same terms unless you say otherwise.
 
 ## Local setup
 

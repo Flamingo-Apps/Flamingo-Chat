@@ -87,7 +87,6 @@ Every figure reported for these must come from saved evidence, not an estimate. 
 - Why usage of the earlier prototype dropped after two days, beyond what "keep chatting" and persistent rooms address.
 - How long messages and moderation records are kept, and who can read them.
 - Who moderates during the pilot, besides the maintainer.
-- The license for the code.
 
 ## Later
 
