@@ -1,0 +1,44 @@
+name: Feature request
+description: Suggest a change or an addition.
+title: "feat: "
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Check [docs/PRD.md](https://github.com/Flamingo-Apps/Flamingo-Chat/blob/main/docs/PRD.md) first. It lists what is in scope and what has been deliberately left out.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem does this solve?
+      description: Describe the situation and who is affected, before describing a solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: What do you propose?
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives you considered
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - gateway
+        - identity
+        - chat
+        - matching
+        - presence
+        - moderation
+        - persistence-worker
+        - web frontend
+        - deployment or CI
+        - documentation
+        - not sure
+    validations:
+      required: true

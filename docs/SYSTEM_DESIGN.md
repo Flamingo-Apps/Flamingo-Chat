@@ -1,5 +1,7 @@
 # System Design: Flamingo Chat
 
+> **Partly out of date.** This document predates the decisions of 2026-10-02 and will be replaced by `ARCHITECTURE.md`. Where it disagrees with [decisions.jsonl](decisions.jsonl), the decision log is right. Known differences: Kafka replaces RabbitMQ (DEC-0020); the pilot runs on Google Cloud, not k3s on VPS nodes (DEC-0023); guests get random matching and verification uses Google sign-in (DEC-0026, DEC-0027); observability is built before launch, not as a later phase (DEC-0024).
+
 Companion to [PRD.md](PRD.md). This defines service boundaries, the tech stack, inter-service data contracts, observability, infrastructure/deployment, and the proposed repo layout. Concrete metrics/benchmarks referenced here get filled in later during load testing, per the PRD's non-functional requirements - nothing here is a measured number yet, it's the design that will produce them. See [PLAN.md](PLAN.md) for the build order/priority - everything in this doc exists regardless of order, PLAN.md is what gets built first.
 
 Primary language: **Go**, across all services, the gateway, and the workers.

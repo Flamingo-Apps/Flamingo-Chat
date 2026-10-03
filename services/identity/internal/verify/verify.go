@@ -1,5 +1,5 @@
 // Package verify checks OAuth ID tokens presented by clients as proof of
-// college-email ownership. See docs/kb for the reasoning: a bare
+// college-email ownership. See DEC-0011 in docs/decisions.jsonl for the reasoning: a bare
 // user-typed email can't prove ownership, but an ID token signed by an
 // identity provider (with a verified email_verified claim) can.
 package verify

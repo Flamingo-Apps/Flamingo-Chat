@@ -1,88 +1,97 @@
-# PRD: Flamingo Chat
+# Product Requirements: Flamingo Chat
 
-Status: draft, phase 1 only (anonymous chat). Phase 2 (dating evolution) is intentionally out of scope for this PRD - see [CONCEPT.md](CONCEPT.md) for the longer-term direction, revisit once phase 1 has real usage data.
+Status: v1 scope agreed on 2026-10-02. The reasoning behind each choice is recorded in [decisions.jsonl](decisions.jsonl); entries are referenced below by ID.
 
-Flamingo Chat is a continuation of an earlier prototype of the same name, which reached about 400 users over its first day or two before usage dropped off. This round rebuilds it properly: real system design, and a second attempt at what keeps people around past the first couple of days.
+## Background
 
-## Problem statement
+Flamingo Chat continues an earlier prototype of the same name. That version had three screens (choose your gender and who you want to talk to, wait for a match, chat) and reached about 400 users in its first day or two. Usage then dropped off. This rebuild has two aims: a product people return to after day two, and a system that is designed, deployed and measured properly.
 
-Students at a given campus want a low-friction way to talk to other students they don't already know, without the social risk of doing it under their real identity. Existing options (Instagram DMs, campus WhatsApp groups) require revealing identity up front and don't have a structured way to meet people you don't already have a connection to.
+## Problem
 
-## Target users
+Students want a low-pressure way to talk to people on their campus they do not already know, without doing it under their real name. Instagram messages and campus WhatsApp groups require showing who you are up front and offer no way to meet someone you have no connection to.
 
-- Students at a single college (v1 scoped to one campus - your own college - not multi-campus)
-- Primarily students looking to meet new people casually, not an existing-friends messaging replacement
+## Users
 
-## Scope - Phase 1
+Students at one college, KIIT. The app is distributed there and nowhere else. It is for meeting new people casually, not for messaging existing friends.
 
-In scope:
+## Product principle
 
-- Two access tiers, no forced verification for the core product:
-  - **Unverified**: sign up freely, access general anonymous chat and group rooms, no gender-specific matching
-  - **Verified ("Badged")**: verify via college ID/email (exact mechanism TBD - likely college email OAuth), unlocks gender-specific match finder. Framed positively at the verification prompt (something like "Get Badged" / "Get Verified") rather than as an intimidating identity check
-- Anonymous 1:1 chat, matched via a gender-wise match finder (verified users only)
-- Group chat rooms (topic-based or campus-wide, open to unverified and verified users)
-  - Creatable by users (creation permissions - all users or verified only - TBD, see open questions)
-  - Joinable via invite link or code
-- Stable per-account pseudonym (Reddit-style: persists across all of a user's conversations), user-chosen and user-changeable at any time
-- Reporting/blocking a user mid-chat
-- Live online user count, broken down by unverified / male / female, shown in the app
+**Share something about yourself to use the same thing about others.** Anyone can try the app without giving anything. Features that depend on personal information, such as matching by gender, are open only to people who have provided that information themselves. (DEC-0026)
 
-Out of scope for phase 1:
+## Access tiers
 
-- The reveal/dating mechanic (phase 2)
-- Multi-campus support
-- Media sharing beyond text (images/voice notes deferred unless explicitly prioritized)
-- Monetization
-- Group search/discovery directory - deferred until there are enough groups for search to be worth building (see Future scope)
+| | Guest | Verified |
+|---|---|---|
+| How you join | Choose a pseudonym | Sign in with a KIIT Google account |
+| Group rooms | Yes | Yes |
+| Random 1:1 matching | Yes | Yes |
+| Matching filtered by gender | No | Yes, after choosing a gender |
+| Sign in on another device | No | Yes |
+| Account lifetime | Deleted after 60 days without activity | Kept |
 
-## Future scope (post-phase-1, not yet prioritized)
+- A guest who signs in later keeps the same account, so their pseudonym and rooms carry over. (DEC-0026)
+- Verification accepts only accounts that Google reports as belonging to KIIT's domain. (DEC-0027)
+- After signing in, a user chooses male, female or prefer not to say. The choice is made once and is permanent; a correction goes through a request that an admin reviews. Users who prefer not to say cannot filter by gender and are not counted in gender totals. (DEC-0028)
 
-- **Group search/discovery**: a directory to browse/search public groups by name or topic. Deferred rather than cut, because it needs an indexing/search component that isn't worth building before there's enough group content to search. Revisit once group creation is live and there's real data on how many groups exist and whether people are already finding them via link/code sharing alone.
+## v1 scope
 
-## Anonymity and data model
+In scope (DEC-0031):
 
-Anonymity is user-facing only, not a backend guarantee. The pseudonym is what other users see; the backend retains the real identity mapping and full message data for moderation purposes. This is an acceptable tradeoff because the audience is a single college (known, bounded user base), not a general public product - the privacy bar is "other users can't identify you," not "the operator can't either."
+- **Accounts.** Guest signup with a pseudonym, protected by a CAPTCHA and rate limits. KIIT sign-in. One-time gender choice. Signing in on a new device. Changing your pseudonym.
+- **1:1 chat.** Random matching for everyone. Gender-filtered matching for verified users who chose a gender. Skip to the next person, or leave.
+- **Keep chatting.** If both people in a random chat choose to, the chat becomes a saved conversation they can return to.
+- **Group rooms.** Create a room, join by invite code or link, leave. One default campus-wide room exists from the start. Anyone can create rooms, limited to a few per day per account. Invite codes are reusable and the room owner can replace them.
+- **Presence.** A live count of people online, shown as totals for guests, male and female.
+- **Safety.** Report and block from any chat. Reports go to an admin queue. Bans follow the Google account for verified users, and the account plus rate limits for guests.
+- **History.** Group room messages are saved, so reloading does not empty the room. A random 1:1 chat disappears for its participants when it ends, unless both chose to keep chatting. Its messages are still kept on the server for moderation.
+- **Legal.** A privacy policy and terms of use.
+- **Operations.** Monitoring is running before the first real user (DEC-0024). Admin actions are done with a command-line tool from inside the cluster; there is no public admin interface (DEC-0029).
 
-Data retention specifics (how long logs are kept, who can access them) still need a concrete policy, but the direction is: real-time messages flow through a fast in-memory layer (e.g. Redis) for live delivery, and are asynchronously persisted by workers into durable storage for moderation/history. The persistence layer should be treated as swappable/scalable from day one (not hard-wired to one database), since this is one of the areas you specifically want to learn by building it. Concrete choices (message broker, database engine, sharding strategy) belong in System Design, not this PRD.
+Out of scope for v1:
 
-## Success metrics (draft - needs your input)
+- images, voice and other media
+- typing indicators and read receipts
+- push notifications
+- browsing or searching for groups
+- profile pages
+- native mobile apps; v1 is a web app designed for phones first
+- more than one campus
+- monetization
 
-- Daily/weekly active users, and specifically retention past day 2-3, since that's exactly where the previous prototype fell off
-- Match-to-conversation rate (% of matches that result in an actual back-and-forth chat)
-- Report rate per active user (proxy for safety/abuse problems)
-- Verified vs. unverified split, and whether verified users behave differently (engagement, report rate)
+## Anonymity and data
+
+Anonymity is between users, not from the operator. Other users see only a pseudonym. The backend keeps the link between an account and its Google identity, and keeps message data, so that reports can be acted on. This is acceptable because the audience is a single college. The sign-in screen must say plainly what is stored and that no other user sees it. (DEC-0001)
+
+For a verified account the backend stores Google's permanent account identifier and the email address. It does not store the name or profile picture that Google also provides. (DEC-0027)
+
+## Success measures
+
+Every figure reported for these must come from saved evidence, not an estimate. (DEC-0025)
+
+- Daily and weekly active users, and retention on day 1, day 3 and day 7. Retention past day 2 is where the earlier prototype failed.
+- The share of matches that turn into a real conversation, and the share that both people choose to keep.
+- Reports per active user, as a signal of abuse.
+- The split between guests and verified users, and whether they behave differently.
 
 ## Non-functional requirements
 
-- **Scalable and distributed by design**: built as independent services from the start, not a monolith split later
-- **This project is also a deliberate learning vehicle** for distributed systems concepts - API gateways, caching layers, service decomposition, swappable/pluggable data stores, worker-based async persistence. Where reasonable for this scale, prefer demonstrating a solid, well-known distributed pattern over the single simplest solution, and treat System Design as the place to make that tradeoff explicit rather than silently defaulting to "simplest thing that works"
-- Real-time messaging with low latency (sub-second delivery expectation)
-- Moderation must be able to act in near-real-time on reports (not a nightly batch process)
-- Live presence counts must be aggregate-only (unverified / male / female tallies) - never expose enough detail to identify who's online, and gender tallies only ever include verified users who set a gender
-- **Observability and benchmarking are first-class deliverables, not an afterthought**: every service should expose Prometheus metrics and participate in distributed tracing (e.g. OpenTelemetry + Jaeger) from day one, since this project doubles as a portfolio piece and retrofitting observability later is more work than designing it in. Inter-service communication should use gRPC where it makes sense (chat/matching/moderation/presence), and the real-time delivery + persistence pipeline should run through a message broker (RabbitMQ/NATS/Kafka - pick one in System Design). Concrete latency/throughput/concurrency numbers should come from actual load testing (k6/vegeta/ghz) against the built system with a documented methodology, not estimated in advance
-
-## Resolved decisions
-
-1. **Campus verification**: college ID/email based (OAuth preferred, exact provider/flow TBD), required only for gender-specific matching, not for general use
-2. **Gender field**: only collected/required for verified users going for gender-specific matching
-3. **Moderation model**: backend keeps full data (identity + messages) for moderation; anonymity is enforced only at the user-facing layer. Single-college launch keeps legal/scale exposure low. Moderator staffing (you, volunteers) still TBD
-4. **Anonymity persistence**: stable per-account pseudonym, user-changeable
-5. **Launch campus**: your own college, continuing from the original Flamingo Chat prototype
-6. **Data retention/architecture**: real-time cache (e.g. Redis) plus async worker-persisted durable storage, with the storage layer designed to be swappable/scalable - detailed design deferred to System Design
+- **Real-time.** Messages are delivered in under a second in normal conditions.
+- **Independent services.** The backend is built as separate services from the start (DEC-0003).
+- **Measured.** Every service exposes metrics and takes part in distributed tracing. Latency, throughput and concurrency figures come from load tests with a documented method.
+- **Private presence.** Online counts are totals only and never reveal who is online.
+- **Timely moderation.** A report can be acted on within minutes, not in a nightly batch.
+- **Portable.** Nothing depends on a single cloud provider, so the system can be moved (DEC-0023).
 
 ## Open questions
 
-- What made the original prototype's usage drop off after a day or two, and what in this rebuild specifically addresses that (better system design alone may not fix a retention problem)?
-- Exact verification mechanism: does your college provide OAuth, or does this need email-domain + magic link instead?
-- Moderator staffing for the pilot: just you, or others?
-- Concrete data retention window and policy for moderation logs
-- Group creation permissions: can any user create a group, or verified users only? Unrestricted creation risks spam/low-quality groups; needs at least a rate limit even if unverified users are allowed to create
-- Invite codes/links: do they expire, are they single-use or reusable, and can a group owner revoke/regenerate one?
+- Why usage of the earlier prototype dropped after two days, beyond what "keep chatting" and persistent rooms address.
+- How long messages and moderation records are kept, and who can read them.
+- Who moderates during the pilot, besides the maintainer.
+- The license for the code.
 
-## Milestones (draft)
+## Later
 
-1. System Design finalized (microservices architecture, data model, caching/persistence strategy)
-2. Pilot build: signup (unverified + verified paths), 1:1 matching, group chat, basic chat, report/block
-3. Closed pilot at your college
-4. Iterate based on pilot metrics, with particular attention to day-2/day-3 retention, before expanding scope
+Not planned for v1 and revisited only with real usage data:
+
+- **Group discovery.** A directory to browse and search public rooms. It needs enough rooms to be worth building.
+- **Identity reveal.** The longer-term idea is a chat-first alternative to swipe-based dating: matched people talk anonymously and may reveal who they are once a condition is met, such as time, message count or mutual consent. This raises safety, moderation and legal questions that an anonymous chat does not, and it needs enough users on one campus to work at all. (DEC-0002)
