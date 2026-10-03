@@ -1,5 +1,7 @@
 # API Gateway architecture
 
+> **Will be folded into `ARCHITECTURE.md`.** The design here still holds, with two changes from [decisions.jsonl](../decisions.jsonl): signing in also works for returning verified users on a new device (DEC-0026), and gender is chosen after sign-in, not sent with the verification request (DEC-0028).
+
 Design notes for the API Gateway, written up before implementation started so the reasoning is on record, not just in chat history. Companion to [SYSTEM_DESIGN.md](../SYSTEM_DESIGN.md) - that doc's Gateway row/section is the one-line summary, this is the walkthrough behind it.
 
 ## Role
@@ -122,4 +124,3 @@ Each Gateway instance owns its own **local connection registry** (in-memory: whi
 
 - [SYSTEM_DESIGN.md](../SYSTEM_DESIGN.md) §1-3 - service boundaries and the message/match/presence data flows this diagram is a close-up of
 - [PRD.md](../PRD.md) - the two-tier (unverified/verified) access model this auth design implements
-- [docs/kb/04-auth-and-verification/04-01-oauth-and-oidc.md](../kb/04-auth-and-verification/04-01-oauth-and-oidc.md) - how Identity verifies the Google ID token Gateway hands it

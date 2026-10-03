@@ -1,47 +1,99 @@
 # Build Plan: Flamingo Chat
 
-Priority list, phase by phase. Edit freely - insert/reorder items if priority changes, that's the point of this doc. Full detail on any item lives in [SYSTEM_DESIGN.md](SYSTEM_DESIGN.md).
+What is done, what is next, and in what order. Scope is defined in [PRD.md](PRD.md); reasons are in [decisions.jsonl](decisions.jsonl). Check an item off in the same pull request that completes it.
 
-## Phase 0 - Setup
+## Dates
 
-- [x] Monorepo scaffold (go.work, services/, proto/, buf config)
-- [x] docker-compose for local dev (Postgres, Redis, RabbitMQ)
-- [x] Basic CI (build + test on push)
+| Date | Milestone |
+|---|---|
+| 2026-10-13 to 14 | Closed beta with a small group |
+| 2026-10-15 | Public launch at KIIT, at the latest |
+| 2026-12-15 to 18 | Move off Google Cloud |
+| 2026-12-25 | Google Cloud trial ends |
 
-## Phase 1 - Core walking skeleton (real-time path only, no durability yet)
+If something has to slip, the launch date slips. Safety features and monitoring do not. (DEC-0024)
 
-- [x] Identity Service (accounts, badge verification, pseudonym)
-- [ ] API Gateway (HTTP/WebSocket, JWT, routing)
-- [ ] Chat Service (rooms, messages, invite codes)
-- [ ] Matching Service (gender-wise queue + pairing)
-- [ ] Presence Service (live online counts)
+## Done
 
-Note: no durable chat history until Phase 2 - messages only flow live (Redis pub/sub), nothing persisted to Postgres yet. Deliberate tradeoff to get the real-time path working end to end first.
+- [x] Monorepo scaffold: Go workspace, one module per service, proto contracts, buf configuration
+- [x] Local dependencies with docker-compose
+- [x] CI: build and test every module
+- [x] Identity service: accounts, pseudonyms, badge verification
+- [x] Shared gRPC request logging (`pkg/grpclog`)
+- [x] Repository foundation: decision log, contributor documents, issue and pull request templates
 
-## Phase 2 - Durability & safety
+## Planning still open
 
-- [ ] Persistence Worker (durable chat history)
-- [ ] Moderation Service (reports, blocks)
+These are decided before the related work starts. (DEC-0016)
 
-## Phase 3 - Observability
+- [ ] Screens and flows for the web app, and the frontend framework
+- [ ] Architecture: how the services talk to each other, Kafka topics, what Redis holds
+- [ ] Infrastructure: cluster layout, cost against the trial credit, deploy pipeline
+- [ ] Monitoring design
+- [ ] License
+- [ ] Domain name
+- [ ] `docs/ARCHITECTURE.md`, replacing `SYSTEM_DESIGN.md` and `architecture/gateway.md`
 
-- [ ] Prometheus + Grafana
-- [ ] OpenTelemetry + Jaeger/Tempo tracing, end to end
-- [ ] Structured logging (+ Loki, optional) - foundation already in place: `pkg/grpclog`'s unary interceptor logs structured request lines via `log/slog`, built during Identity Service so later services don't reinvent it. This phase extends it (real output destination, trace spans, metrics) rather than starting it - see `SYSTEM_DESIGN.md` §6 and `docs/kb/02-protobuf-and-grpc/02-04-interceptors-and-structured-logging.md`.
+## v1
 
-## Phase 4 - Infra / deployment
+Order within each group is set once the architecture is agreed.
 
-- [ ] k3s cluster (VPS nodes)
-- [ ] CI/CD deploy pipeline (build, push to ghcr.io, deploy)
-- [ ] TLS + domain
+### Repository
 
-## Phase 5 - Benchmarking (for resume-worthy numbers)
+- [ ] CI checks: formatting, `go vet`, race detector, linter, vulnerability scan, proto lint and breaking-change check, decision log validation
+- [ ] Branch protection on `main`: pull requests only, CI required
+- [ ] Private vulnerability reporting enabled
 
-- [ ] Load test WebSocket concurrency
-- [ ] Load test message throughput/latency
-- [ ] Record real p50/p95/p99 numbers with documented methodology
+### Backend
 
-## Phase 6 - Product expansion (deferred features, revisit later)
+- [ ] Identity: check the `hd` claim, key accounts on Google's `sub`, one-time gender, sign in to an existing account, delete inactive guests (INC-0006, DEC-0026 to DEC-0028)
+- [ ] Gateway: signup and sign-in over HTTP, session tokens, WebSocket connections, rate limits
+- [ ] Chat: rooms, membership, invite codes, sending messages, "keep chatting"
+- [ ] Matching: random queue and gender-filtered queue, pairing, skip
+- [ ] Presence: heartbeats and live counts
+- [ ] Moderation: reports, blocks, bans, admin queue, gender change requests
+- [ ] Kafka in place of RabbitMQ for durable events (DEC-0020)
+- [ ] Persistence worker: saved chat history
+- [ ] Admin command-line tool (DEC-0029)
+- [ ] Log streaming gRPC calls as well as unary ones
 
-- [ ] Group search/discovery
-- [ ] Phase 2 dating/reveal mechanic (see [CONCEPT.md](CONCEPT.md))
+### Frontend
+
+- [ ] Web app in `web/`, deployed to Vercel (DEC-0032)
+- [ ] Privacy policy and terms pages
+
+### Infrastructure
+
+- [ ] Container images for every service
+- [ ] Kubernetes cluster on Google Cloud, defined as code (DEC-0023)
+- [ ] Deploy pipeline from `main`
+- [ ] Domain and HTTPS (DEC-0033)
+- [ ] Google sign-in published to production, with brand verification
+
+### Monitoring
+
+Running before launch. (DEC-0024)
+
+- [ ] Metrics and dashboards for every service
+- [ ] Distributed tracing across services and the message broker
+- [ ] Central logs
+- [ ] Alerts
+- [ ] Budget alert on the Google Cloud billing account
+
+### Before launch
+
+- [ ] Load test, with the method and results committed (DEC-0025)
+- [ ] Security review
+- [ ] Sign-in re-tested with a KIIT account after publishing to production (DEC-0027)
+- [ ] Closed beta
+
+## After launch
+
+- [ ] Benchmarks with documented method and saved results
+- [ ] Product measures from the PRD, reported from stored data
+- [ ] Migration off Google Cloud
+
+## Later
+
+- [ ] Group discovery
+- [ ] Identity reveal mechanic

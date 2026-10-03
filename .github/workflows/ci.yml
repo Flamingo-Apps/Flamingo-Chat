@@ -7,7 +7,7 @@ on:
 
 env:
   # Use exactly the Go version setup-go installs below - never auto-download
-  # a newer toolchain mid-run. See docs/kb/go-modules-and-toolchains.md.
+  # a newer toolchain mid-run. See INC-0001 in docs/decisions.jsonl.
   GOTOOLCHAIN: local
 
 jobs:
@@ -17,7 +17,7 @@ jobs:
       matrix:
         # go.work ties these together for local dev, but `go build ./...`
         # from the repo root doesn't reliably expand across nested workspace
-        # modules (see docs/kb/go-workspaces.md) - so build/test each module
+        # modules (see INC-0002 in docs/decisions.jsonl) - so build/test each module
         # explicitly instead, same as CI would do per-service later anyway.
         module:
           - pkg
