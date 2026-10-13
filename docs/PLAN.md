@@ -46,6 +46,11 @@ Order within each group is set once the architecture is agreed.
 - [x] Private vulnerability reporting enabled
 - [x] Squash merging only, applied as a repository setting (DEC-0022)
 
+### Local development
+
+- [x] Tilt on a local kind cluster, replacing docker-compose (DEC-0039): `deploy/helm/service` (the shared chart), `deploy/k8s/dev` (Postgres, Redis, Kafka, the topic-creation Job), one `Dockerfile` per service, and the root `Tiltfile`. `tilt ci` brings every workload to healthy, confirmed against a real kind cluster, not only rendered - identity answers a real `grpcurl` call through a port-forward, and the three Kafka topics exist.
+- [ ] Wire in persistence-worker and the delivery worker once they have a real consume loop (they are deliberately not deployed yet - see the Tiltfile's comment)
+
 ### Backend
 
 - [ ] Identity: check the `hd` claim, key accounts on Google's `sub`, one-time gender, sign in to an existing account, delete inactive guests (INC-0006, DEC-0026 to DEC-0028)
@@ -66,7 +71,7 @@ Order within each group is set once the architecture is agreed.
 
 ### Infrastructure
 
-- [ ] Container images for every service
+- [x] Container images for every service that has one yet (the six gRPC/HTTP services; persistence-worker and the delivery worker get theirs when they have real logic to run)
 - [ ] Kubernetes cluster on Google Cloud, defined as code (DEC-0023)
 - [ ] Deploy pipeline from `main`
 - [ ] Domain and HTTPS (DEC-0033)

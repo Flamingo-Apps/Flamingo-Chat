@@ -15,23 +15,20 @@ This guide covers how to set up the project, how changes get merged, and the few
 You need:
 
 - Go 1.27.2 or newer. CI builds with 1.27.2, so do not add a dependency that requires a newer version.
-- Docker with Compose, for Postgres, Redis and the message broker.
+- Docker, [kind](https://kind.sigs.k8s.io) and [Tilt](https://docs.tilt.dev/install.html), for running the full system locally - see the README's "Run it locally" section.
 - [buf](https://buf.build), only if you change `.proto` files.
 
 ```sh
 git clone https://github.com/Flamingo-Apps/Flamingo-Chat.git
 cd Flamingo-Chat
 
-# start local dependencies
-cd deploy && docker compose up -d && cd ..
-
-# build and test one module
+# build and test one module, without needing the rest of the system running
 cd services/identity
 go build ./...
 go test ./...
 ```
 
-Each service is its own Go module. Build and test from inside the module's directory; `go build ./...` from the repository root does not cover the modules.
+Each service is its own Go module. Build and test from inside the module's directory; `go build ./...` from the repository root does not cover the modules. To run the whole system together, including Postgres, Redis and Kafka, see the README.
 
 ## Workflow
 

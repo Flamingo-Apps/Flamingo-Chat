@@ -1,0 +1,9 @@
+apiVersion: v2
+name: service
+description: >-
+  Generic chart for one Flamingo Chat Go service (a Deployment plus a
+  Service). One values file per service supplies the differences - see
+  deploy/helm/service/values/*.yaml and docs/ARCHITECTURE.md §9.
+type: application
+version: 0.1.0
+appVersion: "0.1.0"

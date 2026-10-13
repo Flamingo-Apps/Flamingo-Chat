@@ -335,14 +335,14 @@ Consumer lag, delivery failures and reconnect rates are exported as metrics so t
 
 The monitoring stack (where metrics, traces and logs are stored and viewed) is designed with the deployment.
 
-## 9. Local development (Agreed)
+## 9. Local development (Agreed; built and verified against a real kind cluster)
 
-- **Tilt** runs everything on a local **kind** Kubernetes cluster inside Docker, using the same Kubernetes files as the real deployment. (DEC-0039)
-- `tilt up` builds each service image, deploys Postgres, Redis, Kafka and every service, creates the Kafka topics, and forwards ports to the host.
-- The web app runs on the Vite dev server at `http://localhost:8000`, one of the origins registered for Google sign-in.
-- Kubernetes files: one shared Helm chart for the Go services (`deploy/helm/service`, with a values file per service), and plain manifests for local Postgres, Redis and Kafka under `deploy/k8s/dev`.
-- `deploy/docker-compose.yml` is removed once Tilt works.
-- **Development-only Google verifier.** With `DEV_FAKE_GOOGLE=1`, Identity accepts tokens of the form `fake:<sub>:<email>`, so verified flows can be tested without a browser. It logs a warning at startup and is never enabled outside local development.
+- **Tilt** runs everything on a local **kind** Kubernetes cluster inside Docker, using the same Kubernetes files as the real deployment. (DEC-0039, DEC-0053)
+- `tilt up` builds each service image, deploys Postgres, Redis, Kafka and every service, creates the Kafka topics, and forwards ports to the host. `tilt ci` does the same once and exits, for scripting; it currently reports every workload healthy.
+- The web app will run on the Vite dev server at `http://localhost:8000`, one of the origins registered for Google sign-in - not built yet (§10 is implemented, §11's frontend tests are not).
+- Kubernetes files: one shared Helm chart for the Go services (`deploy/helm/service`, with a values file per service under `deploy/helm/service/values/`), and plain manifests for local Postgres, Redis and Kafka under `deploy/k8s/dev` (including the one-time `kind create cluster` config and the Kafka topic-creation Job). Each service has its own multi-stage `Dockerfile`, building from the repository root into a `gcr.io/distroless/static-debian12:nonroot` image (DEC-0053). `persistence-worker` and the delivery worker are not part of this yet - they have no consume loop to run until the Chat and worker PRs land, so Tilt would just watch them crash-loop for no reason.
+- `deploy/docker-compose.yml` has been removed; Tilt covers everything it used to.
+- **Development-only Google verifier (Proposed, DEC-0049).** With `DEV_FAKE_GOOGLE=1`, Identity accepts tokens of the form `fake:<sub>:<email>`, so verified flows can be tested without a browser. It logs a warning at startup and is never enabled outside local development. Not built yet.
 
 ## 10. Frontend (Agreed)
 

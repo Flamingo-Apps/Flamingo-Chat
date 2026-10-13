@@ -1,0 +1,7 @@
+name: gateway
+image:
+  repository: flamingo/gateway
+protocol: http
+port: 8080
+env:
+  HTTP_PORT: "8080"

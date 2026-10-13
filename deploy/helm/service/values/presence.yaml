@@ -1,0 +1,7 @@
+name: presence
+image:
+  repository: flamingo/presence
+protocol: grpc
+port: 50054
+env:
+  GRPC_PORT: "50054"

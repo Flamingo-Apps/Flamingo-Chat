@@ -1,0 +1,29 @@
+# Defaults shared by every service. Each values/<name>.yaml file under this
+# chart overrides what differs - see docs/ARCHITECTURE.md §9.
+name: ""
+image:
+  repository: ""
+  tag: dev
+  pullPolicy: IfNotPresent
+
+# "grpc" services are checked with Kubernetes' native gRPC probe (stable
+# since Kubernetes 1.27), which calls the standard grpc.health.v1.Health
+# service every service already registers via pkg/grpclog's neighbour,
+# health.NewServer(). "http" services are checked on /healthz instead.
+protocol: grpc
+port: 50051
+
+replicas: 1
+
+# Plain key: value environment variables.
+env: {}
+
+# Names of Secrets whose keys are all exposed as environment variables.
+envFromSecret: []
+
+resources:
+  requests:
+    cpu: 25m
+    memory: 32Mi
+  limits:
+    memory: 128Mi

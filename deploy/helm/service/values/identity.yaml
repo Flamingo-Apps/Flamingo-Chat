@@ -1,0 +1,21 @@
+name: identity
+image:
+  repository: flamingo/identity
+protocol: grpc
+port: 50051
+env:
+  GRPC_PORT: "50051"
+  POSTGRES_URL: "postgres://flamingo:flamingo@postgres:5432/flamingo?sslmode=disable"
+  COLLEGE_EMAIL_DOMAIN: "kiit.ac.in"
+  # Public client ID (not a secret - see docs/decisions.jsonl DEC-0027/DEC-0030
+  # and AGENTS.md's environment notes). Verification itself needs a real
+  # Google ID token from a browser, which local development doesn't have -
+  # that gap is closed by the development-only fake verifier, DEC-0049,
+  # not built yet.
+  COLLEGE_OAUTH_CLIENT_ID: "155057367000-e6fvpmf6g3up2p20133i7jhnd0nc3hfn.apps.googleusercontent.com"
+resources:
+  requests:
+    cpu: 50m
+    memory: 48Mi
+  limits:
+    memory: 192Mi

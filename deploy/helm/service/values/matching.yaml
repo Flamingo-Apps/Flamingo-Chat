@@ -1,0 +1,7 @@
+name: matching
+image:
+  repository: flamingo/matching
+protocol: grpc
+port: 50052
+env:
+  GRPC_PORT: "50052"

@@ -24,33 +24,39 @@ The backend is a set of Go services that talk to each other over gRPC. Only the 
 | `moderation` | Reports, blocks, bans | Skeleton |
 | `persistence-worker` | Writes chat history to the database | Skeleton |
 
-Postgres is the source of truth. Redis carries live message delivery and presence. Kafka will carry durable events between services; the local setup still runs RabbitMQ until that change lands. The web frontend will live in `web/`.
+Postgres is the source of truth. Redis carries live message delivery and presence. Kafka carries durable events between services. The web frontend will live in `web/`.
 
 The design is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and the reasons behind each choice are in [docs/decisions.jsonl](docs/decisions.jsonl).
 
 ## Run it locally
 
-You need Go 1.27.2 or newer and Docker with Compose.
+Everything runs on a local Kubernetes cluster through [Tilt](https://tilt.dev), using the same manifests and Helm chart that deploy to the real cluster - see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) §9.
+
+You need Go 1.27.2 or newer, Docker, [kind](https://kind.sigs.k8s.io), and [Tilt](https://docs.tilt.dev/install.html).
 
 ```sh
-# start Postgres, Redis and the broker
-cd deploy && docker compose up -d && cd ..
+# one-time: create the local cluster Tilt deploys into
+kind create cluster --name flamingo-dev --config deploy/k8s/dev/kind-config.yaml
 
-# run the identity service; it applies its database migrations on startup
-cd services/identity && go run .
+# build every service, deploy Postgres/Redis/Kafka and every service, and
+# keep rebuilding on changes. Opens a UI at localhost:10350.
+tilt up
+
+# or, for a one-shot build-and-verify with no UI (what CI would run):
+tilt ci
 ```
 
-The identity service listens for gRPC on port 50051. With [grpcurl](https://github.com/fullstorydev/grpcurl) installed you can call it directly:
+`tilt up` forwards each service's port to localhost: 8080 for the gateway, 50051 for identity, 50052 for matching, 50053 for chat, 50054 for presence, 50055 for moderation, 5432 for Postgres, 6379 for Redis, and 9092 for Kafka. With [grpcurl](https://github.com/fullstorydev/grpcurl) installed you can call identity directly:
 
 ```sh
 grpcurl -plaintext -d '{"pseudonym": "shadow_fox"}' \
   localhost:50051 identity.v1.IdentityService/CreateAccount
 ```
 
-Each service is its own Go module, so run tests from inside a module:
+Each service is its own Go module, so build and test it directly, without Tilt, from inside its directory:
 
 ```sh
-cd services/identity && go test ./...
+cd services/identity && go build ./... && go test ./...
 ```
 
 ## Documentation
