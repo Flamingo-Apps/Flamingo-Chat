@@ -119,14 +119,13 @@ jobs:
       - uses: actions/checkout@v7
       - run: ./scripts/check-decisions.sh
 
-  # buf breaking is deliberately not enabled yet - this very pull request
-  # is the intentionally breaking protocol redesign docs/ARCHITECTURE.md
-  # §5.3 describes, so turning it on here would fail against its own base.
-  # It is enabled in the pull request immediately after this one lands,
-  # once there is a non-breaking base for every future change to be
-  # checked against. See docs/decisions.jsonl.
+  # buf lint runs always; buf breaking runs only on pull requests, against
+  # their base branch, which is its default comparison - see DEC-0054 for
+  # why it could not be turned on in the pull request that redesigned the
+  # contracts (it would have failed against its own, intentionally
+  # breaking, base).
   buf:
-    name: buf lint
+    name: buf
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
@@ -134,7 +133,6 @@ jobs:
         with:
           lint: true
           format: false
-          breaking: false
           push: false
           archive: false
           pr_comment: false

@@ -42,7 +42,7 @@ Order within each group is set once the architecture is agreed.
 
 - [x] CI checks: formatting, `go vet`, race detector, linter, vulnerability scan, decision log validation (DEC-0051, DEC-0052)
 - [x] CI: `buf lint`, passing now that the protocol redesign follows its naming rules
-- [ ] CI: `buf breaking`, enabled in the pull request immediately after the protocol redesign lands (it would fail against its own, intentionally breaking, base otherwise)
+- [x] CI: `buf breaking`, enabled now that main has a non-breaking base again
 - [x] Branch protection on `main`: pull requests only, CI required
 - [x] Private vulnerability reporting enabled
 - [x] Squash merging only, applied as a repository setting (DEC-0022)
