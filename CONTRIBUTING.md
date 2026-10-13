@@ -14,7 +14,7 @@ This guide covers how to set up the project, how changes get merged, and the few
 
 You need:
 
-- Go 1.24.3 or newer. CI builds with 1.24.3, so do not add a dependency that requires a newer version.
+- Go 1.27.2 or newer. CI builds with 1.27.2, so do not add a dependency that requires a newer version.
 - Docker with Compose, for Postgres, Redis and the message broker.
 - [buf](https://buf.build), only if you change `.proto` files.
 
@@ -69,6 +69,26 @@ Every service depends on the generated code in `proto/gen/go`, so a contract cha
 - Business logic is tested against in-memory fakes of its storage and provider interfaces. See `services/identity/internal/server/server_test.go`.
 - Fakes do not reproduce real database behaviour. Code that talks to a database also needs a test against the real one.
 
+## CI checks
+
+CI runs the following, once per Go module, through a single required check named `CI OK`:
+
+- `gofmt -l` (no output), `go build ./...`, `go vet ./...`, `go test -race ./...`
+- [golangci-lint](https://golangci-lint.run), configured in `.golangci.yml`
+- [govulncheck](https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck), which fails on a dependency with a known, reachable vulnerability
+- `docs/decisions.jsonl` validation (`scripts/check-decisions.sh`)
+
+Reproduce any of these locally from inside a module's directory, for example:
+
+```sh
+cd services/identity
+gofmt -l .
+go vet ./...
+go test -race ./...
+golangci-lint run ./...
+govulncheck ./...
+```
+
 ## Decision log
 
 [docs/decisions.jsonl](docs/decisions.jsonl) records why the project is the way it is. Each line is one JSON object: either a decision, written like an architecture decision record, or an incident, written like a short postmortem.
@@ -115,6 +135,10 @@ jq 'select(.id=="DEC-0020")' docs/decisions.jsonl
 
 # check that every line is valid JSON
 jq -e . docs/decisions.jsonl > /dev/null && echo ok
+
+# everything above, plus required fields, unique ids, and that every
+# supersedes/superseded_by reference resolves - this is what CI runs
+./scripts/check-decisions.sh
 ```
 
 ## Documentation

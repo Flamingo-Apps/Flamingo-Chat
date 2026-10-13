@@ -47,7 +47,9 @@ func main() {
 	if err := migrations.Run(sqlDB); err != nil {
 		log.Fatalf("migrations: %v", err)
 	}
-	sqlDB.Close()
+	if err := sqlDB.Close(); err != nil {
+		log.Printf("migrations: closing db handle: %v", err)
+	}
 
 	var verifier verify.BadgeVerifier
 	if oauthClientID == "" {

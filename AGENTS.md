@@ -59,8 +59,8 @@ GOTOOLCHAIN=local go build ./...
 GOTOOLCHAIN=local go test ./...
 ```
 
-- CI builds and tests every module with Go 1.24.3 and `GOTOOLCHAIN=local`. Do not add a dependency that needs a newer Go version (INC-0001, DEC-0010).
-- In workspace mode Go resolves one version of each dependency for all modules. `services/identity` requires grpc v1.74.2, so every module currently builds against v1.74.2 even though the other `go.mod` files say v1.71.1 (INC-0004). Check with `go list -m google.golang.org/grpc`.
+- CI builds and tests every module with Go 1.27.2 and `GOTOOLCHAIN=local`. Do not add a dependency that needs a newer Go version (INC-0001, DEC-0051). Check the current pin with `go version` in `go.work`, and keep it current rather than letting it drift unreviewed (INC-0004).
+- In workspace mode Go resolves one version of each dependency for all modules; every module currently requires the same grpc version (v1.84.0). Check with `go list -m google.golang.org/grpc` if that ever looks wrong.
 - Local dependencies: `cd deploy && docker compose up -d` starts Postgres, Redis and RabbitMQ. RabbitMQ is being replaced by Kafka (DEC-0020).
 
 ## Code conventions
