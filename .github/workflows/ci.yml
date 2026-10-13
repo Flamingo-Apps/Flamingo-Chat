@@ -2,44 +2,137 @@ name: CI
 
 on:
   push:
+    branches: [main]
   pull_request:
     branches: [main]
+
+# A PR branch gets pushed several times before it's ready; only the latest
+# push needs to finish, so cancel a run still going when a newer one starts
+# for the same branch.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 env:
   # Use exactly the Go version setup-go installs below - never auto-download
   # a newer toolchain mid-run. See INC-0001 in docs/decisions.jsonl.
   GOTOOLCHAIN: local
+  GO_VERSION: "1.27.2"
+  GOLANGCI_LINT_VERSION: "v2.14.0"
 
 jobs:
-  build-and-test:
+  # One source of truth for the module list, consumed by every job below via
+  # a dynamic matrix - see
+  # https://docs.github.com/en/actions/using-jobs/using-a-matrix-for-your-jobs.
+  modules:
+    name: List modules
     runs-on: ubuntu-latest
+    outputs:
+      modules: ${{ steps.list.outputs.modules }}
+    steps:
+      - id: list
+        run: |
+          echo 'modules=["pkg","proto/gen/go","services/gateway","services/identity","services/matching","services/chat","services/presence","services/moderation","services/persistence-worker"]' >> "$GITHUB_OUTPUT"
+
+  build-and-test:
+    name: build-and-test (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    needs: modules
     strategy:
       matrix:
         # go.work ties these together for local dev, but `go build ./...`
         # from the repo root doesn't reliably expand across nested workspace
-        # modules (see INC-0002 in docs/decisions.jsonl) - so build/test each module
-        # explicitly instead, same as CI would do per-service later anyway.
-        module:
-          - pkg
-          - proto/gen/go
-          - services/gateway
-          - services/identity
-          - services/matching
-          - services/chat
-          - services/presence
-          - services/moderation
-          - services/persistence-worker
+        # modules (see INC-0002 in docs/decisions.jsonl) - so build/test each
+        # module explicitly instead, same as a per-service Docker build does.
+        module: ${{ fromJSON(needs.modules.outputs.modules) }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-go@v5
+      - uses: actions/setup-go@v7
         with:
-          go-version: "1.24.3"
+          go-version: ${{ env.GO_VERSION }}
+
+      - name: Format
+        working-directory: ${{ matrix.module }}
+        run: |
+          unformatted=$(gofmt -l .)
+          if [ -n "$unformatted" ]; then
+            echo "not gofmt'd:"
+            echo "$unformatted"
+            exit 1
+          fi
 
       - name: Build
         working-directory: ${{ matrix.module }}
         run: go build ./...
 
-      - name: Test
+      - name: Vet
         working-directory: ${{ matrix.module }}
-        run: go test ./...
+        run: go vet ./...
+
+      - name: Test (race detector)
+        working-directory: ${{ matrix.module }}
+        run: go test -race ./...
+
+  lint:
+    name: lint (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    needs: modules
+    strategy:
+      matrix:
+        module: ${{ fromJSON(needs.modules.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      - uses: golangci/golangci-lint-action@v9
+        with:
+          version: ${{ env.GOLANGCI_LINT_VERSION }}
+          working-directory: ${{ matrix.module }}
+
+  vulncheck:
+    name: vulncheck (${{ matrix.module }})
+    runs-on: ubuntu-latest
+    needs: modules
+    strategy:
+      matrix:
+        module: ${{ fromJSON(needs.modules.outputs.modules) }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: golang/govulncheck-action@v1
+        with:
+          go-version-input: ${{ env.GO_VERSION }}
+          work-dir: ${{ matrix.module }}
+          repo-checkout: false
+
+  decisions:
+    name: Decision log
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - run: ./scripts/check-decisions.sh
+
+  # buf lint and buf breaking are deliberately not here yet - the current
+  # .proto files fail buf's STANDARD lint rules (response message naming),
+  # and are about to be rewritten anyway. Both land together once that
+  # redesign does. See docs/decisions.jsonl.
+
+  # Branch protection requires this one job, not every matrix entry above,
+  # so the required-check list doesn't need editing every time a module is
+  # added or a job is renamed.
+  ci-ok:
+    name: CI OK
+    runs-on: ubuntu-latest
+    if: always()
+    needs: [build-and-test, lint, vulncheck, decisions]
+    steps:
+      - name: Check that every required job succeeded
+        run: |
+          if [ "${{ contains(needs.*.result, 'failure') }}" = "true" ] || [ "${{ contains(needs.*.result, 'cancelled') }}" = "true" ]; then
+            echo "one or more required jobs did not succeed"
+            exit 1
+          fi

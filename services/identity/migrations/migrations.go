@@ -6,6 +6,7 @@ package migrations
 import (
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
@@ -34,9 +35,12 @@ func Run(sqlDB *sql.DB) error {
 	if err != nil {
 		return fmt.Errorf("migrations: instance: %w", err)
 	}
-	defer m.Close()
+	// Best-effort cleanup: Up() already ran by the time this runs, so a
+	// failure to close the source/database handles here doesn't change
+	// whether the migration itself succeeded.
+	defer func() { _, _ = m.Close() }()
 
-	if err := m.Up(); err != nil && err != migrate.ErrNoChange {
+	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
 		return fmt.Errorf("migrations: up: %w", err)
 	}
 	return nil

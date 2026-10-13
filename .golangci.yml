@@ -1,0 +1,10 @@
+# golangci-lint v2 configuration, shared by every Go module in this
+# workspace. CI runs this once per module (see .github/workflows/ci.yml);
+# running `golangci-lint run ./...` from inside any module directory uses
+# the same rules locally.
+version: "2"
+linters:
+  default: standard
+  enable:
+    - errorlint
+    - gosec

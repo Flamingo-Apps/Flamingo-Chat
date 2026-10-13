@@ -30,7 +30,7 @@ The design is described in [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md), and t
 
 ## Run it locally
 
-You need Go 1.24.3 or newer and Docker with Compose.
+You need Go 1.27.2 or newer and Docker with Compose.
 
 ```sh
 # start Postgres, Redis and the broker

@@ -40,9 +40,11 @@ Order within each group is set once the architecture is agreed.
 
 ### Repository
 
-- [ ] CI checks: formatting, `go vet`, race detector, linter, vulnerability scan, proto lint and breaking-change check, decision log validation
-- [ ] Branch protection on `main`: pull requests only, CI required
-- [ ] Private vulnerability reporting enabled
+- [x] CI checks: formatting, `go vet`, race detector, linter, vulnerability scan, decision log validation (DEC-0051, DEC-0052)
+- [ ] CI: proto lint and breaking-change check (comes with the protocol redesign, since the current `.proto` files do not yet pass `buf lint`)
+- [x] Branch protection on `main`: pull requests only, CI required
+- [x] Private vulnerability reporting enabled
+- [x] Squash merging only, applied as a repository setting (DEC-0022)
 
 ### Backend
 
