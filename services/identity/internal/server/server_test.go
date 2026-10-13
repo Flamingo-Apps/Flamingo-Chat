@@ -117,7 +117,7 @@ func TestCreateAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAccount: %v", err)
 	}
-	if acc.Id != "acc-1" || acc.Pseudonym != "shadow_fox" || acc.BadgeVerified {
+	if acc.GetAccount().GetId() != "acc-1" || acc.GetAccount().GetPseudonym() != "shadow_fox" || acc.GetAccount().GetBadgeVerified() {
 		t.Fatalf("unexpected account: %+v", acc)
 	}
 
@@ -157,7 +157,7 @@ func TestUpdatePseudonym(t *testing.T) {
 	}
 
 	acc, err := s.UpdatePseudonym(context.Background(), &identityv1.UpdatePseudonymRequest{AccountId: "acc-1", NewPseudonym: "night_owl"})
-	if err != nil || acc.Pseudonym != "night_owl" {
+	if err != nil || acc.GetAccount().GetPseudonym() != "night_owl" {
 		t.Fatalf("UpdatePseudonym: acc=%+v err=%v", acc, err)
 	}
 
@@ -196,7 +196,7 @@ func TestVerifyBadge(t *testing.T) {
 		if err != nil {
 			t.Fatalf("VerifyBadge: %v", err)
 		}
-		if !acc.BadgeVerified || acc.Gender != identityv1.Gender_GENDER_FEMALE {
+		if !acc.GetAccount().GetBadgeVerified() || acc.GetAccount().GetGender() != identityv1.Gender_GENDER_FEMALE {
 			t.Fatalf("unexpected account: %+v", acc)
 		}
 	})

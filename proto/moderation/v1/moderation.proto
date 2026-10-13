@@ -4,9 +4,47 @@ package moderation.v1;
 
 option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/moderation/v1;moderationv1";
 
+import "identity/v1/identity.proto";
+
+// See docs/ARCHITECTURE.md §3.5 and §4.4 (DEC-0046). The Admin* and
+// List*/Resolve* RPCs below are only ever called from tools/admin
+// (DEC-0029) - the gateway never reaches them, since nothing about
+// moderation is reachable from outside the cluster.
 service ModerationService {
   rpc FileReport(FileReportRequest) returns (FileReportResponse);
   rpc BlockUser(BlockUserRequest) returns (BlockUserResponse);
+  rpc ListBlocks(ListBlocksRequest) returns (ListBlocksResponse);
+
+  // A verified user asking to change their one-time gender choice
+  // (DEC-0028). Goes to the same admin queue as reports.
+  rpc RequestGenderChange(RequestGenderChangeRequest) returns (RequestGenderChangeResponse);
+
+  rpc ListReports(ListReportsRequest) returns (ListReportsResponse);
+  rpc ResolveReport(ResolveReportRequest) returns (ResolveReportResponse);
+  rpc BanAccount(BanAccountRequest) returns (BanAccountResponse);
+  rpc UnbanAccount(UnbanAccountRequest) returns (UnbanAccountResponse);
+  rpc ListGenderChangeRequests(ListGenderChangeRequestsRequest) returns (ListGenderChangeRequestsResponse);
+  rpc ResolveGenderChangeRequest(ResolveGenderChangeRequestRequest) returns (ResolveGenderChangeRequestResponse);
+}
+
+message Report {
+  string id = 1;
+  string reporter_account_id = 2;
+  string reported_account_id = 3;
+  string room_id = 4;
+  string reason = 5;
+  bool resolved = 6;
+  int64 filed_at_unix = 7;
+}
+
+message GenderChangeRequest {
+  string id = 1;
+  string account_id = 2;
+  identity.v1.Gender requested_gender = 3;
+  string note = 4;
+  bool resolved = 5;
+  bool approved = 6;
+  int64 requested_at_unix = 7;
 }
 
 message FileReportRequest {
@@ -28,3 +66,69 @@ message BlockUserRequest {
 message BlockUserResponse {
   bool blocked = 1;
 }
+
+message ListBlocksRequest {
+  string account_id = 1;
+}
+
+message ListBlocksResponse {
+  repeated string blocked_account_ids = 1;
+}
+
+message RequestGenderChangeRequest {
+  string account_id = 1;
+  identity.v1.Gender requested_gender = 2;
+  string note = 3;
+}
+
+message RequestGenderChangeResponse {
+  string request_id = 1;
+}
+
+message ListReportsRequest {
+  bool only_unresolved = 1;
+}
+
+message ListReportsResponse {
+  repeated Report reports = 1;
+}
+
+message ResolveReportRequest {
+  string report_id = 1;
+  // Who resolved it, recorded in the admin action log (DEC-0029).
+  string resolved_by = 2;
+  string outcome = 3;
+}
+
+message ResolveReportResponse {}
+
+message BanAccountRequest {
+  string account_id = 1;
+  string reason = 2;
+  string banned_by = 3;
+}
+
+message BanAccountResponse {}
+
+message UnbanAccountRequest {
+  string account_id = 1;
+  string unbanned_by = 2;
+}
+
+message UnbanAccountResponse {}
+
+message ListGenderChangeRequestsRequest {
+  bool only_unresolved = 1;
+}
+
+message ListGenderChangeRequestsResponse {
+  repeated GenderChangeRequest requests = 1;
+}
+
+message ResolveGenderChangeRequestRequest {
+  string request_id = 1;
+  bool approve = 2;
+  string resolved_by = 3;
+}
+
+message ResolveGenderChangeRequestResponse {}

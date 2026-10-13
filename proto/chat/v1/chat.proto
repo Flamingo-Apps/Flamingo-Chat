@@ -4,11 +4,37 @@ package chat.v1;
 
 option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1;chatv1";
 
+// See docs/ARCHITECTURE.md §2 and §3 for the rooms and flows this
+// implements. StreamRoomEvents and the old generic CreateRoom are gone:
+// live delivery goes only through Redis (DEC-0015, DEC-0036), and group
+// rooms and direct (matched) rooms are different enough in who can create
+// them and why that they get their own RPCs instead of one RPC with a
+// type flag.
 service ChatService {
-  rpc CreateRoom(CreateRoomRequest) returns (Room);
-  rpc JoinRoomByCode(JoinRoomByCodeRequest) returns (Room);
+  rpc CreateGroupRoom(CreateGroupRoomRequest) returns (CreateGroupRoomResponse);
+
+  // Called by Matching when it pairs two users, never directly by a
+  // client (DEC-0044).
+  rpc CreateDirectRoom(CreateDirectRoomRequest) returns (CreateDirectRoomResponse);
+
+  rpc JoinRoomByCode(JoinRoomByCodeRequest) returns (JoinRoomByCodeResponse);
+  rpc LeaveRoom(LeaveRoomRequest) returns (LeaveRoomResponse);
+  rpc RotateInviteCode(RotateInviteCodeRequest) returns (RotateInviteCodeResponse);
+  rpc ListMyRooms(ListMyRoomsRequest) returns (ListMyRoomsResponse);
+  rpc ListMessages(ListMessagesRequest) returns (ListMessagesResponse);
   rpc SendMessage(SendMessageRequest) returns (SendMessageResponse);
-  rpc StreamRoomEvents(StreamRoomEventsRequest) returns (stream RoomEvent);
+
+  // Either participant in a direct room votes to keep it; once both have,
+  // the room survives the chat ending (DEC-0031, docs/ARCHITECTURE.md §3.3).
+  rpc VoteKeep(VoteKeepRequest) returns (VoteKeepResponse);
+
+  // Ends a direct room that was never kept - "Next" or leaving a random
+  // chat.
+  rpc EndDirectRoom(EndDirectRoomRequest) returns (EndDirectRoomResponse);
+
+  // Removes a member from a group room: the owner removing someone, or
+  // the admin tool acting on a ban (DEC-0029).
+  rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
 }
 
 enum RoomType {
@@ -20,13 +46,42 @@ enum RoomType {
 message Room {
   string id = 1;
   RoomType type = 2;
-  string invite_code = 3;
-  repeated string member_account_ids = 4;
+  string name = 3;              // group rooms only
+  string owner_account_id = 4;  // group rooms only
+  string invite_code = 5;       // group rooms only
+  // Direct rooms only: true once both participants have voted to keep the
+  // conversation (DEC-0031).
+  bool kept = 6;
+  int64 created_at_unix = 7;
+  // 0 while the room is still open.
+  int64 ended_at_unix = 8;
 }
 
-message CreateRoomRequest {
-  RoomType type = 1;
-  repeated string member_account_ids = 2;
+message Message {
+  string message_id = 1;
+  string room_id = 2;
+  string sender_account_id = 3;
+  string sender_pseudonym = 4;
+  string body = 5;
+  int64 sent_at_unix = 6;
+}
+
+message CreateGroupRoomRequest {
+  string owner_account_id = 1;
+  string name = 2;
+}
+
+message CreateGroupRoomResponse {
+  Room room = 1;
+}
+
+message CreateDirectRoomRequest {
+  // Exactly two members.
+  repeated string member_account_ids = 1;
+}
+
+message CreateDirectRoomResponse {
+  Room room = 1;
 }
 
 message JoinRoomByCodeRequest {
@@ -34,10 +89,57 @@ message JoinRoomByCodeRequest {
   string invite_code = 2;
 }
 
+message JoinRoomByCodeResponse {
+  Room room = 1;
+}
+
+message LeaveRoomRequest {
+  string account_id = 1;
+  string room_id = 2;
+}
+
+message LeaveRoomResponse {}
+
+message RotateInviteCodeRequest {
+  string room_id = 1;
+  // Must be the room's owner; anyone else is rejected.
+  string requested_by_account_id = 2;
+}
+
+message RotateInviteCodeResponse {
+  string invite_code = 1;
+}
+
+message ListMyRoomsRequest {
+  string account_id = 1;
+}
+
+message ListMyRoomsResponse {
+  repeated Room rooms = 1;
+}
+
+message ListMessagesRequest {
+  string room_id = 1;
+  // Must be a current or former member; checked before returning anything.
+  string account_id = 2;
+  // Pagination cursor: messages strictly before this id. Empty means the
+  // newest page (docs/ARCHITECTURE.md §5.1).
+  string before_message_id = 3;
+  int32 limit = 4;
+}
+
+message ListMessagesResponse {
+  repeated Message messages = 1;
+}
+
 message SendMessageRequest {
   string room_id = 1;
   string sender_account_id = 2;
-  string body = 3;
+  string sender_pseudonym = 3;
+  string body = 4;
+  // Set by the client so a retried send after a dropped response is never
+  // recorded twice (docs/ARCHITECTURE.md §5.2 and §7, DEC-0047).
+  string client_msg_id = 5;
 }
 
 message SendMessageResponse {
@@ -45,14 +147,30 @@ message SendMessageResponse {
   int64 sent_at_unix = 2;
 }
 
-message StreamRoomEventsRequest {
+message VoteKeepRequest {
   string room_id = 1;
+  string account_id = 2;
 }
 
-message RoomEvent {
-  string message_id = 1;
-  string room_id = 2;
-  string sender_account_id = 3;
-  string body = 4;
-  int64 sent_at_unix = 5;
+message VoteKeepResponse {
+  // True once both participants have voted keep (DEC-0031).
+  bool kept = 1;
 }
+
+message EndDirectRoomRequest {
+  string room_id = 1;
+  string account_id = 2;
+  string reason = 3;
+}
+
+message EndDirectRoomResponse {}
+
+message RemoveMemberRequest {
+  string room_id = 1;
+  // The member being removed.
+  string account_id = 2;
+  // The room's owner, or the admin tool acting on a ban.
+  string requested_by_account_id = 3;
+}
+
+message RemoveMemberResponse {}

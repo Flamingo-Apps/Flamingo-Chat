@@ -26,9 +26,12 @@ const (
 // PresenceServiceClient is the client API for PresenceService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// See docs/ARCHITECTURE.md §3.4 (DEC-0045) for the batching and aging
+// behaviour this supports.
 type PresenceServiceClient interface {
 	Heartbeat(ctx context.Context, in *HeartbeatRequest, opts ...grpc.CallOption) (*HeartbeatResponse, error)
-	GetLiveCounts(ctx context.Context, in *GetLiveCountsRequest, opts ...grpc.CallOption) (*LiveCounts, error)
+	GetLiveCounts(ctx context.Context, in *GetLiveCountsRequest, opts ...grpc.CallOption) (*GetLiveCountsResponse, error)
 }
 
 type presenceServiceClient struct {
@@ -49,9 +52,9 @@ func (c *presenceServiceClient) Heartbeat(ctx context.Context, in *HeartbeatRequ
 	return out, nil
 }
 
-func (c *presenceServiceClient) GetLiveCounts(ctx context.Context, in *GetLiveCountsRequest, opts ...grpc.CallOption) (*LiveCounts, error) {
+func (c *presenceServiceClient) GetLiveCounts(ctx context.Context, in *GetLiveCountsRequest, opts ...grpc.CallOption) (*GetLiveCountsResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(LiveCounts)
+	out := new(GetLiveCountsResponse)
 	err := c.cc.Invoke(ctx, PresenceService_GetLiveCounts_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -62,9 +65,12 @@ func (c *presenceServiceClient) GetLiveCounts(ctx context.Context, in *GetLiveCo
 // PresenceServiceServer is the server API for PresenceService service.
 // All implementations must embed UnimplementedPresenceServiceServer
 // for forward compatibility.
+//
+// See docs/ARCHITECTURE.md §3.4 (DEC-0045) for the batching and aging
+// behaviour this supports.
 type PresenceServiceServer interface {
 	Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error)
-	GetLiveCounts(context.Context, *GetLiveCountsRequest) (*LiveCounts, error)
+	GetLiveCounts(context.Context, *GetLiveCountsRequest) (*GetLiveCountsResponse, error)
 	mustEmbedUnimplementedPresenceServiceServer()
 }
 
@@ -78,7 +84,7 @@ type UnimplementedPresenceServiceServer struct{}
 func (UnimplementedPresenceServiceServer) Heartbeat(context.Context, *HeartbeatRequest) (*HeartbeatResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method Heartbeat not implemented")
 }
-func (UnimplementedPresenceServiceServer) GetLiveCounts(context.Context, *GetLiveCountsRequest) (*LiveCounts, error) {
+func (UnimplementedPresenceServiceServer) GetLiveCounts(context.Context, *GetLiveCountsRequest) (*GetLiveCountsResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetLiveCounts not implemented")
 }
 func (UnimplementedPresenceServiceServer) mustEmbedUnimplementedPresenceServiceServer() {}

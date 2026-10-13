@@ -7,6 +7,7 @@
 package matchingv1
 
 import (
+	v1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -21,58 +22,68 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type MatchStatus int32
+type Preference int32
 
 const (
-	MatchStatus_MATCH_STATUS_UNSPECIFIED MatchStatus = 0
-	MatchStatus_MATCH_STATUS_QUEUED      MatchStatus = 1
-	MatchStatus_MATCH_STATUS_MATCHED     MatchStatus = 2
+	Preference_PREFERENCE_UNSPECIFIED Preference = 0
+	Preference_PREFERENCE_ANY         Preference = 1
+	Preference_PREFERENCE_MALE        Preference = 2
+	Preference_PREFERENCE_FEMALE      Preference = 3
 )
 
-// Enum value maps for MatchStatus.
+// Enum value maps for Preference.
 var (
-	MatchStatus_name = map[int32]string{
-		0: "MATCH_STATUS_UNSPECIFIED",
-		1: "MATCH_STATUS_QUEUED",
-		2: "MATCH_STATUS_MATCHED",
+	Preference_name = map[int32]string{
+		0: "PREFERENCE_UNSPECIFIED",
+		1: "PREFERENCE_ANY",
+		2: "PREFERENCE_MALE",
+		3: "PREFERENCE_FEMALE",
 	}
-	MatchStatus_value = map[string]int32{
-		"MATCH_STATUS_UNSPECIFIED": 0,
-		"MATCH_STATUS_QUEUED":      1,
-		"MATCH_STATUS_MATCHED":     2,
+	Preference_value = map[string]int32{
+		"PREFERENCE_UNSPECIFIED": 0,
+		"PREFERENCE_ANY":         1,
+		"PREFERENCE_MALE":        2,
+		"PREFERENCE_FEMALE":      3,
 	}
 )
 
-func (x MatchStatus) Enum() *MatchStatus {
-	p := new(MatchStatus)
+func (x Preference) Enum() *Preference {
+	p := new(Preference)
 	*p = x
 	return p
 }
 
-func (x MatchStatus) String() string {
+func (x Preference) String() string {
 	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
 }
 
-func (MatchStatus) Descriptor() protoreflect.EnumDescriptor {
+func (Preference) Descriptor() protoreflect.EnumDescriptor {
 	return file_matching_v1_matching_proto_enumTypes[0].Descriptor()
 }
 
-func (MatchStatus) Type() protoreflect.EnumType {
+func (Preference) Type() protoreflect.EnumType {
 	return &file_matching_v1_matching_proto_enumTypes[0]
 }
 
-func (x MatchStatus) Number() protoreflect.EnumNumber {
+func (x Preference) Number() protoreflect.EnumNumber {
 	return protoreflect.EnumNumber(x)
 }
 
-// Deprecated: Use MatchStatus.Descriptor instead.
-func (MatchStatus) EnumDescriptor() ([]byte, []int) {
+// Deprecated: Use Preference.Descriptor instead.
+func (Preference) EnumDescriptor() ([]byte, []int) {
 	return file_matching_v1_matching_proto_rawDescGZIP(), []int{0}
 }
 
 type RequestMatchRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	state      protoimpl.MessageState `protogen:"open.v1"`
+	AccountId  string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Preference Preference             `protobuf:"varint,2,opt,name=preference,proto3,enum=matching.v1.Preference" json:"preference,omitempty"`
+	// The account's own tier and gender, passed by the gateway (DEC-0014) -
+	// Matching trusts these rather than looking them up itself, the same
+	// trust boundary every other internal call relies on.
+	Verified      bool      `protobuf:"varint,3,opt,name=verified,proto3" json:"verified,omitempty"`
+	Gender        v1.Gender `protobuf:"varint,4,opt,name=gender,proto3,enum=identity.v1.Gender" json:"gender,omitempty"`
+	Pseudonym     string    `protobuf:"bytes,5,opt,name=pseudonym,proto3" json:"pseudonym,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -114,29 +125,58 @@ func (x *RequestMatchRequest) GetAccountId() string {
 	return ""
 }
 
-type MatchEvent struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Status           MatchStatus            `protobuf:"varint,1,opt,name=status,proto3,enum=matching.v1.MatchStatus" json:"status,omitempty"`
-	RoomId           string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	MatchedAccountId string                 `protobuf:"bytes,3,opt,name=matched_account_id,json=matchedAccountId,proto3" json:"matched_account_id,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+func (x *RequestMatchRequest) GetPreference() Preference {
+	if x != nil {
+		return x.Preference
+	}
+	return Preference_PREFERENCE_UNSPECIFIED
 }
 
-func (x *MatchEvent) Reset() {
-	*x = MatchEvent{}
+func (x *RequestMatchRequest) GetVerified() bool {
+	if x != nil {
+		return x.Verified
+	}
+	return false
+}
+
+func (x *RequestMatchRequest) GetGender() v1.Gender {
+	if x != nil {
+		return x.Gender
+	}
+	return v1.Gender(0)
+}
+
+func (x *RequestMatchRequest) GetPseudonym() string {
+	if x != nil {
+		return x.Pseudonym
+	}
+	return ""
+}
+
+type RequestMatchResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Always true when this call returns successfully. A match, once
+	// found, is delivered asynchronously over the gateway's WebSocket -
+	// see docs/ARCHITECTURE.md §3.2 and DEC-0038.
+	Queued        bool `protobuf:"varint,1,opt,name=queued,proto3" json:"queued,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestMatchResponse) Reset() {
+	*x = RequestMatchResponse{}
 	mi := &file_matching_v1_matching_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *MatchEvent) String() string {
+func (x *RequestMatchResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*MatchEvent) ProtoMessage() {}
+func (*RequestMatchResponse) ProtoMessage() {}
 
-func (x *MatchEvent) ProtoReflect() protoreflect.Message {
+func (x *RequestMatchResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_matching_v1_matching_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -148,30 +188,112 @@ func (x *MatchEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use MatchEvent.ProtoReflect.Descriptor instead.
-func (*MatchEvent) Descriptor() ([]byte, []int) {
+// Deprecated: Use RequestMatchResponse.ProtoReflect.Descriptor instead.
+func (*RequestMatchResponse) Descriptor() ([]byte, []int) {
 	return file_matching_v1_matching_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *MatchEvent) GetStatus() MatchStatus {
+func (x *RequestMatchResponse) GetQueued() bool {
 	if x != nil {
-		return x.Status
+		return x.Queued
 	}
-	return MatchStatus_MATCH_STATUS_UNSPECIFIED
+	return false
 }
 
-func (x *MatchEvent) GetRoomId() string {
+type NextRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	CurrentRoomId string                 `protobuf:"bytes,2,opt,name=current_room_id,json=currentRoomId,proto3" json:"current_room_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NextRequest) Reset() {
+	*x = NextRequest{}
+	mi := &file_matching_v1_matching_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NextRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NextRequest) ProtoMessage() {}
+
+func (x *NextRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_matching_v1_matching_proto_msgTypes[2]
 	if x != nil {
-		return x.RoomId
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NextRequest.ProtoReflect.Descriptor instead.
+func (*NextRequest) Descriptor() ([]byte, []int) {
+	return file_matching_v1_matching_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *NextRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
 	}
 	return ""
 }
 
-func (x *MatchEvent) GetMatchedAccountId() string {
+func (x *NextRequest) GetCurrentRoomId() string {
 	if x != nil {
-		return x.MatchedAccountId
+		return x.CurrentRoomId
 	}
 	return ""
+}
+
+type NextResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Queued        bool                   `protobuf:"varint,1,opt,name=queued,proto3" json:"queued,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *NextResponse) Reset() {
+	*x = NextResponse{}
+	mi := &file_matching_v1_matching_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *NextResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*NextResponse) ProtoMessage() {}
+
+func (x *NextResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_matching_v1_matching_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use NextResponse.ProtoReflect.Descriptor instead.
+func (*NextResponse) Descriptor() ([]byte, []int) {
+	return file_matching_v1_matching_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *NextResponse) GetQueued() bool {
+	if x != nil {
+		return x.Queued
+	}
+	return false
 }
 
 type CancelMatchRequest struct {
@@ -183,7 +305,7 @@ type CancelMatchRequest struct {
 
 func (x *CancelMatchRequest) Reset() {
 	*x = CancelMatchRequest{}
-	mi := &file_matching_v1_matching_proto_msgTypes[2]
+	mi := &file_matching_v1_matching_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -195,7 +317,7 @@ func (x *CancelMatchRequest) String() string {
 func (*CancelMatchRequest) ProtoMessage() {}
 
 func (x *CancelMatchRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_matching_v1_matching_proto_msgTypes[2]
+	mi := &file_matching_v1_matching_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -208,7 +330,7 @@ func (x *CancelMatchRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelMatchRequest.ProtoReflect.Descriptor instead.
 func (*CancelMatchRequest) Descriptor() ([]byte, []int) {
-	return file_matching_v1_matching_proto_rawDescGZIP(), []int{2}
+	return file_matching_v1_matching_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *CancelMatchRequest) GetAccountId() string {
@@ -227,7 +349,7 @@ type CancelMatchResponse struct {
 
 func (x *CancelMatchResponse) Reset() {
 	*x = CancelMatchResponse{}
-	mi := &file_matching_v1_matching_proto_msgTypes[3]
+	mi := &file_matching_v1_matching_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -239,7 +361,7 @@ func (x *CancelMatchResponse) String() string {
 func (*CancelMatchResponse) ProtoMessage() {}
 
 func (x *CancelMatchResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_matching_v1_matching_proto_msgTypes[3]
+	mi := &file_matching_v1_matching_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -252,7 +374,7 @@ func (x *CancelMatchResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use CancelMatchResponse.ProtoReflect.Descriptor instead.
 func (*CancelMatchResponse) Descriptor() ([]byte, []int) {
-	return file_matching_v1_matching_proto_rawDescGZIP(), []int{3}
+	return file_matching_v1_matching_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *CancelMatchResponse) GetCancelled() bool {
@@ -266,26 +388,38 @@ var File_matching_v1_matching_proto protoreflect.FileDescriptor
 
 const file_matching_v1_matching_proto_rawDesc = "" +
 	"\n" +
-	"\x1amatching/v1/matching.proto\x12\vmatching.v1\"4\n" +
+	"\x1amatching/v1/matching.proto\x12\vmatching.v1\x1a\x1aidentity/v1/identity.proto\"\xd4\x01\n" +
 	"\x13RequestMatchRequest\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\tR\taccountId\"\x85\x01\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x127\n" +
 	"\n" +
-	"MatchEvent\x120\n" +
-	"\x06status\x18\x01 \x01(\x0e2\x18.matching.v1.MatchStatusR\x06status\x12\x17\n" +
-	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12,\n" +
-	"\x12matched_account_id\x18\x03 \x01(\tR\x10matchedAccountId\"3\n" +
+	"preference\x18\x02 \x01(\x0e2\x17.matching.v1.PreferenceR\n" +
+	"preference\x12\x1a\n" +
+	"\bverified\x18\x03 \x01(\bR\bverified\x12+\n" +
+	"\x06gender\x18\x04 \x01(\x0e2\x13.identity.v1.GenderR\x06gender\x12\x1c\n" +
+	"\tpseudonym\x18\x05 \x01(\tR\tpseudonym\".\n" +
+	"\x14RequestMatchResponse\x12\x16\n" +
+	"\x06queued\x18\x01 \x01(\bR\x06queued\"T\n" +
+	"\vNextRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12&\n" +
+	"\x0fcurrent_room_id\x18\x02 \x01(\tR\rcurrentRoomId\"&\n" +
+	"\fNextResponse\x12\x16\n" +
+	"\x06queued\x18\x01 \x01(\bR\x06queued\"3\n" +
 	"\x12CancelMatchRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\"3\n" +
 	"\x13CancelMatchResponse\x12\x1c\n" +
-	"\tcancelled\x18\x01 \x01(\bR\tcancelled*^\n" +
-	"\vMatchStatus\x12\x1c\n" +
-	"\x18MATCH_STATUS_UNSPECIFIED\x10\x00\x12\x17\n" +
-	"\x13MATCH_STATUS_QUEUED\x10\x01\x12\x18\n" +
-	"\x14MATCH_STATUS_MATCHED\x10\x022\xb0\x01\n" +
-	"\x0fMatchingService\x12K\n" +
-	"\fRequestMatch\x12 .matching.v1.RequestMatchRequest\x1a\x17.matching.v1.MatchEvent0\x01\x12P\n" +
+	"\tcancelled\x18\x01 \x01(\bR\tcancelled*h\n" +
+	"\n" +
+	"Preference\x12\x1a\n" +
+	"\x16PREFERENCE_UNSPECIFIED\x10\x00\x12\x12\n" +
+	"\x0ePREFERENCE_ANY\x10\x01\x12\x13\n" +
+	"\x0fPREFERENCE_MALE\x10\x02\x12\x15\n" +
+	"\x11PREFERENCE_FEMALE\x10\x032\xf5\x01\n" +
+	"\x0fMatchingService\x12S\n" +
+	"\fRequestMatch\x12 .matching.v1.RequestMatchRequest\x1a!.matching.v1.RequestMatchResponse\x12;\n" +
+	"\x04Next\x12\x18.matching.v1.NextRequest\x1a\x19.matching.v1.NextResponse\x12P\n" +
 	"\vCancelMatch\x12\x1f.matching.v1.CancelMatchRequest\x1a .matching.v1.CancelMatchResponseBLZJgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1;matchingv1b\x06proto3"
 
 var (
@@ -301,25 +435,31 @@ func file_matching_v1_matching_proto_rawDescGZIP() []byte {
 }
 
 var file_matching_v1_matching_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_matching_v1_matching_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_matching_v1_matching_proto_msgTypes = make([]protoimpl.MessageInfo, 6)
 var file_matching_v1_matching_proto_goTypes = []any{
-	(MatchStatus)(0),            // 0: matching.v1.MatchStatus
-	(*RequestMatchRequest)(nil), // 1: matching.v1.RequestMatchRequest
-	(*MatchEvent)(nil),          // 2: matching.v1.MatchEvent
-	(*CancelMatchRequest)(nil),  // 3: matching.v1.CancelMatchRequest
-	(*CancelMatchResponse)(nil), // 4: matching.v1.CancelMatchResponse
+	(Preference)(0),              // 0: matching.v1.Preference
+	(*RequestMatchRequest)(nil),  // 1: matching.v1.RequestMatchRequest
+	(*RequestMatchResponse)(nil), // 2: matching.v1.RequestMatchResponse
+	(*NextRequest)(nil),          // 3: matching.v1.NextRequest
+	(*NextResponse)(nil),         // 4: matching.v1.NextResponse
+	(*CancelMatchRequest)(nil),   // 5: matching.v1.CancelMatchRequest
+	(*CancelMatchResponse)(nil),  // 6: matching.v1.CancelMatchResponse
+	(v1.Gender)(0),               // 7: identity.v1.Gender
 }
 var file_matching_v1_matching_proto_depIdxs = []int32{
-	0, // 0: matching.v1.MatchEvent.status:type_name -> matching.v1.MatchStatus
-	1, // 1: matching.v1.MatchingService.RequestMatch:input_type -> matching.v1.RequestMatchRequest
-	3, // 2: matching.v1.MatchingService.CancelMatch:input_type -> matching.v1.CancelMatchRequest
-	2, // 3: matching.v1.MatchingService.RequestMatch:output_type -> matching.v1.MatchEvent
-	4, // 4: matching.v1.MatchingService.CancelMatch:output_type -> matching.v1.CancelMatchResponse
-	3, // [3:5] is the sub-list for method output_type
-	1, // [1:3] is the sub-list for method input_type
-	1, // [1:1] is the sub-list for extension type_name
-	1, // [1:1] is the sub-list for extension extendee
-	0, // [0:1] is the sub-list for field type_name
+	0, // 0: matching.v1.RequestMatchRequest.preference:type_name -> matching.v1.Preference
+	7, // 1: matching.v1.RequestMatchRequest.gender:type_name -> identity.v1.Gender
+	1, // 2: matching.v1.MatchingService.RequestMatch:input_type -> matching.v1.RequestMatchRequest
+	3, // 3: matching.v1.MatchingService.Next:input_type -> matching.v1.NextRequest
+	5, // 4: matching.v1.MatchingService.CancelMatch:input_type -> matching.v1.CancelMatchRequest
+	2, // 5: matching.v1.MatchingService.RequestMatch:output_type -> matching.v1.RequestMatchResponse
+	4, // 6: matching.v1.MatchingService.Next:output_type -> matching.v1.NextResponse
+	6, // 7: matching.v1.MatchingService.CancelMatch:output_type -> matching.v1.CancelMatchResponse
+	5, // [5:8] is the sub-list for method output_type
+	2, // [2:5] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_matching_v1_matching_proto_init() }
@@ -333,7 +473,7 @@ func file_matching_v1_matching_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_matching_v1_matching_proto_rawDesc), len(file_matching_v1_matching_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   4,
+			NumMessages:   6,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

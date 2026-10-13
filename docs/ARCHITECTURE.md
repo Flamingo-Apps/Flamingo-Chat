@@ -253,23 +253,23 @@ Server to client:
 
 Clients reconnect with exponential backoff and jitter, send `ping` every 25 seconds, and after reconnecting load messages newer than the last `message_id` they saw in each open room.
 
-### 5.3 gRPC changes (Proposed)
+### 5.3 gRPC changes (Proposed; built, pending review - DEC-0054)
 
-These are made in one pull request before Gateway work starts, with `buf generate` run and the change called out.
+Every RPC now has its own `<Method>Request`/`<Method>Response` message, which is what `buf lint`'s STANDARD rules require (the earlier contracts shared message types across RPCs and did not pass it); `buf lint` is clean as of this redesign.
 
-- **identity:** add `SignInWithGoogle`, `SetGender`, `AdminSetGender` and `TouchAccount`. Remove `VerifyBadge`, which has no callers yet. Add `GENDER_PREFER_NOT_TO_SAY = 3`; `GENDER_UNSPECIFIED` means "not chosen yet". `Account` gains `google_linked` and `gender_chosen`.
+- **identity:** added `SignInWithGoogle`, `SetGender`, `AdminSetGender` and `TouchAccount`. `VerifyBadge` is marked deprecated but kept, with its existing implementation and tests, until the pull request that implements `SignInWithGoogle` removes both together - removing it here would have broken Identity's already-working code in a pull request meant to touch only contracts. Added `GENDER_PREFER_NOT_TO_SAY = 3`; `GENDER_UNSPECIFIED` means "not chosen yet". `Account` gains `google_linked` and `gender_chosen`.
 - **chat:**
-  - Remove `StreamRoomEvents` and the generic `CreateRoom`.
-  - Add `CreateGroupRoom`, `CreateDirectRoom`, `JoinRoomByCode`, `LeaveRoom`, `RotateInviteCode`, `ListMyRooms`, `ListMessages`, `VoteKeep`, `EndDirectRoom` and `RemoveMember`.
+  - Removed `StreamRoomEvents` and the generic `CreateRoom` (no implementation existed yet, so nothing broke).
+  - Added `CreateGroupRoom`, `CreateDirectRoom`, `JoinRoomByCode`, `LeaveRoom`, `RotateInviteCode`, `ListMyRooms`, `ListMessages`, `VoteKeep`, `EndDirectRoom` and `RemoveMember`.
   - `SendMessage` gains `client_msg_id` and `sender_pseudonym`.
-- **matching:** `RequestMatch` becomes unary, taking `preference`, `tier`, `gender` and `pseudonym` and returning `QUEUED` or `MATCHED`. Add `Next`; keep `CancelMatch`.
-- **presence:** replace `int32 gender` with a category enum, and make `Heartbeat` take a batch of entries.
-- **moderation:** add `ListBlocks`, `RequestGenderChange`, and the admin RPCs `ListReports`, `ResolveReport`, `BanAccount`, `UnbanAccount`, `ListGenderChangeRequests` and `ResolveGenderChangeRequest`.
-- **events (new package `proto/events/v1`):** protobuf payloads for Kafka (section 5.4).
+- **matching:** `RequestMatch` is now unary, taking `preference`, `verified`, `gender` and `pseudonym`. It always returns `queued = true`; a match, once found, is delivered later over the gateway's WebSocket, the same path for every caller regardless of timing (DEC-0038) - so there is no `MATCHED` response to wait for here. Added `Next`; kept `CancelMatch`.
+- **presence:** replaced `int32 gender` with a `Category` enum (`GUEST`, `MALE`, `FEMALE`, `VERIFIED_OTHER`), and `Heartbeat` now takes a batch of entries.
+- **moderation:** added `ListBlocks`, `RequestGenderChange`, and the admin RPCs `ListReports`, `ResolveReport`, `BanAccount`, `UnbanAccount`, `ListGenderChangeRequests` and `ResolveGenderChangeRequest`.
+- **events (new package `proto/events/v1`):** protobuf payloads for Kafka (section 5.4). This file declares no RPCs, so buf's RPC naming rules do not apply to it.
 
-The `buf breaking` check is turned on in CI only after this redesign lands, because the redesign is intentionally breaking and nothing is deployed yet.
+`buf breaking` could not be turned on in the same pull request as this redesign - it would fail against its own base, since the redesign is intentionally breaking. It is enabled in the pull request immediately after this one lands on `main`.
 
-### 5.4 Kafka topics (Agreed topics; payloads Proposed)
+### 5.4 Kafka topics (Agreed topics; payloads built, pending review - DEC-0043, DEC-0054)
 
 Payloads are protobuf messages from `proto/events/v1`, so their schemas are versioned in the repository with everything else. There is no schema registry.
 

@@ -4,17 +4,42 @@ package identity.v1;
 
 option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1;identityv1";
 
+// See docs/ARCHITECTURE.md §4 for the account model this implements.
 service IdentityService {
-  rpc CreateAccount(CreateAccountRequest) returns (Account);
-  rpc VerifyBadge(VerifyBadgeRequest) returns (Account);
-  rpc GetAccount(GetAccountRequest) returns (Account);
-  rpc UpdatePseudonym(UpdatePseudonymRequest) returns (Account);
+  rpc CreateAccount(CreateAccountRequest) returns (CreateAccountResponse);
+  rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
+  rpc UpdatePseudonym(UpdatePseudonymRequest) returns (UpdatePseudonymResponse);
+
+  // Deprecated: superseded by SignInWithGoogle (DEC-0027, DEC-0041). Kept,
+  // with its existing implementation and tests, until the pull request
+  // that implements SignInWithGoogle removes both together rather than
+  // breaking the build in a pull request that only touches contracts.
+  rpc VerifyBadge(VerifyBadgeRequest) returns (VerifyBadgeResponse);
+
+  // Covers all three sign-in cases in one call: an existing verified
+  // account, upgrading a guest account in place, or creating a new
+  // verified account. See docs/ARCHITECTURE.md §4.2 (DEC-0041).
+  rpc SignInWithGoogle(SignInWithGoogleRequest) returns (SignInWithGoogleResponse);
+
+  // Gender is chosen once; a second call fails (DEC-0028).
+  rpc SetGender(SetGenderRequest) returns (SetGenderResponse);
+
+  // Only for the admin tool, after a reviewed change request (DEC-0028,
+  // DEC-0029) - never reachable from the gateway.
+  rpc AdminSetGender(AdminSetGenderRequest) returns (AdminSetGenderResponse);
+
+  // Keeps last_seen_at current for guest-account cleanup (DEC-0026).
+  // Identity itself throttles the actual write to at most once an hour
+  // per account (docs/ARCHITECTURE.md §4.3); callers do not need to.
+  rpc TouchAccount(TouchAccountRequest) returns (TouchAccountResponse);
 }
 
 enum Gender {
+  // Not yet chosen - the default for every new account, verified or not.
   GENDER_UNSPECIFIED = 0;
   GENDER_MALE = 1;
   GENDER_FEMALE = 2;
+  GENDER_PREFER_NOT_TO_SAY = 3;
 }
 
 message Account {
@@ -23,10 +48,39 @@ message Account {
   bool badge_verified = 3;
   Gender gender = 4;
   int64 created_at_unix = 5;
+  // True once SignInWithGoogle has linked this account to a Google
+  // identity (DEC-0041). Not built yet; false until that lands.
+  bool google_linked = 6;
+  // True once a gender has been chosen (DEC-0028), including choosing
+  // "prefer not to say" - kept separate from checking gender !=
+  // GENDER_UNSPECIFIED so a client can tell "never asked" apart from
+  // "asked, declined" if that distinction is ever needed.
+  bool gender_chosen = 7;
 }
 
 message CreateAccountRequest {
   string pseudonym = 1;
+}
+
+message CreateAccountResponse {
+  Account account = 1;
+}
+
+message GetAccountRequest {
+  string account_id = 1;
+}
+
+message GetAccountResponse {
+  Account account = 1;
+}
+
+message UpdatePseudonymRequest {
+  string account_id = 1;
+  string new_pseudonym = 2;
+}
+
+message UpdatePseudonymResponse {
+  Account account = 1;
 }
 
 message VerifyBadgeRequest {
@@ -38,11 +92,50 @@ message VerifyBadgeRequest {
   Gender gender = 3;
 }
 
-message GetAccountRequest {
+message VerifyBadgeResponse {
+  Account account = 1;
+}
+
+message SignInWithGoogleRequest {
+  // Google ID token from the client's "Sign in with Google" flow.
+  // Identity checks the hd and email_verified claims itself (DEC-0027).
+  string id_token = 1;
+  // The caller's current guest account, if any. When set, and no account
+  // is already linked to this Google identity, that guest account is
+  // upgraded in place instead of a new one being created.
+  optional string guest_account_id = 2;
+}
+
+message SignInWithGoogleResponse {
+  Account account = 1;
+  // True if the account still needs SetGender called before it can use
+  // gender-filtered matching.
+  bool needs_gender = 2;
+}
+
+message SetGenderRequest {
+  string account_id = 1;
+  Gender gender = 2;
+}
+
+message SetGenderResponse {
+  Account account = 1;
+}
+
+message AdminSetGenderRequest {
+  string account_id = 1;
+  Gender gender = 2;
+  // Who approved the change and why, recorded in the moderation action
+  // log (DEC-0029).
+  string reason = 3;
+}
+
+message AdminSetGenderResponse {
+  Account account = 1;
+}
+
+message TouchAccountRequest {
   string account_id = 1;
 }
 
-message UpdatePseudonymRequest {
-  string account_id = 1;
-  string new_pseudonym = 2;
-}
+message TouchAccountResponse {}

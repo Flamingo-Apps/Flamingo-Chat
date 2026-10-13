@@ -24,9 +24,11 @@ const (
 type Gender int32
 
 const (
-	Gender_GENDER_UNSPECIFIED Gender = 0
-	Gender_GENDER_MALE        Gender = 1
-	Gender_GENDER_FEMALE      Gender = 2
+	// Not yet chosen - the default for every new account, verified or not.
+	Gender_GENDER_UNSPECIFIED       Gender = 0
+	Gender_GENDER_MALE              Gender = 1
+	Gender_GENDER_FEMALE            Gender = 2
+	Gender_GENDER_PREFER_NOT_TO_SAY Gender = 3
 )
 
 // Enum value maps for Gender.
@@ -35,11 +37,13 @@ var (
 		0: "GENDER_UNSPECIFIED",
 		1: "GENDER_MALE",
 		2: "GENDER_FEMALE",
+		3: "GENDER_PREFER_NOT_TO_SAY",
 	}
 	Gender_value = map[string]int32{
-		"GENDER_UNSPECIFIED": 0,
-		"GENDER_MALE":        1,
-		"GENDER_FEMALE":      2,
+		"GENDER_UNSPECIFIED":       0,
+		"GENDER_MALE":              1,
+		"GENDER_FEMALE":            2,
+		"GENDER_PREFER_NOT_TO_SAY": 3,
 	}
 )
 
@@ -77,6 +81,14 @@ type Account struct {
 	BadgeVerified bool                   `protobuf:"varint,3,opt,name=badge_verified,json=badgeVerified,proto3" json:"badge_verified,omitempty"`
 	Gender        Gender                 `protobuf:"varint,4,opt,name=gender,proto3,enum=identity.v1.Gender" json:"gender,omitempty"`
 	CreatedAtUnix int64                  `protobuf:"varint,5,opt,name=created_at_unix,json=createdAtUnix,proto3" json:"created_at_unix,omitempty"`
+	// True once SignInWithGoogle has linked this account to a Google
+	// identity (DEC-0041). Not built yet; false until that lands.
+	GoogleLinked bool `protobuf:"varint,6,opt,name=google_linked,json=googleLinked,proto3" json:"google_linked,omitempty"`
+	// True once a gender has been chosen (DEC-0028), including choosing
+	// "prefer not to say" - kept separate from checking gender !=
+	// GENDER_UNSPECIFIED so a client can tell "never asked" apart from
+	// "asked, declined" if that distinction is ever needed.
+	GenderChosen  bool `protobuf:"varint,7,opt,name=gender_chosen,json=genderChosen,proto3" json:"gender_chosen,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -146,6 +158,20 @@ func (x *Account) GetCreatedAtUnix() int64 {
 	return 0
 }
 
+func (x *Account) GetGoogleLinked() bool {
+	if x != nil {
+		return x.GoogleLinked
+	}
+	return false
+}
+
+func (x *Account) GetGenderChosen() bool {
+	if x != nil {
+		return x.GenderChosen
+	}
+	return false
+}
+
 type CreateAccountRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Pseudonym     string                 `protobuf:"bytes,1,opt,name=pseudonym,proto3" json:"pseudonym,omitempty"`
@@ -190,32 +216,27 @@ func (x *CreateAccountRequest) GetPseudonym() string {
 	return ""
 }
 
-type VerifyBadgeRequest struct {
-	state     protoimpl.MessageState `protogen:"open.v1"`
-	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	// OAuth ID token (JWT) from the client's college-email login, e.g. Google
-	// Sign-In. Identity verifies this itself rather than trusting a bare
-	// email string, since a bare string can't prove ownership.
-	IdToken       string `protobuf:"bytes,2,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`
-	Gender        Gender `protobuf:"varint,3,opt,name=gender,proto3,enum=identity.v1.Gender" json:"gender,omitempty"`
+type CreateAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *VerifyBadgeRequest) Reset() {
-	*x = VerifyBadgeRequest{}
+func (x *CreateAccountResponse) Reset() {
+	*x = CreateAccountResponse{}
 	mi := &file_identity_v1_identity_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *VerifyBadgeRequest) String() string {
+func (x *CreateAccountResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*VerifyBadgeRequest) ProtoMessage() {}
+func (*CreateAccountResponse) ProtoMessage() {}
 
-func (x *VerifyBadgeRequest) ProtoReflect() protoreflect.Message {
+func (x *CreateAccountResponse) ProtoReflect() protoreflect.Message {
 	mi := &file_identity_v1_identity_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -227,30 +248,16 @@ func (x *VerifyBadgeRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use VerifyBadgeRequest.ProtoReflect.Descriptor instead.
-func (*VerifyBadgeRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use CreateAccountResponse.ProtoReflect.Descriptor instead.
+func (*CreateAccountResponse) Descriptor() ([]byte, []int) {
 	return file_identity_v1_identity_proto_rawDescGZIP(), []int{2}
 }
 
-func (x *VerifyBadgeRequest) GetAccountId() string {
+func (x *CreateAccountResponse) GetAccount() *Account {
 	if x != nil {
-		return x.AccountId
+		return x.Account
 	}
-	return ""
-}
-
-func (x *VerifyBadgeRequest) GetIdToken() string {
-	if x != nil {
-		return x.IdToken
-	}
-	return ""
-}
-
-func (x *VerifyBadgeRequest) GetGender() Gender {
-	if x != nil {
-		return x.Gender
-	}
-	return Gender_GENDER_UNSPECIFIED
+	return nil
 }
 
 type GetAccountRequest struct {
@@ -297,6 +304,50 @@ func (x *GetAccountRequest) GetAccountId() string {
 	return ""
 }
 
+type GetAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *GetAccountResponse) Reset() {
+	*x = GetAccountResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GetAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GetAccountResponse) ProtoMessage() {}
+
+func (x *GetAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GetAccountResponse.ProtoReflect.Descriptor instead.
+func (*GetAccountResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *GetAccountResponse) GetAccount() *Account {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
 type UpdatePseudonymRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
@@ -307,7 +358,7 @@ type UpdatePseudonymRequest struct {
 
 func (x *UpdatePseudonymRequest) Reset() {
 	*x = UpdatePseudonymRequest{}
-	mi := &file_identity_v1_identity_proto_msgTypes[4]
+	mi := &file_identity_v1_identity_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -319,7 +370,7 @@ func (x *UpdatePseudonymRequest) String() string {
 func (*UpdatePseudonymRequest) ProtoMessage() {}
 
 func (x *UpdatePseudonymRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_identity_v1_identity_proto_msgTypes[4]
+	mi := &file_identity_v1_identity_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -332,7 +383,7 @@ func (x *UpdatePseudonymRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use UpdatePseudonymRequest.ProtoReflect.Descriptor instead.
 func (*UpdatePseudonymRequest) Descriptor() ([]byte, []int) {
-	return file_identity_v1_identity_proto_rawDescGZIP(), []int{4}
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *UpdatePseudonymRequest) GetAccountId() string {
@@ -349,41 +400,624 @@ func (x *UpdatePseudonymRequest) GetNewPseudonym() string {
 	return ""
 }
 
+type UpdatePseudonymResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UpdatePseudonymResponse) Reset() {
+	*x = UpdatePseudonymResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UpdatePseudonymResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UpdatePseudonymResponse) ProtoMessage() {}
+
+func (x *UpdatePseudonymResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UpdatePseudonymResponse.ProtoReflect.Descriptor instead.
+func (*UpdatePseudonymResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *UpdatePseudonymResponse) GetAccount() *Account {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+type VerifyBadgeRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// OAuth ID token (JWT) from the client's college-email login, e.g. Google
+	// Sign-In. Identity verifies this itself rather than trusting a bare
+	// email string, since a bare string can't prove ownership.
+	IdToken       string `protobuf:"bytes,2,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`
+	Gender        Gender `protobuf:"varint,3,opt,name=gender,proto3,enum=identity.v1.Gender" json:"gender,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyBadgeRequest) Reset() {
+	*x = VerifyBadgeRequest{}
+	mi := &file_identity_v1_identity_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyBadgeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyBadgeRequest) ProtoMessage() {}
+
+func (x *VerifyBadgeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyBadgeRequest.ProtoReflect.Descriptor instead.
+func (*VerifyBadgeRequest) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *VerifyBadgeRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *VerifyBadgeRequest) GetIdToken() string {
+	if x != nil {
+		return x.IdToken
+	}
+	return ""
+}
+
+func (x *VerifyBadgeRequest) GetGender() Gender {
+	if x != nil {
+		return x.Gender
+	}
+	return Gender_GENDER_UNSPECIFIED
+}
+
+type VerifyBadgeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VerifyBadgeResponse) Reset() {
+	*x = VerifyBadgeResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *VerifyBadgeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*VerifyBadgeResponse) ProtoMessage() {}
+
+func (x *VerifyBadgeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use VerifyBadgeResponse.ProtoReflect.Descriptor instead.
+func (*VerifyBadgeResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *VerifyBadgeResponse) GetAccount() *Account {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+type SignInWithGoogleRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Google ID token from the client's "Sign in with Google" flow.
+	// Identity checks the hd and email_verified claims itself (DEC-0027).
+	IdToken string `protobuf:"bytes,1,opt,name=id_token,json=idToken,proto3" json:"id_token,omitempty"`
+	// The caller's current guest account, if any. When set, and no account
+	// is already linked to this Google identity, that guest account is
+	// upgraded in place instead of a new one being created.
+	GuestAccountId *string `protobuf:"bytes,2,opt,name=guest_account_id,json=guestAccountId,proto3,oneof" json:"guest_account_id,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *SignInWithGoogleRequest) Reset() {
+	*x = SignInWithGoogleRequest{}
+	mi := &file_identity_v1_identity_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignInWithGoogleRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignInWithGoogleRequest) ProtoMessage() {}
+
+func (x *SignInWithGoogleRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignInWithGoogleRequest.ProtoReflect.Descriptor instead.
+func (*SignInWithGoogleRequest) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *SignInWithGoogleRequest) GetIdToken() string {
+	if x != nil {
+		return x.IdToken
+	}
+	return ""
+}
+
+func (x *SignInWithGoogleRequest) GetGuestAccountId() string {
+	if x != nil && x.GuestAccountId != nil {
+		return *x.GuestAccountId
+	}
+	return ""
+}
+
+type SignInWithGoogleResponse struct {
+	state   protoimpl.MessageState `protogen:"open.v1"`
+	Account *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	// True if the account still needs SetGender called before it can use
+	// gender-filtered matching.
+	NeedsGender   bool `protobuf:"varint,2,opt,name=needs_gender,json=needsGender,proto3" json:"needs_gender,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SignInWithGoogleResponse) Reset() {
+	*x = SignInWithGoogleResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SignInWithGoogleResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SignInWithGoogleResponse) ProtoMessage() {}
+
+func (x *SignInWithGoogleResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SignInWithGoogleResponse.ProtoReflect.Descriptor instead.
+func (*SignInWithGoogleResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *SignInWithGoogleResponse) GetAccount() *Account {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+func (x *SignInWithGoogleResponse) GetNeedsGender() bool {
+	if x != nil {
+		return x.NeedsGender
+	}
+	return false
+}
+
+type SetGenderRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Gender        Gender                 `protobuf:"varint,2,opt,name=gender,proto3,enum=identity.v1.Gender" json:"gender,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetGenderRequest) Reset() {
+	*x = SetGenderRequest{}
+	mi := &file_identity_v1_identity_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetGenderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetGenderRequest) ProtoMessage() {}
+
+func (x *SetGenderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetGenderRequest.ProtoReflect.Descriptor instead.
+func (*SetGenderRequest) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *SetGenderRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *SetGenderRequest) GetGender() Gender {
+	if x != nil {
+		return x.Gender
+	}
+	return Gender_GENDER_UNSPECIFIED
+}
+
+type SetGenderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *SetGenderResponse) Reset() {
+	*x = SetGenderResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *SetGenderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*SetGenderResponse) ProtoMessage() {}
+
+func (x *SetGenderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use SetGenderResponse.ProtoReflect.Descriptor instead.
+func (*SetGenderResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *SetGenderResponse) GetAccount() *Account {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+type AdminSetGenderRequest struct {
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	AccountId string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Gender    Gender                 `protobuf:"varint,2,opt,name=gender,proto3,enum=identity.v1.Gender" json:"gender,omitempty"`
+	// Who approved the change and why, recorded in the moderation action
+	// log (DEC-0029).
+	Reason        string `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdminSetGenderRequest) Reset() {
+	*x = AdminSetGenderRequest{}
+	mi := &file_identity_v1_identity_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdminSetGenderRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdminSetGenderRequest) ProtoMessage() {}
+
+func (x *AdminSetGenderRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdminSetGenderRequest.ProtoReflect.Descriptor instead.
+func (*AdminSetGenderRequest) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *AdminSetGenderRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *AdminSetGenderRequest) GetGender() Gender {
+	if x != nil {
+		return x.Gender
+	}
+	return Gender_GENDER_UNSPECIFIED
+}
+
+func (x *AdminSetGenderRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+type AdminSetGenderResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Account       *Account               `protobuf:"bytes,1,opt,name=account,proto3" json:"account,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *AdminSetGenderResponse) Reset() {
+	*x = AdminSetGenderResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *AdminSetGenderResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*AdminSetGenderResponse) ProtoMessage() {}
+
+func (x *AdminSetGenderResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use AdminSetGenderResponse.ProtoReflect.Descriptor instead.
+func (*AdminSetGenderResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *AdminSetGenderResponse) GetAccount() *Account {
+	if x != nil {
+		return x.Account
+	}
+	return nil
+}
+
+type TouchAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TouchAccountRequest) Reset() {
+	*x = TouchAccountRequest{}
+	mi := &file_identity_v1_identity_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TouchAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TouchAccountRequest) ProtoMessage() {}
+
+func (x *TouchAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TouchAccountRequest.ProtoReflect.Descriptor instead.
+func (*TouchAccountRequest) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *TouchAccountRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type TouchAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *TouchAccountResponse) Reset() {
+	*x = TouchAccountResponse{}
+	mi := &file_identity_v1_identity_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *TouchAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*TouchAccountResponse) ProtoMessage() {}
+
+func (x *TouchAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_identity_v1_identity_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use TouchAccountResponse.ProtoReflect.Descriptor instead.
+func (*TouchAccountResponse) Descriptor() ([]byte, []int) {
+	return file_identity_v1_identity_proto_rawDescGZIP(), []int{16}
+}
+
 var File_identity_v1_identity_proto protoreflect.FileDescriptor
 
 const file_identity_v1_identity_proto_rawDesc = "" +
 	"\n" +
-	"\x1aidentity/v1/identity.proto\x12\videntity.v1\"\xb3\x01\n" +
+	"\x1aidentity/v1/identity.proto\x12\videntity.v1\"\xfd\x01\n" +
 	"\aAccount\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1c\n" +
 	"\tpseudonym\x18\x02 \x01(\tR\tpseudonym\x12%\n" +
 	"\x0ebadge_verified\x18\x03 \x01(\bR\rbadgeVerified\x12+\n" +
 	"\x06gender\x18\x04 \x01(\x0e2\x13.identity.v1.GenderR\x06gender\x12&\n" +
-	"\x0fcreated_at_unix\x18\x05 \x01(\x03R\rcreatedAtUnix\"4\n" +
+	"\x0fcreated_at_unix\x18\x05 \x01(\x03R\rcreatedAtUnix\x12#\n" +
+	"\rgoogle_linked\x18\x06 \x01(\bR\fgoogleLinked\x12#\n" +
+	"\rgender_chosen\x18\a \x01(\bR\fgenderChosen\"4\n" +
 	"\x14CreateAccountRequest\x12\x1c\n" +
-	"\tpseudonym\x18\x01 \x01(\tR\tpseudonym\"{\n" +
+	"\tpseudonym\x18\x01 \x01(\tR\tpseudonym\"G\n" +
+	"\x15CreateAccountResponse\x12.\n" +
+	"\aaccount\x18\x01 \x01(\v2\x14.identity.v1.AccountR\aaccount\"2\n" +
+	"\x11GetAccountRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"D\n" +
+	"\x12GetAccountResponse\x12.\n" +
+	"\aaccount\x18\x01 \x01(\v2\x14.identity.v1.AccountR\aaccount\"\\\n" +
+	"\x16UpdatePseudonymRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12#\n" +
+	"\rnew_pseudonym\x18\x02 \x01(\tR\fnewPseudonym\"I\n" +
+	"\x17UpdatePseudonymResponse\x12.\n" +
+	"\aaccount\x18\x01 \x01(\v2\x14.identity.v1.AccountR\aaccount\"{\n" +
 	"\x12VerifyBadgeRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x19\n" +
 	"\bid_token\x18\x02 \x01(\tR\aidToken\x12+\n" +
-	"\x06gender\x18\x03 \x01(\x0e2\x13.identity.v1.GenderR\x06gender\"2\n" +
-	"\x11GetAccountRequest\x12\x1d\n" +
+	"\x06gender\x18\x03 \x01(\x0e2\x13.identity.v1.GenderR\x06gender\"E\n" +
+	"\x13VerifyBadgeResponse\x12.\n" +
+	"\aaccount\x18\x01 \x01(\v2\x14.identity.v1.AccountR\aaccount\"x\n" +
+	"\x17SignInWithGoogleRequest\x12\x19\n" +
+	"\bid_token\x18\x01 \x01(\tR\aidToken\x12-\n" +
+	"\x10guest_account_id\x18\x02 \x01(\tH\x00R\x0eguestAccountId\x88\x01\x01B\x13\n" +
+	"\x11_guest_account_id\"m\n" +
+	"\x18SignInWithGoogleResponse\x12.\n" +
+	"\aaccount\x18\x01 \x01(\v2\x14.identity.v1.AccountR\aaccount\x12!\n" +
+	"\fneeds_gender\x18\x02 \x01(\bR\vneedsGender\"^\n" +
+	"\x10SetGenderRequest\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\tR\taccountId\"\\\n" +
-	"\x16UpdatePseudonymRequest\x12\x1d\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12+\n" +
+	"\x06gender\x18\x02 \x01(\x0e2\x13.identity.v1.GenderR\x06gender\"C\n" +
+	"\x11SetGenderResponse\x12.\n" +
+	"\aaccount\x18\x01 \x01(\v2\x14.identity.v1.AccountR\aaccount\"{\n" +
+	"\x15AdminSetGenderRequest\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\tR\taccountId\x12#\n" +
-	"\rnew_pseudonym\x18\x02 \x01(\tR\fnewPseudonym*D\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12+\n" +
+	"\x06gender\x18\x02 \x01(\x0e2\x13.identity.v1.GenderR\x06gender\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"H\n" +
+	"\x16AdminSetGenderResponse\x12.\n" +
+	"\aaccount\x18\x01 \x01(\v2\x14.identity.v1.AccountR\aaccount\"4\n" +
+	"\x13TouchAccountRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"\x16\n" +
+	"\x14TouchAccountResponse*b\n" +
 	"\x06Gender\x12\x16\n" +
 	"\x12GENDER_UNSPECIFIED\x10\x00\x12\x0f\n" +
 	"\vGENDER_MALE\x10\x01\x12\x11\n" +
-	"\rGENDER_FEMALE\x10\x022\xb3\x02\n" +
-	"\x0fIdentityService\x12H\n" +
-	"\rCreateAccount\x12!.identity.v1.CreateAccountRequest\x1a\x14.identity.v1.Account\x12D\n" +
-	"\vVerifyBadge\x12\x1f.identity.v1.VerifyBadgeRequest\x1a\x14.identity.v1.Account\x12B\n" +
+	"\rGENDER_FEMALE\x10\x02\x12\x1c\n" +
+	"\x18GENDER_PREFER_NOT_TO_SAY\x10\x032\xc5\x05\n" +
+	"\x0fIdentityService\x12V\n" +
+	"\rCreateAccount\x12!.identity.v1.CreateAccountRequest\x1a\".identity.v1.CreateAccountResponse\x12M\n" +
 	"\n" +
-	"GetAccount\x12\x1e.identity.v1.GetAccountRequest\x1a\x14.identity.v1.Account\x12L\n" +
-	"\x0fUpdatePseudonym\x12#.identity.v1.UpdatePseudonymRequest\x1a\x14.identity.v1.AccountBLZJgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1;identityv1b\x06proto3"
+	"GetAccount\x12\x1e.identity.v1.GetAccountRequest\x1a\x1f.identity.v1.GetAccountResponse\x12\\\n" +
+	"\x0fUpdatePseudonym\x12#.identity.v1.UpdatePseudonymRequest\x1a$.identity.v1.UpdatePseudonymResponse\x12P\n" +
+	"\vVerifyBadge\x12\x1f.identity.v1.VerifyBadgeRequest\x1a .identity.v1.VerifyBadgeResponse\x12_\n" +
+	"\x10SignInWithGoogle\x12$.identity.v1.SignInWithGoogleRequest\x1a%.identity.v1.SignInWithGoogleResponse\x12J\n" +
+	"\tSetGender\x12\x1d.identity.v1.SetGenderRequest\x1a\x1e.identity.v1.SetGenderResponse\x12Y\n" +
+	"\x0eAdminSetGender\x12\".identity.v1.AdminSetGenderRequest\x1a#.identity.v1.AdminSetGenderResponse\x12S\n" +
+	"\fTouchAccount\x12 .identity.v1.TouchAccountRequest\x1a!.identity.v1.TouchAccountResponseBLZJgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1;identityv1b\x06proto3"
 
 var (
 	file_identity_v1_identity_proto_rawDescOnce sync.Once
@@ -398,31 +1032,60 @@ func file_identity_v1_identity_proto_rawDescGZIP() []byte {
 }
 
 var file_identity_v1_identity_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
+var file_identity_v1_identity_proto_msgTypes = make([]protoimpl.MessageInfo, 17)
 var file_identity_v1_identity_proto_goTypes = []any{
-	(Gender)(0),                    // 0: identity.v1.Gender
-	(*Account)(nil),                // 1: identity.v1.Account
-	(*CreateAccountRequest)(nil),   // 2: identity.v1.CreateAccountRequest
-	(*VerifyBadgeRequest)(nil),     // 3: identity.v1.VerifyBadgeRequest
-	(*GetAccountRequest)(nil),      // 4: identity.v1.GetAccountRequest
-	(*UpdatePseudonymRequest)(nil), // 5: identity.v1.UpdatePseudonymRequest
+	(Gender)(0),                      // 0: identity.v1.Gender
+	(*Account)(nil),                  // 1: identity.v1.Account
+	(*CreateAccountRequest)(nil),     // 2: identity.v1.CreateAccountRequest
+	(*CreateAccountResponse)(nil),    // 3: identity.v1.CreateAccountResponse
+	(*GetAccountRequest)(nil),        // 4: identity.v1.GetAccountRequest
+	(*GetAccountResponse)(nil),       // 5: identity.v1.GetAccountResponse
+	(*UpdatePseudonymRequest)(nil),   // 6: identity.v1.UpdatePseudonymRequest
+	(*UpdatePseudonymResponse)(nil),  // 7: identity.v1.UpdatePseudonymResponse
+	(*VerifyBadgeRequest)(nil),       // 8: identity.v1.VerifyBadgeRequest
+	(*VerifyBadgeResponse)(nil),      // 9: identity.v1.VerifyBadgeResponse
+	(*SignInWithGoogleRequest)(nil),  // 10: identity.v1.SignInWithGoogleRequest
+	(*SignInWithGoogleResponse)(nil), // 11: identity.v1.SignInWithGoogleResponse
+	(*SetGenderRequest)(nil),         // 12: identity.v1.SetGenderRequest
+	(*SetGenderResponse)(nil),        // 13: identity.v1.SetGenderResponse
+	(*AdminSetGenderRequest)(nil),    // 14: identity.v1.AdminSetGenderRequest
+	(*AdminSetGenderResponse)(nil),   // 15: identity.v1.AdminSetGenderResponse
+	(*TouchAccountRequest)(nil),      // 16: identity.v1.TouchAccountRequest
+	(*TouchAccountResponse)(nil),     // 17: identity.v1.TouchAccountResponse
 }
 var file_identity_v1_identity_proto_depIdxs = []int32{
-	0, // 0: identity.v1.Account.gender:type_name -> identity.v1.Gender
-	0, // 1: identity.v1.VerifyBadgeRequest.gender:type_name -> identity.v1.Gender
-	2, // 2: identity.v1.IdentityService.CreateAccount:input_type -> identity.v1.CreateAccountRequest
-	3, // 3: identity.v1.IdentityService.VerifyBadge:input_type -> identity.v1.VerifyBadgeRequest
-	4, // 4: identity.v1.IdentityService.GetAccount:input_type -> identity.v1.GetAccountRequest
-	5, // 5: identity.v1.IdentityService.UpdatePseudonym:input_type -> identity.v1.UpdatePseudonymRequest
-	1, // 6: identity.v1.IdentityService.CreateAccount:output_type -> identity.v1.Account
-	1, // 7: identity.v1.IdentityService.VerifyBadge:output_type -> identity.v1.Account
-	1, // 8: identity.v1.IdentityService.GetAccount:output_type -> identity.v1.Account
-	1, // 9: identity.v1.IdentityService.UpdatePseudonym:output_type -> identity.v1.Account
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0,  // 0: identity.v1.Account.gender:type_name -> identity.v1.Gender
+	1,  // 1: identity.v1.CreateAccountResponse.account:type_name -> identity.v1.Account
+	1,  // 2: identity.v1.GetAccountResponse.account:type_name -> identity.v1.Account
+	1,  // 3: identity.v1.UpdatePseudonymResponse.account:type_name -> identity.v1.Account
+	0,  // 4: identity.v1.VerifyBadgeRequest.gender:type_name -> identity.v1.Gender
+	1,  // 5: identity.v1.VerifyBadgeResponse.account:type_name -> identity.v1.Account
+	1,  // 6: identity.v1.SignInWithGoogleResponse.account:type_name -> identity.v1.Account
+	0,  // 7: identity.v1.SetGenderRequest.gender:type_name -> identity.v1.Gender
+	1,  // 8: identity.v1.SetGenderResponse.account:type_name -> identity.v1.Account
+	0,  // 9: identity.v1.AdminSetGenderRequest.gender:type_name -> identity.v1.Gender
+	1,  // 10: identity.v1.AdminSetGenderResponse.account:type_name -> identity.v1.Account
+	2,  // 11: identity.v1.IdentityService.CreateAccount:input_type -> identity.v1.CreateAccountRequest
+	4,  // 12: identity.v1.IdentityService.GetAccount:input_type -> identity.v1.GetAccountRequest
+	6,  // 13: identity.v1.IdentityService.UpdatePseudonym:input_type -> identity.v1.UpdatePseudonymRequest
+	8,  // 14: identity.v1.IdentityService.VerifyBadge:input_type -> identity.v1.VerifyBadgeRequest
+	10, // 15: identity.v1.IdentityService.SignInWithGoogle:input_type -> identity.v1.SignInWithGoogleRequest
+	12, // 16: identity.v1.IdentityService.SetGender:input_type -> identity.v1.SetGenderRequest
+	14, // 17: identity.v1.IdentityService.AdminSetGender:input_type -> identity.v1.AdminSetGenderRequest
+	16, // 18: identity.v1.IdentityService.TouchAccount:input_type -> identity.v1.TouchAccountRequest
+	3,  // 19: identity.v1.IdentityService.CreateAccount:output_type -> identity.v1.CreateAccountResponse
+	5,  // 20: identity.v1.IdentityService.GetAccount:output_type -> identity.v1.GetAccountResponse
+	7,  // 21: identity.v1.IdentityService.UpdatePseudonym:output_type -> identity.v1.UpdatePseudonymResponse
+	9,  // 22: identity.v1.IdentityService.VerifyBadge:output_type -> identity.v1.VerifyBadgeResponse
+	11, // 23: identity.v1.IdentityService.SignInWithGoogle:output_type -> identity.v1.SignInWithGoogleResponse
+	13, // 24: identity.v1.IdentityService.SetGender:output_type -> identity.v1.SetGenderResponse
+	15, // 25: identity.v1.IdentityService.AdminSetGender:output_type -> identity.v1.AdminSetGenderResponse
+	17, // 26: identity.v1.IdentityService.TouchAccount:output_type -> identity.v1.TouchAccountResponse
+	19, // [19:27] is the sub-list for method output_type
+	11, // [11:19] is the sub-list for method input_type
+	11, // [11:11] is the sub-list for extension type_name
+	11, // [11:11] is the sub-list for extension extendee
+	0,  // [0:11] is the sub-list for field type_name
 }
 
 func init() { file_identity_v1_identity_proto_init() }
@@ -430,13 +1093,14 @@ func file_identity_v1_identity_proto_init() {
 	if File_identity_v1_identity_proto != nil {
 		return
 	}
+	file_identity_v1_identity_proto_msgTypes[9].OneofWrappers = []any{}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_identity_v1_identity_proto_rawDesc), len(file_identity_v1_identity_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   5,
+			NumMessages:   17,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

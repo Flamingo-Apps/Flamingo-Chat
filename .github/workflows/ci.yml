@@ -119,10 +119,25 @@ jobs:
       - uses: actions/checkout@v7
       - run: ./scripts/check-decisions.sh
 
-  # buf lint and buf breaking are deliberately not here yet - the current
-  # .proto files fail buf's STANDARD lint rules (response message naming),
-  # and are about to be rewritten anyway. Both land together once that
-  # redesign does. See docs/decisions.jsonl.
+  # buf breaking is deliberately not enabled yet - this very pull request
+  # is the intentionally breaking protocol redesign docs/ARCHITECTURE.md
+  # §5.3 describes, so turning it on here would fail against its own base.
+  # It is enabled in the pull request immediately after this one lands,
+  # once there is a non-breaking base for every future change to be
+  # checked against. See docs/decisions.jsonl.
+  buf:
+    name: buf lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: bufbuild/buf-action@v1
+        with:
+          lint: true
+          format: false
+          breaking: false
+          push: false
+          archive: false
+          pr_comment: false
 
   # Branch protection requires this one job, not every matrix entry above,
   # so the required-check list doesn't need editing every time a module is
@@ -131,7 +146,7 @@ jobs:
     name: CI OK
     runs-on: ubuntu-latest
     if: always()
-    needs: [build-and-test, lint, vulncheck, decisions]
+    needs: [build-and-test, lint, vulncheck, decisions, buf]
     steps:
       - name: Check that every required job succeeded
         run: |

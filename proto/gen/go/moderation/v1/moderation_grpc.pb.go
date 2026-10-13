@@ -19,16 +19,39 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ModerationService_FileReport_FullMethodName = "/moderation.v1.ModerationService/FileReport"
-	ModerationService_BlockUser_FullMethodName  = "/moderation.v1.ModerationService/BlockUser"
+	ModerationService_FileReport_FullMethodName                 = "/moderation.v1.ModerationService/FileReport"
+	ModerationService_BlockUser_FullMethodName                  = "/moderation.v1.ModerationService/BlockUser"
+	ModerationService_ListBlocks_FullMethodName                 = "/moderation.v1.ModerationService/ListBlocks"
+	ModerationService_RequestGenderChange_FullMethodName        = "/moderation.v1.ModerationService/RequestGenderChange"
+	ModerationService_ListReports_FullMethodName                = "/moderation.v1.ModerationService/ListReports"
+	ModerationService_ResolveReport_FullMethodName              = "/moderation.v1.ModerationService/ResolveReport"
+	ModerationService_BanAccount_FullMethodName                 = "/moderation.v1.ModerationService/BanAccount"
+	ModerationService_UnbanAccount_FullMethodName               = "/moderation.v1.ModerationService/UnbanAccount"
+	ModerationService_ListGenderChangeRequests_FullMethodName   = "/moderation.v1.ModerationService/ListGenderChangeRequests"
+	ModerationService_ResolveGenderChangeRequest_FullMethodName = "/moderation.v1.ModerationService/ResolveGenderChangeRequest"
 )
 
 // ModerationServiceClient is the client API for ModerationService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// See docs/ARCHITECTURE.md §3.5 and §4.4 (DEC-0046). The Admin* and
+// List*/Resolve* RPCs below are only ever called from tools/admin
+// (DEC-0029) - the gateway never reaches them, since nothing about
+// moderation is reachable from outside the cluster.
 type ModerationServiceClient interface {
 	FileReport(ctx context.Context, in *FileReportRequest, opts ...grpc.CallOption) (*FileReportResponse, error)
 	BlockUser(ctx context.Context, in *BlockUserRequest, opts ...grpc.CallOption) (*BlockUserResponse, error)
+	ListBlocks(ctx context.Context, in *ListBlocksRequest, opts ...grpc.CallOption) (*ListBlocksResponse, error)
+	// A verified user asking to change their one-time gender choice
+	// (DEC-0028). Goes to the same admin queue as reports.
+	RequestGenderChange(ctx context.Context, in *RequestGenderChangeRequest, opts ...grpc.CallOption) (*RequestGenderChangeResponse, error)
+	ListReports(ctx context.Context, in *ListReportsRequest, opts ...grpc.CallOption) (*ListReportsResponse, error)
+	ResolveReport(ctx context.Context, in *ResolveReportRequest, opts ...grpc.CallOption) (*ResolveReportResponse, error)
+	BanAccount(ctx context.Context, in *BanAccountRequest, opts ...grpc.CallOption) (*BanAccountResponse, error)
+	UnbanAccount(ctx context.Context, in *UnbanAccountRequest, opts ...grpc.CallOption) (*UnbanAccountResponse, error)
+	ListGenderChangeRequests(ctx context.Context, in *ListGenderChangeRequestsRequest, opts ...grpc.CallOption) (*ListGenderChangeRequestsResponse, error)
+	ResolveGenderChangeRequest(ctx context.Context, in *ResolveGenderChangeRequestRequest, opts ...grpc.CallOption) (*ResolveGenderChangeRequestResponse, error)
 }
 
 type moderationServiceClient struct {
@@ -59,12 +82,107 @@ func (c *moderationServiceClient) BlockUser(ctx context.Context, in *BlockUserRe
 	return out, nil
 }
 
+func (c *moderationServiceClient) ListBlocks(ctx context.Context, in *ListBlocksRequest, opts ...grpc.CallOption) (*ListBlocksResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListBlocksResponse)
+	err := c.cc.Invoke(ctx, ModerationService_ListBlocks_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *moderationServiceClient) RequestGenderChange(ctx context.Context, in *RequestGenderChangeRequest, opts ...grpc.CallOption) (*RequestGenderChangeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RequestGenderChangeResponse)
+	err := c.cc.Invoke(ctx, ModerationService_RequestGenderChange_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *moderationServiceClient) ListReports(ctx context.Context, in *ListReportsRequest, opts ...grpc.CallOption) (*ListReportsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListReportsResponse)
+	err := c.cc.Invoke(ctx, ModerationService_ListReports_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *moderationServiceClient) ResolveReport(ctx context.Context, in *ResolveReportRequest, opts ...grpc.CallOption) (*ResolveReportResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveReportResponse)
+	err := c.cc.Invoke(ctx, ModerationService_ResolveReport_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *moderationServiceClient) BanAccount(ctx context.Context, in *BanAccountRequest, opts ...grpc.CallOption) (*BanAccountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(BanAccountResponse)
+	err := c.cc.Invoke(ctx, ModerationService_BanAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *moderationServiceClient) UnbanAccount(ctx context.Context, in *UnbanAccountRequest, opts ...grpc.CallOption) (*UnbanAccountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(UnbanAccountResponse)
+	err := c.cc.Invoke(ctx, ModerationService_UnbanAccount_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *moderationServiceClient) ListGenderChangeRequests(ctx context.Context, in *ListGenderChangeRequestsRequest, opts ...grpc.CallOption) (*ListGenderChangeRequestsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListGenderChangeRequestsResponse)
+	err := c.cc.Invoke(ctx, ModerationService_ListGenderChangeRequests_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *moderationServiceClient) ResolveGenderChangeRequest(ctx context.Context, in *ResolveGenderChangeRequestRequest, opts ...grpc.CallOption) (*ResolveGenderChangeRequestResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ResolveGenderChangeRequestResponse)
+	err := c.cc.Invoke(ctx, ModerationService_ResolveGenderChangeRequest_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // ModerationServiceServer is the server API for ModerationService service.
 // All implementations must embed UnimplementedModerationServiceServer
 // for forward compatibility.
+//
+// See docs/ARCHITECTURE.md §3.5 and §4.4 (DEC-0046). The Admin* and
+// List*/Resolve* RPCs below are only ever called from tools/admin
+// (DEC-0029) - the gateway never reaches them, since nothing about
+// moderation is reachable from outside the cluster.
 type ModerationServiceServer interface {
 	FileReport(context.Context, *FileReportRequest) (*FileReportResponse, error)
 	BlockUser(context.Context, *BlockUserRequest) (*BlockUserResponse, error)
+	ListBlocks(context.Context, *ListBlocksRequest) (*ListBlocksResponse, error)
+	// A verified user asking to change their one-time gender choice
+	// (DEC-0028). Goes to the same admin queue as reports.
+	RequestGenderChange(context.Context, *RequestGenderChangeRequest) (*RequestGenderChangeResponse, error)
+	ListReports(context.Context, *ListReportsRequest) (*ListReportsResponse, error)
+	ResolveReport(context.Context, *ResolveReportRequest) (*ResolveReportResponse, error)
+	BanAccount(context.Context, *BanAccountRequest) (*BanAccountResponse, error)
+	UnbanAccount(context.Context, *UnbanAccountRequest) (*UnbanAccountResponse, error)
+	ListGenderChangeRequests(context.Context, *ListGenderChangeRequestsRequest) (*ListGenderChangeRequestsResponse, error)
+	ResolveGenderChangeRequest(context.Context, *ResolveGenderChangeRequestRequest) (*ResolveGenderChangeRequestResponse, error)
 	mustEmbedUnimplementedModerationServiceServer()
 }
 
@@ -80,6 +198,30 @@ func (UnimplementedModerationServiceServer) FileReport(context.Context, *FileRep
 }
 func (UnimplementedModerationServiceServer) BlockUser(context.Context, *BlockUserRequest) (*BlockUserResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method BlockUser not implemented")
+}
+func (UnimplementedModerationServiceServer) ListBlocks(context.Context, *ListBlocksRequest) (*ListBlocksResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListBlocks not implemented")
+}
+func (UnimplementedModerationServiceServer) RequestGenderChange(context.Context, *RequestGenderChangeRequest) (*RequestGenderChangeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestGenderChange not implemented")
+}
+func (UnimplementedModerationServiceServer) ListReports(context.Context, *ListReportsRequest) (*ListReportsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListReports not implemented")
+}
+func (UnimplementedModerationServiceServer) ResolveReport(context.Context, *ResolveReportRequest) (*ResolveReportResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveReport not implemented")
+}
+func (UnimplementedModerationServiceServer) BanAccount(context.Context, *BanAccountRequest) (*BanAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method BanAccount not implemented")
+}
+func (UnimplementedModerationServiceServer) UnbanAccount(context.Context, *UnbanAccountRequest) (*UnbanAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method UnbanAccount not implemented")
+}
+func (UnimplementedModerationServiceServer) ListGenderChangeRequests(context.Context, *ListGenderChangeRequestsRequest) (*ListGenderChangeRequestsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListGenderChangeRequests not implemented")
+}
+func (UnimplementedModerationServiceServer) ResolveGenderChangeRequest(context.Context, *ResolveGenderChangeRequestRequest) (*ResolveGenderChangeRequestResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ResolveGenderChangeRequest not implemented")
 }
 func (UnimplementedModerationServiceServer) mustEmbedUnimplementedModerationServiceServer() {}
 func (UnimplementedModerationServiceServer) testEmbeddedByValue()                           {}
@@ -138,6 +280,150 @@ func _ModerationService_BlockUser_Handler(srv interface{}, ctx context.Context, 
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ModerationService_ListBlocks_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListBlocksRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModerationServiceServer).ListBlocks(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModerationService_ListBlocks_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModerationServiceServer).ListBlocks(ctx, req.(*ListBlocksRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ModerationService_RequestGenderChange_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestGenderChangeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModerationServiceServer).RequestGenderChange(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModerationService_RequestGenderChange_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModerationServiceServer).RequestGenderChange(ctx, req.(*RequestGenderChangeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ModerationService_ListReports_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListReportsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModerationServiceServer).ListReports(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModerationService_ListReports_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModerationServiceServer).ListReports(ctx, req.(*ListReportsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ModerationService_ResolveReport_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveReportRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModerationServiceServer).ResolveReport(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModerationService_ResolveReport_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModerationServiceServer).ResolveReport(ctx, req.(*ResolveReportRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ModerationService_BanAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(BanAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModerationServiceServer).BanAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModerationService_BanAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModerationServiceServer).BanAccount(ctx, req.(*BanAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ModerationService_UnbanAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(UnbanAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModerationServiceServer).UnbanAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModerationService_UnbanAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModerationServiceServer).UnbanAccount(ctx, req.(*UnbanAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ModerationService_ListGenderChangeRequests_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListGenderChangeRequestsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModerationServiceServer).ListGenderChangeRequests(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModerationService_ListGenderChangeRequests_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModerationServiceServer).ListGenderChangeRequests(ctx, req.(*ListGenderChangeRequestsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ModerationService_ResolveGenderChangeRequest_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ResolveGenderChangeRequestRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ModerationServiceServer).ResolveGenderChangeRequest(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ModerationService_ResolveGenderChangeRequest_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ModerationServiceServer).ResolveGenderChangeRequest(ctx, req.(*ResolveGenderChangeRequestRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // ModerationService_ServiceDesc is the grpc.ServiceDesc for ModerationService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -152,6 +438,38 @@ var ModerationService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "BlockUser",
 			Handler:    _ModerationService_BlockUser_Handler,
+		},
+		{
+			MethodName: "ListBlocks",
+			Handler:    _ModerationService_ListBlocks_Handler,
+		},
+		{
+			MethodName: "RequestGenderChange",
+			Handler:    _ModerationService_RequestGenderChange_Handler,
+		},
+		{
+			MethodName: "ListReports",
+			Handler:    _ModerationService_ListReports_Handler,
+		},
+		{
+			MethodName: "ResolveReport",
+			Handler:    _ModerationService_ResolveReport_Handler,
+		},
+		{
+			MethodName: "BanAccount",
+			Handler:    _ModerationService_BanAccount_Handler,
+		},
+		{
+			MethodName: "UnbanAccount",
+			Handler:    _ModerationService_UnbanAccount_Handler,
+		},
+		{
+			MethodName: "ListGenderChangeRequests",
+			Handler:    _ModerationService_ListGenderChangeRequests_Handler,
+		},
+		{
+			MethodName: "ResolveGenderChangeRequest",
+			Handler:    _ModerationService_ResolveGenderChangeRequest_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

@@ -19,20 +19,49 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	ChatService_CreateRoom_FullMethodName       = "/chat.v1.ChatService/CreateRoom"
+	ChatService_CreateGroupRoom_FullMethodName  = "/chat.v1.ChatService/CreateGroupRoom"
+	ChatService_CreateDirectRoom_FullMethodName = "/chat.v1.ChatService/CreateDirectRoom"
 	ChatService_JoinRoomByCode_FullMethodName   = "/chat.v1.ChatService/JoinRoomByCode"
+	ChatService_LeaveRoom_FullMethodName        = "/chat.v1.ChatService/LeaveRoom"
+	ChatService_RotateInviteCode_FullMethodName = "/chat.v1.ChatService/RotateInviteCode"
+	ChatService_ListMyRooms_FullMethodName      = "/chat.v1.ChatService/ListMyRooms"
+	ChatService_ListMessages_FullMethodName     = "/chat.v1.ChatService/ListMessages"
 	ChatService_SendMessage_FullMethodName      = "/chat.v1.ChatService/SendMessage"
-	ChatService_StreamRoomEvents_FullMethodName = "/chat.v1.ChatService/StreamRoomEvents"
+	ChatService_VoteKeep_FullMethodName         = "/chat.v1.ChatService/VoteKeep"
+	ChatService_EndDirectRoom_FullMethodName    = "/chat.v1.ChatService/EndDirectRoom"
+	ChatService_RemoveMember_FullMethodName     = "/chat.v1.ChatService/RemoveMember"
 )
 
 // ChatServiceClient is the client API for ChatService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// See docs/ARCHITECTURE.md §2 and §3 for the rooms and flows this
+// implements. StreamRoomEvents and the old generic CreateRoom are gone:
+// live delivery goes only through Redis (DEC-0015, DEC-0036), and group
+// rooms and direct (matched) rooms are different enough in who can create
+// them and why that they get their own RPCs instead of one RPC with a
+// type flag.
 type ChatServiceClient interface {
-	CreateRoom(ctx context.Context, in *CreateRoomRequest, opts ...grpc.CallOption) (*Room, error)
-	JoinRoomByCode(ctx context.Context, in *JoinRoomByCodeRequest, opts ...grpc.CallOption) (*Room, error)
+	CreateGroupRoom(ctx context.Context, in *CreateGroupRoomRequest, opts ...grpc.CallOption) (*CreateGroupRoomResponse, error)
+	// Called by Matching when it pairs two users, never directly by a
+	// client (DEC-0044).
+	CreateDirectRoom(ctx context.Context, in *CreateDirectRoomRequest, opts ...grpc.CallOption) (*CreateDirectRoomResponse, error)
+	JoinRoomByCode(ctx context.Context, in *JoinRoomByCodeRequest, opts ...grpc.CallOption) (*JoinRoomByCodeResponse, error)
+	LeaveRoom(ctx context.Context, in *LeaveRoomRequest, opts ...grpc.CallOption) (*LeaveRoomResponse, error)
+	RotateInviteCode(ctx context.Context, in *RotateInviteCodeRequest, opts ...grpc.CallOption) (*RotateInviteCodeResponse, error)
+	ListMyRooms(ctx context.Context, in *ListMyRoomsRequest, opts ...grpc.CallOption) (*ListMyRoomsResponse, error)
+	ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error)
 	SendMessage(ctx context.Context, in *SendMessageRequest, opts ...grpc.CallOption) (*SendMessageResponse, error)
-	StreamRoomEvents(ctx context.Context, in *StreamRoomEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RoomEvent], error)
+	// Either participant in a direct room votes to keep it; once both have,
+	// the room survives the chat ending (DEC-0031, docs/ARCHITECTURE.md §3.3).
+	VoteKeep(ctx context.Context, in *VoteKeepRequest, opts ...grpc.CallOption) (*VoteKeepResponse, error)
+	// Ends a direct room that was never kept - "Next" or leaving a random
+	// chat.
+	EndDirectRoom(ctx context.Context, in *EndDirectRoomRequest, opts ...grpc.CallOption) (*EndDirectRoomResponse, error)
+	// Removes a member from a group room: the owner removing someone, or
+	// the admin tool acting on a ban (DEC-0029).
+	RemoveMember(ctx context.Context, in *RemoveMemberRequest, opts ...grpc.CallOption) (*RemoveMemberResponse, error)
 }
 
 type chatServiceClient struct {
@@ -43,20 +72,70 @@ func NewChatServiceClient(cc grpc.ClientConnInterface) ChatServiceClient {
 	return &chatServiceClient{cc}
 }
 
-func (c *chatServiceClient) CreateRoom(ctx context.Context, in *CreateRoomRequest, opts ...grpc.CallOption) (*Room, error) {
+func (c *chatServiceClient) CreateGroupRoom(ctx context.Context, in *CreateGroupRoomRequest, opts ...grpc.CallOption) (*CreateGroupRoomResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Room)
-	err := c.cc.Invoke(ctx, ChatService_CreateRoom_FullMethodName, in, out, cOpts...)
+	out := new(CreateGroupRoomResponse)
+	err := c.cc.Invoke(ctx, ChatService_CreateGroupRoom_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
 	return out, nil
 }
 
-func (c *chatServiceClient) JoinRoomByCode(ctx context.Context, in *JoinRoomByCodeRequest, opts ...grpc.CallOption) (*Room, error) {
+func (c *chatServiceClient) CreateDirectRoom(ctx context.Context, in *CreateDirectRoomRequest, opts ...grpc.CallOption) (*CreateDirectRoomResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Room)
+	out := new(CreateDirectRoomResponse)
+	err := c.cc.Invoke(ctx, ChatService_CreateDirectRoom_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) JoinRoomByCode(ctx context.Context, in *JoinRoomByCodeRequest, opts ...grpc.CallOption) (*JoinRoomByCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(JoinRoomByCodeResponse)
 	err := c.cc.Invoke(ctx, ChatService_JoinRoomByCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) LeaveRoom(ctx context.Context, in *LeaveRoomRequest, opts ...grpc.CallOption) (*LeaveRoomResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(LeaveRoomResponse)
+	err := c.cc.Invoke(ctx, ChatService_LeaveRoom_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) RotateInviteCode(ctx context.Context, in *RotateInviteCodeRequest, opts ...grpc.CallOption) (*RotateInviteCodeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RotateInviteCodeResponse)
+	err := c.cc.Invoke(ctx, ChatService_RotateInviteCode_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) ListMyRooms(ctx context.Context, in *ListMyRoomsRequest, opts ...grpc.CallOption) (*ListMyRoomsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMyRoomsResponse)
+	err := c.cc.Invoke(ctx, ChatService_ListMyRooms_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) ListMessages(ctx context.Context, in *ListMessagesRequest, opts ...grpc.CallOption) (*ListMessagesResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(ListMessagesResponse)
+	err := c.cc.Invoke(ctx, ChatService_ListMessages_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -73,33 +152,66 @@ func (c *chatServiceClient) SendMessage(ctx context.Context, in *SendMessageRequ
 	return out, nil
 }
 
-func (c *chatServiceClient) StreamRoomEvents(ctx context.Context, in *StreamRoomEventsRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[RoomEvent], error) {
+func (c *chatServiceClient) VoteKeep(ctx context.Context, in *VoteKeepRequest, opts ...grpc.CallOption) (*VoteKeepResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &ChatService_ServiceDesc.Streams[0], ChatService_StreamRoomEvents_FullMethodName, cOpts...)
+	out := new(VoteKeepResponse)
+	err := c.cc.Invoke(ctx, ChatService_VoteKeep_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[StreamRoomEventsRequest, RoomEvent]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ChatService_StreamRoomEventsClient = grpc.ServerStreamingClient[RoomEvent]
+func (c *chatServiceClient) EndDirectRoom(ctx context.Context, in *EndDirectRoomRequest, opts ...grpc.CallOption) (*EndDirectRoomResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(EndDirectRoomResponse)
+	err := c.cc.Invoke(ctx, ChatService_EndDirectRoom_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *chatServiceClient) RemoveMember(ctx context.Context, in *RemoveMemberRequest, opts ...grpc.CallOption) (*RemoveMemberResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(RemoveMemberResponse)
+	err := c.cc.Invoke(ctx, ChatService_RemoveMember_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 // ChatServiceServer is the server API for ChatService service.
 // All implementations must embed UnimplementedChatServiceServer
 // for forward compatibility.
+//
+// See docs/ARCHITECTURE.md §2 and §3 for the rooms and flows this
+// implements. StreamRoomEvents and the old generic CreateRoom are gone:
+// live delivery goes only through Redis (DEC-0015, DEC-0036), and group
+// rooms and direct (matched) rooms are different enough in who can create
+// them and why that they get their own RPCs instead of one RPC with a
+// type flag.
 type ChatServiceServer interface {
-	CreateRoom(context.Context, *CreateRoomRequest) (*Room, error)
-	JoinRoomByCode(context.Context, *JoinRoomByCodeRequest) (*Room, error)
+	CreateGroupRoom(context.Context, *CreateGroupRoomRequest) (*CreateGroupRoomResponse, error)
+	// Called by Matching when it pairs two users, never directly by a
+	// client (DEC-0044).
+	CreateDirectRoom(context.Context, *CreateDirectRoomRequest) (*CreateDirectRoomResponse, error)
+	JoinRoomByCode(context.Context, *JoinRoomByCodeRequest) (*JoinRoomByCodeResponse, error)
+	LeaveRoom(context.Context, *LeaveRoomRequest) (*LeaveRoomResponse, error)
+	RotateInviteCode(context.Context, *RotateInviteCodeRequest) (*RotateInviteCodeResponse, error)
+	ListMyRooms(context.Context, *ListMyRoomsRequest) (*ListMyRoomsResponse, error)
+	ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error)
 	SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error)
-	StreamRoomEvents(*StreamRoomEventsRequest, grpc.ServerStreamingServer[RoomEvent]) error
+	// Either participant in a direct room votes to keep it; once both have,
+	// the room survives the chat ending (DEC-0031, docs/ARCHITECTURE.md §3.3).
+	VoteKeep(context.Context, *VoteKeepRequest) (*VoteKeepResponse, error)
+	// Ends a direct room that was never kept - "Next" or leaving a random
+	// chat.
+	EndDirectRoom(context.Context, *EndDirectRoomRequest) (*EndDirectRoomResponse, error)
+	// Removes a member from a group room: the owner removing someone, or
+	// the admin tool acting on a ban (DEC-0029).
+	RemoveMember(context.Context, *RemoveMemberRequest) (*RemoveMemberResponse, error)
 	mustEmbedUnimplementedChatServiceServer()
 }
 
@@ -110,17 +222,38 @@ type ChatServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedChatServiceServer struct{}
 
-func (UnimplementedChatServiceServer) CreateRoom(context.Context, *CreateRoomRequest) (*Room, error) {
-	return nil, status.Error(codes.Unimplemented, "method CreateRoom not implemented")
+func (UnimplementedChatServiceServer) CreateGroupRoom(context.Context, *CreateGroupRoomRequest) (*CreateGroupRoomResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateGroupRoom not implemented")
 }
-func (UnimplementedChatServiceServer) JoinRoomByCode(context.Context, *JoinRoomByCodeRequest) (*Room, error) {
+func (UnimplementedChatServiceServer) CreateDirectRoom(context.Context, *CreateDirectRoomRequest) (*CreateDirectRoomResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CreateDirectRoom not implemented")
+}
+func (UnimplementedChatServiceServer) JoinRoomByCode(context.Context, *JoinRoomByCodeRequest) (*JoinRoomByCodeResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method JoinRoomByCode not implemented")
+}
+func (UnimplementedChatServiceServer) LeaveRoom(context.Context, *LeaveRoomRequest) (*LeaveRoomResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method LeaveRoom not implemented")
+}
+func (UnimplementedChatServiceServer) RotateInviteCode(context.Context, *RotateInviteCodeRequest) (*RotateInviteCodeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RotateInviteCode not implemented")
+}
+func (UnimplementedChatServiceServer) ListMyRooms(context.Context, *ListMyRoomsRequest) (*ListMyRoomsResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMyRooms not implemented")
+}
+func (UnimplementedChatServiceServer) ListMessages(context.Context, *ListMessagesRequest) (*ListMessagesResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method ListMessages not implemented")
 }
 func (UnimplementedChatServiceServer) SendMessage(context.Context, *SendMessageRequest) (*SendMessageResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SendMessage not implemented")
 }
-func (UnimplementedChatServiceServer) StreamRoomEvents(*StreamRoomEventsRequest, grpc.ServerStreamingServer[RoomEvent]) error {
-	return status.Error(codes.Unimplemented, "method StreamRoomEvents not implemented")
+func (UnimplementedChatServiceServer) VoteKeep(context.Context, *VoteKeepRequest) (*VoteKeepResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VoteKeep not implemented")
+}
+func (UnimplementedChatServiceServer) EndDirectRoom(context.Context, *EndDirectRoomRequest) (*EndDirectRoomResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method EndDirectRoom not implemented")
+}
+func (UnimplementedChatServiceServer) RemoveMember(context.Context, *RemoveMemberRequest) (*RemoveMemberResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RemoveMember not implemented")
 }
 func (UnimplementedChatServiceServer) mustEmbedUnimplementedChatServiceServer() {}
 func (UnimplementedChatServiceServer) testEmbeddedByValue()                     {}
@@ -143,20 +276,38 @@ func RegisterChatServiceServer(s grpc.ServiceRegistrar, srv ChatServiceServer) {
 	s.RegisterService(&ChatService_ServiceDesc, srv)
 }
 
-func _ChatService_CreateRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CreateRoomRequest)
+func _ChatService_CreateGroupRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateGroupRoomRequest)
 	if err := dec(in); err != nil {
 		return nil, err
 	}
 	if interceptor == nil {
-		return srv.(ChatServiceServer).CreateRoom(ctx, in)
+		return srv.(ChatServiceServer).CreateGroupRoom(ctx, in)
 	}
 	info := &grpc.UnaryServerInfo{
 		Server:     srv,
-		FullMethod: ChatService_CreateRoom_FullMethodName,
+		FullMethod: ChatService_CreateGroupRoom_FullMethodName,
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(ChatServiceServer).CreateRoom(ctx, req.(*CreateRoomRequest))
+		return srv.(ChatServiceServer).CreateGroupRoom(ctx, req.(*CreateGroupRoomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_CreateDirectRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CreateDirectRoomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).CreateDirectRoom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_CreateDirectRoom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).CreateDirectRoom(ctx, req.(*CreateDirectRoomRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -179,6 +330,78 @@ func _ChatService_JoinRoomByCode_Handler(srv interface{}, ctx context.Context, d
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChatService_LeaveRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(LeaveRoomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).LeaveRoom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_LeaveRoom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).LeaveRoom(ctx, req.(*LeaveRoomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_RotateInviteCode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RotateInviteCodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).RotateInviteCode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_RotateInviteCode_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).RotateInviteCode(ctx, req.(*RotateInviteCodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_ListMyRooms_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMyRoomsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).ListMyRooms(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_ListMyRooms_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).ListMyRooms(ctx, req.(*ListMyRoomsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_ListMessages_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ListMessagesRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).ListMessages(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_ListMessages_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).ListMessages(ctx, req.(*ListMessagesRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ChatService_SendMessage_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(SendMessageRequest)
 	if err := dec(in); err != nil {
@@ -197,16 +420,59 @@ func _ChatService_SendMessage_Handler(srv interface{}, ctx context.Context, dec 
 	return interceptor(ctx, in, info, handler)
 }
 
-func _ChatService_StreamRoomEvents_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(StreamRoomEventsRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _ChatService_VoteKeep_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VoteKeepRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(ChatServiceServer).StreamRoomEvents(m, &grpc.GenericServerStream[StreamRoomEventsRequest, RoomEvent]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(ChatServiceServer).VoteKeep(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_VoteKeep_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).VoteKeep(ctx, req.(*VoteKeepRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type ChatService_StreamRoomEventsServer = grpc.ServerStreamingServer[RoomEvent]
+func _ChatService_EndDirectRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(EndDirectRoomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).EndDirectRoom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_EndDirectRoom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).EndDirectRoom(ctx, req.(*EndDirectRoomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _ChatService_RemoveMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RemoveMemberRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).RemoveMember(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_RemoveMember_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).RemoveMember(ctx, req.(*RemoveMemberRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 // ChatService_ServiceDesc is the grpc.ServiceDesc for ChatService service.
 // It's only intended for direct use with grpc.RegisterService,
@@ -216,24 +482,50 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*ChatServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
-			MethodName: "CreateRoom",
-			Handler:    _ChatService_CreateRoom_Handler,
+			MethodName: "CreateGroupRoom",
+			Handler:    _ChatService_CreateGroupRoom_Handler,
+		},
+		{
+			MethodName: "CreateDirectRoom",
+			Handler:    _ChatService_CreateDirectRoom_Handler,
 		},
 		{
 			MethodName: "JoinRoomByCode",
 			Handler:    _ChatService_JoinRoomByCode_Handler,
 		},
 		{
+			MethodName: "LeaveRoom",
+			Handler:    _ChatService_LeaveRoom_Handler,
+		},
+		{
+			MethodName: "RotateInviteCode",
+			Handler:    _ChatService_RotateInviteCode_Handler,
+		},
+		{
+			MethodName: "ListMyRooms",
+			Handler:    _ChatService_ListMyRooms_Handler,
+		},
+		{
+			MethodName: "ListMessages",
+			Handler:    _ChatService_ListMessages_Handler,
+		},
+		{
 			MethodName: "SendMessage",
 			Handler:    _ChatService_SendMessage_Handler,
 		},
-	},
-	Streams: []grpc.StreamDesc{
 		{
-			StreamName:    "StreamRoomEvents",
-			Handler:       _ChatService_StreamRoomEvents_Handler,
-			ServerStreams: true,
+			MethodName: "VoteKeep",
+			Handler:    _ChatService_VoteKeep_Handler,
+		},
+		{
+			MethodName: "EndDirectRoom",
+			Handler:    _ChatService_EndDirectRoom_Handler,
+		},
+		{
+			MethodName: "RemoveMember",
+			Handler:    _ChatService_RemoveMember_Handler,
 		},
 	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "chat/v1/chat.proto",
 }
