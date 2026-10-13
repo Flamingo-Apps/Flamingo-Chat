@@ -1,0 +1,7 @@
+name: moderation
+image:
+  repository: flamingo/moderation
+protocol: grpc
+port: 50055
+env:
+  GRPC_PORT: "50055"

@@ -1,0 +1,7 @@
+name: chat
+image:
+  repository: flamingo/chat
+protocol: grpc
+port: 50053
+env:
+  GRPC_PORT: "50053"

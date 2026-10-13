@@ -1,0 +1,28 @@
+# Every service's Dockerfile builds from the repository root (go.work ties
+# the modules together, so a service's own directory isn't a complete build
+# context on its own - see docs/ARCHITECTURE.md §9). This keeps the context
+# sent to the Docker daemon down to source code only.
+.git/
+.claude/
+docs/
+deploy/
+web/
+*.md
+
+# Stray `go build` output when run without -o - see .gitignore for the
+# matching list of binary names this excludes.
+/bin/
+/chat
+/gateway
+/identity
+/matching
+/presence
+/moderation
+/persistence-worker
+services/*/chat
+services/*/gateway
+services/*/identity
+services/*/matching
+services/*/presence
+services/*/moderation
+services/*/persistence-worker

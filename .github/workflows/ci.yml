@@ -39,6 +39,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: modules
     strategy:
+      fail-fast: false
       matrix:
         # go.work ties these together for local dev, but `go build ./...`
         # from the repo root doesn't reliably expand across nested workspace
@@ -79,6 +80,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: modules
     strategy:
+      fail-fast: false
       matrix:
         module: ${{ fromJSON(needs.modules.outputs.modules) }}
     steps:
@@ -98,6 +100,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: modules
     strategy:
+      fail-fast: false
       matrix:
         module: ${{ fromJSON(needs.modules.outputs.modules) }}
     steps:

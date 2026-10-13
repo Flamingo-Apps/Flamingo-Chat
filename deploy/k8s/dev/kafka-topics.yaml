@@ -1,0 +1,41 @@
+# Local development only: creates the three topics docs/ARCHITECTURE.md §5.4
+# defines (DEC-0043), each with 3 partitions and replication factor 1 -
+# the most replication a single broker can offer. Waits for Kafka itself
+# in a retry loop rather than relying on Tilt's resource_deps alone, so
+# this Job is correct even if it runs before Kafka's readiness probe
+# passes. (kafka-topics.sh warns that topic names containing both "." and
+# "_" can collide in metric names; none of ours do, confirmed by actually
+# creating them against a real broker before writing this file.)
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: kafka-create-topics
+spec:
+  backoffLimit: 20
+  template:
+    spec:
+      restartPolicy: OnFailure
+      containers:
+        - name: create-topics
+          image: apache/kafka:4.3.1
+          command: ["/bin/bash", "-c"]
+          args:
+            - |
+              set -euo pipefail
+              until /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list >/dev/null 2>&1; do
+                echo "waiting for kafka..."
+                sleep 3
+              done
+              for topic in chat.events matching.events moderation.events; do
+                /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 \
+                  --create --if-not-exists --topic "$topic" \
+                  --partitions 3 --replication-factor 1
+              done
+              echo "topics ready:"
+              /opt/kafka/bin/kafka-topics.sh --bootstrap-server kafka:9092 --list
+          resources:
+            requests:
+              cpu: 25m
+              memory: 128Mi
+            limits:
+              memory: 256Mi

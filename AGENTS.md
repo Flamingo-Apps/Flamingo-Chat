@@ -36,16 +36,19 @@ If what you are about to build contradicts one of these, stop and raise it. Eith
 ## Repository layout
 
 ```
-services/            one Go module per service
+services/            one Go module per service, each with its own Dockerfile
   gateway/           public HTTP and WebSocket entry point
   identity/          accounts, pseudonyms, verification
   matching/  chat/  presence/  moderation/  persistence-worker/
 proto/               .proto contracts, one directory per service
   gen/go/            generated Go code; never edit by hand
 pkg/                 shared Go packages (config, grpclog)
-deploy/              docker-compose for local dependencies
-scripts/             scaffold-service.sh for a new gRPC service
-docs/                PRD, design, plan, decision log
+deploy/
+  helm/service/      one Helm chart for every Go service; values/<name>.yaml per service
+  k8s/dev/           plain manifests for local Postgres, Redis and Kafka
+Tiltfile             local development: builds images, deploys everything above
+scripts/             scaffold-service.sh for a new gRPC service, check-decisions.sh
+docs/                PRD, architecture, plan, decision log
 web/                 web frontend (planned, not created yet)
 ```
 
@@ -61,7 +64,7 @@ GOTOOLCHAIN=local go test ./...
 
 - CI builds and tests every module with Go 1.27.2 and `GOTOOLCHAIN=local`. Do not add a dependency that needs a newer Go version (INC-0001, DEC-0051). Check the current pin with `go version` in `go.work`, and keep it current rather than letting it drift unreviewed (INC-0004).
 - In workspace mode Go resolves one version of each dependency for all modules; every module currently requires the same grpc version (v1.84.0). Check with `go list -m google.golang.org/grpc` if that ever looks wrong.
-- Local dependencies: `cd deploy && docker compose up -d` starts Postgres, Redis and RabbitMQ. RabbitMQ is being replaced by Kafka (DEC-0020).
+- Local dependencies (Postgres, Redis, Kafka) and every service run together under Tilt, on a local kind cluster: `tilt up`, or `tilt ci` for a one-shot run with no UI. See the README's "Run it locally" section and `docs/ARCHITECTURE.md` §9 (DEC-0039). `deploy/docker-compose.yml` is gone (DEC-0020, DEC-0039) - don't re-add it.
 
 ## Code conventions
 
