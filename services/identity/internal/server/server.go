@@ -37,7 +37,7 @@ func New(accountStore store.AccountStore, verifier verify.BadgeVerifier, genID I
 	}
 }
 
-func (s *Server) CreateAccount(ctx context.Context, req *identityv1.CreateAccountRequest) (*identityv1.Account, error) {
+func (s *Server) CreateAccount(ctx context.Context, req *identityv1.CreateAccountRequest) (*identityv1.CreateAccountResponse, error) {
 	if strings.TrimSpace(req.GetPseudonym()) == "" {
 		return nil, status.Error(codes.InvalidArgument, "pseudonym must not be empty")
 	}
@@ -49,10 +49,10 @@ func (s *Server) CreateAccount(ctx context.Context, req *identityv1.CreateAccoun
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "create account: %v", err)
 	}
-	return toProto(acc), nil
+	return &identityv1.CreateAccountResponse{Account: toProto(acc)}, nil
 }
 
-func (s *Server) GetAccount(ctx context.Context, req *identityv1.GetAccountRequest) (*identityv1.Account, error) {
+func (s *Server) GetAccount(ctx context.Context, req *identityv1.GetAccountRequest) (*identityv1.GetAccountResponse, error) {
 	acc, err := s.store.Get(ctx, req.GetAccountId())
 	if errors.Is(err, store.ErrNotFound) {
 		return nil, status.Error(codes.NotFound, "account not found")
@@ -60,10 +60,10 @@ func (s *Server) GetAccount(ctx context.Context, req *identityv1.GetAccountReque
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "get account: %v", err)
 	}
-	return toProto(acc), nil
+	return &identityv1.GetAccountResponse{Account: toProto(acc)}, nil
 }
 
-func (s *Server) UpdatePseudonym(ctx context.Context, req *identityv1.UpdatePseudonymRequest) (*identityv1.Account, error) {
+func (s *Server) UpdatePseudonym(ctx context.Context, req *identityv1.UpdatePseudonymRequest) (*identityv1.UpdatePseudonymResponse, error) {
 	if strings.TrimSpace(req.GetNewPseudonym()) == "" {
 		return nil, status.Error(codes.InvalidArgument, "new pseudonym must not be empty")
 	}
@@ -78,10 +78,14 @@ func (s *Server) UpdatePseudonym(ctx context.Context, req *identityv1.UpdatePseu
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "update pseudonym: %v", err)
 	}
-	return toProto(acc), nil
+	return &identityv1.UpdatePseudonymResponse{Account: toProto(acc)}, nil
 }
 
-func (s *Server) VerifyBadge(ctx context.Context, req *identityv1.VerifyBadgeRequest) (*identityv1.Account, error) {
+// VerifyBadge is deprecated in favour of SignInWithGoogle (DEC-0027,
+// DEC-0041) and kept only so this service and its tests keep building
+// until the pull request that implements SignInWithGoogle removes both
+// together - see proto/identity/v1/identity.proto.
+func (s *Server) VerifyBadge(ctx context.Context, req *identityv1.VerifyBadgeRequest) (*identityv1.VerifyBadgeResponse, error) {
 	if req.GetGender() == identityv1.Gender_GENDER_UNSPECIFIED {
 		return nil, status.Error(codes.InvalidArgument, "gender is required to verify a badge")
 	}
@@ -105,7 +109,7 @@ func (s *Server) VerifyBadge(ctx context.Context, req *identityv1.VerifyBadgeReq
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "verify badge: %v", err)
 	}
-	return toProto(acc), nil
+	return &identityv1.VerifyBadgeResponse{Account: toProto(acc)}, nil
 }
 
 func toProto(acc store.Account) *identityv1.Account {

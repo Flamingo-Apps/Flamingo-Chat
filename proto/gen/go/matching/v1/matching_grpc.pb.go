@@ -20,14 +20,24 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	MatchingService_RequestMatch_FullMethodName = "/matching.v1.MatchingService/RequestMatch"
+	MatchingService_Next_FullMethodName         = "/matching.v1.MatchingService/Next"
 	MatchingService_CancelMatch_FullMethodName  = "/matching.v1.MatchingService/CancelMatch"
 )
 
 // MatchingServiceClient is the client API for MatchingService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// See docs/ARCHITECTURE.md §3.2 for the matching algorithm. RequestMatch
+// is unary, not a stream (DEC-0038): a result that arrives later reaches
+// the client through the gateway's WebSocket, over the same path
+// regardless of how quickly a match is actually found, rather than a
+// long-lived call tying a waiting client to one Matching instance.
 type MatchingServiceClient interface {
-	RequestMatch(ctx context.Context, in *RequestMatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MatchEvent], error)
+	RequestMatch(ctx context.Context, in *RequestMatchRequest, opts ...grpc.CallOption) (*RequestMatchResponse, error)
+	// Ends the caller's current direct room and immediately queues them
+	// again - the chat UI's "Next" button.
+	Next(ctx context.Context, in *NextRequest, opts ...grpc.CallOption) (*NextResponse, error)
 	CancelMatch(ctx context.Context, in *CancelMatchRequest, opts ...grpc.CallOption) (*CancelMatchResponse, error)
 }
 
@@ -39,24 +49,25 @@ func NewMatchingServiceClient(cc grpc.ClientConnInterface) MatchingServiceClient
 	return &matchingServiceClient{cc}
 }
 
-func (c *matchingServiceClient) RequestMatch(ctx context.Context, in *RequestMatchRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[MatchEvent], error) {
+func (c *matchingServiceClient) RequestMatch(ctx context.Context, in *RequestMatchRequest, opts ...grpc.CallOption) (*RequestMatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &MatchingService_ServiceDesc.Streams[0], MatchingService_RequestMatch_FullMethodName, cOpts...)
+	out := new(RequestMatchResponse)
+	err := c.cc.Invoke(ctx, MatchingService_RequestMatch_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
-	x := &grpc.GenericClientStream[RequestMatchRequest, MatchEvent]{ClientStream: stream}
-	if err := x.ClientStream.SendMsg(in); err != nil {
-		return nil, err
-	}
-	if err := x.ClientStream.CloseSend(); err != nil {
-		return nil, err
-	}
-	return x, nil
+	return out, nil
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type MatchingService_RequestMatchClient = grpc.ServerStreamingClient[MatchEvent]
+func (c *matchingServiceClient) Next(ctx context.Context, in *NextRequest, opts ...grpc.CallOption) (*NextResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(NextResponse)
+	err := c.cc.Invoke(ctx, MatchingService_Next_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
 
 func (c *matchingServiceClient) CancelMatch(ctx context.Context, in *CancelMatchRequest, opts ...grpc.CallOption) (*CancelMatchResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
@@ -71,8 +82,17 @@ func (c *matchingServiceClient) CancelMatch(ctx context.Context, in *CancelMatch
 // MatchingServiceServer is the server API for MatchingService service.
 // All implementations must embed UnimplementedMatchingServiceServer
 // for forward compatibility.
+//
+// See docs/ARCHITECTURE.md §3.2 for the matching algorithm. RequestMatch
+// is unary, not a stream (DEC-0038): a result that arrives later reaches
+// the client through the gateway's WebSocket, over the same path
+// regardless of how quickly a match is actually found, rather than a
+// long-lived call tying a waiting client to one Matching instance.
 type MatchingServiceServer interface {
-	RequestMatch(*RequestMatchRequest, grpc.ServerStreamingServer[MatchEvent]) error
+	RequestMatch(context.Context, *RequestMatchRequest) (*RequestMatchResponse, error)
+	// Ends the caller's current direct room and immediately queues them
+	// again - the chat UI's "Next" button.
+	Next(context.Context, *NextRequest) (*NextResponse, error)
 	CancelMatch(context.Context, *CancelMatchRequest) (*CancelMatchResponse, error)
 	mustEmbedUnimplementedMatchingServiceServer()
 }
@@ -84,8 +104,11 @@ type MatchingServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedMatchingServiceServer struct{}
 
-func (UnimplementedMatchingServiceServer) RequestMatch(*RequestMatchRequest, grpc.ServerStreamingServer[MatchEvent]) error {
-	return status.Error(codes.Unimplemented, "method RequestMatch not implemented")
+func (UnimplementedMatchingServiceServer) RequestMatch(context.Context, *RequestMatchRequest) (*RequestMatchResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method RequestMatch not implemented")
+}
+func (UnimplementedMatchingServiceServer) Next(context.Context, *NextRequest) (*NextResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method Next not implemented")
 }
 func (UnimplementedMatchingServiceServer) CancelMatch(context.Context, *CancelMatchRequest) (*CancelMatchResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CancelMatch not implemented")
@@ -111,16 +134,41 @@ func RegisterMatchingServiceServer(s grpc.ServiceRegistrar, srv MatchingServiceS
 	s.RegisterService(&MatchingService_ServiceDesc, srv)
 }
 
-func _MatchingService_RequestMatch_Handler(srv interface{}, stream grpc.ServerStream) error {
-	m := new(RequestMatchRequest)
-	if err := stream.RecvMsg(m); err != nil {
-		return err
+func _MatchingService_RequestMatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RequestMatchRequest)
+	if err := dec(in); err != nil {
+		return nil, err
 	}
-	return srv.(MatchingServiceServer).RequestMatch(m, &grpc.GenericServerStream[RequestMatchRequest, MatchEvent]{ServerStream: stream})
+	if interceptor == nil {
+		return srv.(MatchingServiceServer).RequestMatch(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MatchingService_RequestMatch_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MatchingServiceServer).RequestMatch(ctx, req.(*RequestMatchRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
-// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
-type MatchingService_RequestMatchServer = grpc.ServerStreamingServer[MatchEvent]
+func _MatchingService_Next_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(NextRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MatchingServiceServer).Next(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: MatchingService_Next_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MatchingServiceServer).Next(ctx, req.(*NextRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
 
 func _MatchingService_CancelMatch_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(CancelMatchRequest)
@@ -148,16 +196,18 @@ var MatchingService_ServiceDesc = grpc.ServiceDesc{
 	HandlerType: (*MatchingServiceServer)(nil),
 	Methods: []grpc.MethodDesc{
 		{
+			MethodName: "RequestMatch",
+			Handler:    _MatchingService_RequestMatch_Handler,
+		},
+		{
+			MethodName: "Next",
+			Handler:    _MatchingService_Next_Handler,
+		},
+		{
 			MethodName: "CancelMatch",
 			Handler:    _MatchingService_CancelMatch_Handler,
 		},
 	},
-	Streams: []grpc.StreamDesc{
-		{
-			StreamName:    "RequestMatch",
-			Handler:       _MatchingService_RequestMatch_Handler,
-			ServerStreams: true,
-		},
-	},
+	Streams:  []grpc.StreamDesc{},
 	Metadata: "matching/v1/matching.proto",
 }

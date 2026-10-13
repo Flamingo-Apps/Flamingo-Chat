@@ -7,6 +7,7 @@
 package moderationv1
 
 import (
+	v1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	protoreflect "google.golang.org/protobuf/reflect/protoreflect"
 	protoimpl "google.golang.org/protobuf/runtime/protoimpl"
 	reflect "reflect"
@@ -21,6 +22,190 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
+type Report struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	Id                string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	ReporterAccountId string                 `protobuf:"bytes,2,opt,name=reporter_account_id,json=reporterAccountId,proto3" json:"reporter_account_id,omitempty"`
+	ReportedAccountId string                 `protobuf:"bytes,3,opt,name=reported_account_id,json=reportedAccountId,proto3" json:"reported_account_id,omitempty"`
+	RoomId            string                 `protobuf:"bytes,4,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	Reason            string                 `protobuf:"bytes,5,opt,name=reason,proto3" json:"reason,omitempty"`
+	Resolved          bool                   `protobuf:"varint,6,opt,name=resolved,proto3" json:"resolved,omitempty"`
+	FiledAtUnix       int64                  `protobuf:"varint,7,opt,name=filed_at_unix,json=filedAtUnix,proto3" json:"filed_at_unix,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *Report) Reset() {
+	*x = Report{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *Report) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*Report) ProtoMessage() {}
+
+func (x *Report) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use Report.ProtoReflect.Descriptor instead.
+func (*Report) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *Report) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *Report) GetReporterAccountId() string {
+	if x != nil {
+		return x.ReporterAccountId
+	}
+	return ""
+}
+
+func (x *Report) GetReportedAccountId() string {
+	if x != nil {
+		return x.ReportedAccountId
+	}
+	return ""
+}
+
+func (x *Report) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *Report) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *Report) GetResolved() bool {
+	if x != nil {
+		return x.Resolved
+	}
+	return false
+}
+
+func (x *Report) GetFiledAtUnix() int64 {
+	if x != nil {
+		return x.FiledAtUnix
+	}
+	return 0
+}
+
+type GenderChangeRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	Id              string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	AccountId       string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	RequestedGender v1.Gender              `protobuf:"varint,3,opt,name=requested_gender,json=requestedGender,proto3,enum=identity.v1.Gender" json:"requested_gender,omitempty"`
+	Note            string                 `protobuf:"bytes,4,opt,name=note,proto3" json:"note,omitempty"`
+	Resolved        bool                   `protobuf:"varint,5,opt,name=resolved,proto3" json:"resolved,omitempty"`
+	Approved        bool                   `protobuf:"varint,6,opt,name=approved,proto3" json:"approved,omitempty"`
+	RequestedAtUnix int64                  `protobuf:"varint,7,opt,name=requested_at_unix,json=requestedAtUnix,proto3" json:"requested_at_unix,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *GenderChangeRequest) Reset() {
+	*x = GenderChangeRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[1]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *GenderChangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*GenderChangeRequest) ProtoMessage() {}
+
+func (x *GenderChangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[1]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use GenderChangeRequest.ProtoReflect.Descriptor instead.
+func (*GenderChangeRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{1}
+}
+
+func (x *GenderChangeRequest) GetId() string {
+	if x != nil {
+		return x.Id
+	}
+	return ""
+}
+
+func (x *GenderChangeRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *GenderChangeRequest) GetRequestedGender() v1.Gender {
+	if x != nil {
+		return x.RequestedGender
+	}
+	return v1.Gender(0)
+}
+
+func (x *GenderChangeRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+func (x *GenderChangeRequest) GetResolved() bool {
+	if x != nil {
+		return x.Resolved
+	}
+	return false
+}
+
+func (x *GenderChangeRequest) GetApproved() bool {
+	if x != nil {
+		return x.Approved
+	}
+	return false
+}
+
+func (x *GenderChangeRequest) GetRequestedAtUnix() int64 {
+	if x != nil {
+		return x.RequestedAtUnix
+	}
+	return 0
+}
+
 type FileReportRequest struct {
 	state             protoimpl.MessageState `protogen:"open.v1"`
 	ReporterAccountId string                 `protobuf:"bytes,1,opt,name=reporter_account_id,json=reporterAccountId,proto3" json:"reporter_account_id,omitempty"`
@@ -33,7 +218,7 @@ type FileReportRequest struct {
 
 func (x *FileReportRequest) Reset() {
 	*x = FileReportRequest{}
-	mi := &file_moderation_v1_moderation_proto_msgTypes[0]
+	mi := &file_moderation_v1_moderation_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -45,7 +230,7 @@ func (x *FileReportRequest) String() string {
 func (*FileReportRequest) ProtoMessage() {}
 
 func (x *FileReportRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_moderation_v1_moderation_proto_msgTypes[0]
+	mi := &file_moderation_v1_moderation_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -58,7 +243,7 @@ func (x *FileReportRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileReportRequest.ProtoReflect.Descriptor instead.
 func (*FileReportRequest) Descriptor() ([]byte, []int) {
-	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{0}
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{2}
 }
 
 func (x *FileReportRequest) GetReporterAccountId() string {
@@ -98,7 +283,7 @@ type FileReportResponse struct {
 
 func (x *FileReportResponse) Reset() {
 	*x = FileReportResponse{}
-	mi := &file_moderation_v1_moderation_proto_msgTypes[1]
+	mi := &file_moderation_v1_moderation_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -110,7 +295,7 @@ func (x *FileReportResponse) String() string {
 func (*FileReportResponse) ProtoMessage() {}
 
 func (x *FileReportResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_moderation_v1_moderation_proto_msgTypes[1]
+	mi := &file_moderation_v1_moderation_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -123,7 +308,7 @@ func (x *FileReportResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use FileReportResponse.ProtoReflect.Descriptor instead.
 func (*FileReportResponse) Descriptor() ([]byte, []int) {
-	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{1}
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{3}
 }
 
 func (x *FileReportResponse) GetReportId() string {
@@ -143,7 +328,7 @@ type BlockUserRequest struct {
 
 func (x *BlockUserRequest) Reset() {
 	*x = BlockUserRequest{}
-	mi := &file_moderation_v1_moderation_proto_msgTypes[2]
+	mi := &file_moderation_v1_moderation_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -155,7 +340,7 @@ func (x *BlockUserRequest) String() string {
 func (*BlockUserRequest) ProtoMessage() {}
 
 func (x *BlockUserRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_moderation_v1_moderation_proto_msgTypes[2]
+	mi := &file_moderation_v1_moderation_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -168,7 +353,7 @@ func (x *BlockUserRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockUserRequest.ProtoReflect.Descriptor instead.
 func (*BlockUserRequest) Descriptor() ([]byte, []int) {
-	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{2}
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *BlockUserRequest) GetAccountId() string {
@@ -194,7 +379,7 @@ type BlockUserResponse struct {
 
 func (x *BlockUserResponse) Reset() {
 	*x = BlockUserResponse{}
-	mi := &file_moderation_v1_moderation_proto_msgTypes[3]
+	mi := &file_moderation_v1_moderation_proto_msgTypes[5]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -206,7 +391,7 @@ func (x *BlockUserResponse) String() string {
 func (*BlockUserResponse) ProtoMessage() {}
 
 func (x *BlockUserResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_moderation_v1_moderation_proto_msgTypes[3]
+	mi := &file_moderation_v1_moderation_proto_msgTypes[5]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -219,7 +404,7 @@ func (x *BlockUserResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use BlockUserResponse.ProtoReflect.Descriptor instead.
 func (*BlockUserResponse) Descriptor() ([]byte, []int) {
-	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{3}
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{5}
 }
 
 func (x *BlockUserResponse) GetBlocked() bool {
@@ -229,11 +414,773 @@ func (x *BlockUserResponse) GetBlocked() bool {
 	return false
 }
 
+type ListBlocksRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListBlocksRequest) Reset() {
+	*x = ListBlocksRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[6]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlocksRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlocksRequest) ProtoMessage() {}
+
+func (x *ListBlocksRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[6]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlocksRequest.ProtoReflect.Descriptor instead.
+func (*ListBlocksRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{6}
+}
+
+func (x *ListBlocksRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type ListBlocksResponse struct {
+	state             protoimpl.MessageState `protogen:"open.v1"`
+	BlockedAccountIds []string               `protobuf:"bytes,1,rep,name=blocked_account_ids,json=blockedAccountIds,proto3" json:"blocked_account_ids,omitempty"`
+	unknownFields     protoimpl.UnknownFields
+	sizeCache         protoimpl.SizeCache
+}
+
+func (x *ListBlocksResponse) Reset() {
+	*x = ListBlocksResponse{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListBlocksResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListBlocksResponse) ProtoMessage() {}
+
+func (x *ListBlocksResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListBlocksResponse.ProtoReflect.Descriptor instead.
+func (*ListBlocksResponse) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *ListBlocksResponse) GetBlockedAccountIds() []string {
+	if x != nil {
+		return x.BlockedAccountIds
+	}
+	return nil
+}
+
+type RequestGenderChangeRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	AccountId       string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	RequestedGender v1.Gender              `protobuf:"varint,2,opt,name=requested_gender,json=requestedGender,proto3,enum=identity.v1.Gender" json:"requested_gender,omitempty"`
+	Note            string                 `protobuf:"bytes,3,opt,name=note,proto3" json:"note,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *RequestGenderChangeRequest) Reset() {
+	*x = RequestGenderChangeRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestGenderChangeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestGenderChangeRequest) ProtoMessage() {}
+
+func (x *RequestGenderChangeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestGenderChangeRequest.ProtoReflect.Descriptor instead.
+func (*RequestGenderChangeRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *RequestGenderChangeRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RequestGenderChangeRequest) GetRequestedGender() v1.Gender {
+	if x != nil {
+		return x.RequestedGender
+	}
+	return v1.Gender(0)
+}
+
+func (x *RequestGenderChangeRequest) GetNote() string {
+	if x != nil {
+		return x.Note
+	}
+	return ""
+}
+
+type RequestGenderChangeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RequestGenderChangeResponse) Reset() {
+	*x = RequestGenderChangeResponse{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RequestGenderChangeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RequestGenderChangeResponse) ProtoMessage() {}
+
+func (x *RequestGenderChangeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RequestGenderChangeResponse.ProtoReflect.Descriptor instead.
+func (*RequestGenderChangeResponse) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{9}
+}
+
+func (x *RequestGenderChangeResponse) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type ListReportsRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OnlyUnresolved bool                   `protobuf:"varint,1,opt,name=only_unresolved,json=onlyUnresolved,proto3" json:"only_unresolved,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListReportsRequest) Reset() {
+	*x = ListReportsRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListReportsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListReportsRequest) ProtoMessage() {}
+
+func (x *ListReportsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListReportsRequest.ProtoReflect.Descriptor instead.
+func (*ListReportsRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *ListReportsRequest) GetOnlyUnresolved() bool {
+	if x != nil {
+		return x.OnlyUnresolved
+	}
+	return false
+}
+
+type ListReportsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Reports       []*Report              `protobuf:"bytes,1,rep,name=reports,proto3" json:"reports,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListReportsResponse) Reset() {
+	*x = ListReportsResponse{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListReportsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListReportsResponse) ProtoMessage() {}
+
+func (x *ListReportsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListReportsResponse.ProtoReflect.Descriptor instead.
+func (*ListReportsResponse) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *ListReportsResponse) GetReports() []*Report {
+	if x != nil {
+		return x.Reports
+	}
+	return nil
+}
+
+type ResolveReportRequest struct {
+	state    protoimpl.MessageState `protogen:"open.v1"`
+	ReportId string                 `protobuf:"bytes,1,opt,name=report_id,json=reportId,proto3" json:"report_id,omitempty"`
+	// Who resolved it, recorded in the admin action log (DEC-0029).
+	ResolvedBy    string `protobuf:"bytes,2,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
+	Outcome       string `protobuf:"bytes,3,opt,name=outcome,proto3" json:"outcome,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveReportRequest) Reset() {
+	*x = ResolveReportRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveReportRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveReportRequest) ProtoMessage() {}
+
+func (x *ResolveReportRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveReportRequest.ProtoReflect.Descriptor instead.
+func (*ResolveReportRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ResolveReportRequest) GetReportId() string {
+	if x != nil {
+		return x.ReportId
+	}
+	return ""
+}
+
+func (x *ResolveReportRequest) GetResolvedBy() string {
+	if x != nil {
+		return x.ResolvedBy
+	}
+	return ""
+}
+
+func (x *ResolveReportRequest) GetOutcome() string {
+	if x != nil {
+		return x.Outcome
+	}
+	return ""
+}
+
+type ResolveReportResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveReportResponse) Reset() {
+	*x = ResolveReportResponse{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveReportResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveReportResponse) ProtoMessage() {}
+
+func (x *ResolveReportResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveReportResponse.ProtoReflect.Descriptor instead.
+func (*ResolveReportResponse) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{13}
+}
+
+type BanAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	BannedBy      string                 `protobuf:"bytes,3,opt,name=banned_by,json=bannedBy,proto3" json:"banned_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BanAccountRequest) Reset() {
+	*x = BanAccountRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BanAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BanAccountRequest) ProtoMessage() {}
+
+func (x *BanAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BanAccountRequest.ProtoReflect.Descriptor instead.
+func (*BanAccountRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *BanAccountRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *BanAccountRequest) GetReason() string {
+	if x != nil {
+		return x.Reason
+	}
+	return ""
+}
+
+func (x *BanAccountRequest) GetBannedBy() string {
+	if x != nil {
+		return x.BannedBy
+	}
+	return ""
+}
+
+type BanAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *BanAccountResponse) Reset() {
+	*x = BanAccountResponse{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *BanAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*BanAccountResponse) ProtoMessage() {}
+
+func (x *BanAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use BanAccountResponse.ProtoReflect.Descriptor instead.
+func (*BanAccountResponse) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{15}
+}
+
+type UnbanAccountRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	UnbannedBy    string                 `protobuf:"bytes,2,opt,name=unbanned_by,json=unbannedBy,proto3" json:"unbanned_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnbanAccountRequest) Reset() {
+	*x = UnbanAccountRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[16]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnbanAccountRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnbanAccountRequest) ProtoMessage() {}
+
+func (x *UnbanAccountRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[16]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnbanAccountRequest.ProtoReflect.Descriptor instead.
+func (*UnbanAccountRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{16}
+}
+
+func (x *UnbanAccountRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *UnbanAccountRequest) GetUnbannedBy() string {
+	if x != nil {
+		return x.UnbannedBy
+	}
+	return ""
+}
+
+type UnbanAccountResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *UnbanAccountResponse) Reset() {
+	*x = UnbanAccountResponse{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[17]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *UnbanAccountResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*UnbanAccountResponse) ProtoMessage() {}
+
+func (x *UnbanAccountResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[17]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use UnbanAccountResponse.ProtoReflect.Descriptor instead.
+func (*UnbanAccountResponse) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{17}
+}
+
+type ListGenderChangeRequestsRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OnlyUnresolved bool                   `protobuf:"varint,1,opt,name=only_unresolved,json=onlyUnresolved,proto3" json:"only_unresolved,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *ListGenderChangeRequestsRequest) Reset() {
+	*x = ListGenderChangeRequestsRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListGenderChangeRequestsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGenderChangeRequestsRequest) ProtoMessage() {}
+
+func (x *ListGenderChangeRequestsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGenderChangeRequestsRequest.ProtoReflect.Descriptor instead.
+func (*ListGenderChangeRequestsRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *ListGenderChangeRequestsRequest) GetOnlyUnresolved() bool {
+	if x != nil {
+		return x.OnlyUnresolved
+	}
+	return false
+}
+
+type ListGenderChangeRequestsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Requests      []*GenderChangeRequest `protobuf:"bytes,1,rep,name=requests,proto3" json:"requests,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListGenderChangeRequestsResponse) Reset() {
+	*x = ListGenderChangeRequestsResponse{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListGenderChangeRequestsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListGenderChangeRequestsResponse) ProtoMessage() {}
+
+func (x *ListGenderChangeRequestsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListGenderChangeRequestsResponse.ProtoReflect.Descriptor instead.
+func (*ListGenderChangeRequestsResponse) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *ListGenderChangeRequestsResponse) GetRequests() []*GenderChangeRequest {
+	if x != nil {
+		return x.Requests
+	}
+	return nil
+}
+
+type ResolveGenderChangeRequestRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RequestId     string                 `protobuf:"bytes,1,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Approve       bool                   `protobuf:"varint,2,opt,name=approve,proto3" json:"approve,omitempty"`
+	ResolvedBy    string                 `protobuf:"bytes,3,opt,name=resolved_by,json=resolvedBy,proto3" json:"resolved_by,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveGenderChangeRequestRequest) Reset() {
+	*x = ResolveGenderChangeRequestRequest{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveGenderChangeRequestRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveGenderChangeRequestRequest) ProtoMessage() {}
+
+func (x *ResolveGenderChangeRequestRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveGenderChangeRequestRequest.ProtoReflect.Descriptor instead.
+func (*ResolveGenderChangeRequestRequest) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *ResolveGenderChangeRequestRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *ResolveGenderChangeRequestRequest) GetApprove() bool {
+	if x != nil {
+		return x.Approve
+	}
+	return false
+}
+
+func (x *ResolveGenderChangeRequestRequest) GetResolvedBy() string {
+	if x != nil {
+		return x.ResolvedBy
+	}
+	return ""
+}
+
+type ResolveGenderChangeRequestResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ResolveGenderChangeRequestResponse) Reset() {
+	*x = ResolveGenderChangeRequestResponse{}
+	mi := &file_moderation_v1_moderation_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ResolveGenderChangeRequestResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ResolveGenderChangeRequestResponse) ProtoMessage() {}
+
+func (x *ResolveGenderChangeRequestResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_moderation_v1_moderation_proto_msgTypes[21]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ResolveGenderChangeRequestResponse.ProtoReflect.Descriptor instead.
+func (*ResolveGenderChangeRequestResponse) Descriptor() ([]byte, []int) {
+	return file_moderation_v1_moderation_proto_rawDescGZIP(), []int{21}
+}
+
 var File_moderation_v1_moderation_proto protoreflect.FileDescriptor
 
 const file_moderation_v1_moderation_proto_rawDesc = "" +
 	"\n" +
-	"\x1emoderation/v1/moderation.proto\x12\rmoderation.v1\"\xa4\x01\n" +
+	"\x1emoderation/v1/moderation.proto\x12\rmoderation.v1\x1a\x1aidentity/v1/identity.proto\"\xe9\x01\n" +
+	"\x06Report\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12.\n" +
+	"\x13reporter_account_id\x18\x02 \x01(\tR\x11reporterAccountId\x12.\n" +
+	"\x13reported_account_id\x18\x03 \x01(\tR\x11reportedAccountId\x12\x17\n" +
+	"\aroom_id\x18\x04 \x01(\tR\x06roomId\x12\x16\n" +
+	"\x06reason\x18\x05 \x01(\tR\x06reason\x12\x1a\n" +
+	"\bresolved\x18\x06 \x01(\bR\bresolved\x12\"\n" +
+	"\rfiled_at_unix\x18\a \x01(\x03R\vfiledAtUnix\"\xfc\x01\n" +
+	"\x13GenderChangeRequest\x12\x0e\n" +
+	"\x02id\x18\x01 \x01(\tR\x02id\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12>\n" +
+	"\x10requested_gender\x18\x03 \x01(\x0e2\x13.identity.v1.GenderR\x0frequestedGender\x12\x12\n" +
+	"\x04note\x18\x04 \x01(\tR\x04note\x12\x1a\n" +
+	"\bresolved\x18\x05 \x01(\bR\bresolved\x12\x1a\n" +
+	"\bapproved\x18\x06 \x01(\bR\bapproved\x12*\n" +
+	"\x11requested_at_unix\x18\a \x01(\x03R\x0frequestedAtUnix\"\xa4\x01\n" +
 	"\x11FileReportRequest\x12.\n" +
 	"\x13reporter_account_id\x18\x01 \x01(\tR\x11reporterAccountId\x12.\n" +
 	"\x13reported_account_id\x18\x02 \x01(\tR\x11reportedAccountId\x12\x17\n" +
@@ -246,11 +1193,67 @@ const file_moderation_v1_moderation_proto_rawDesc = "" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12,\n" +
 	"\x12blocked_account_id\x18\x02 \x01(\tR\x10blockedAccountId\"-\n" +
 	"\x11BlockUserResponse\x12\x18\n" +
-	"\ablocked\x18\x01 \x01(\bR\ablocked2\xb6\x01\n" +
+	"\ablocked\x18\x01 \x01(\bR\ablocked\"2\n" +
+	"\x11ListBlocksRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\"D\n" +
+	"\x12ListBlocksResponse\x12.\n" +
+	"\x13blocked_account_ids\x18\x01 \x03(\tR\x11blockedAccountIds\"\x8f\x01\n" +
+	"\x1aRequestGenderChangeRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12>\n" +
+	"\x10requested_gender\x18\x02 \x01(\x0e2\x13.identity.v1.GenderR\x0frequestedGender\x12\x12\n" +
+	"\x04note\x18\x03 \x01(\tR\x04note\"<\n" +
+	"\x1bRequestGenderChangeResponse\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\"=\n" +
+	"\x12ListReportsRequest\x12'\n" +
+	"\x0fonly_unresolved\x18\x01 \x01(\bR\x0eonlyUnresolved\"F\n" +
+	"\x13ListReportsResponse\x12/\n" +
+	"\areports\x18\x01 \x03(\v2\x15.moderation.v1.ReportR\areports\"n\n" +
+	"\x14ResolveReportRequest\x12\x1b\n" +
+	"\treport_id\x18\x01 \x01(\tR\breportId\x12\x1f\n" +
+	"\vresolved_by\x18\x02 \x01(\tR\n" +
+	"resolvedBy\x12\x18\n" +
+	"\aoutcome\x18\x03 \x01(\tR\aoutcome\"\x17\n" +
+	"\x15ResolveReportResponse\"g\n" +
+	"\x11BanAccountRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x16\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12\x1b\n" +
+	"\tbanned_by\x18\x03 \x01(\tR\bbannedBy\"\x14\n" +
+	"\x12BanAccountResponse\"U\n" +
+	"\x13UnbanAccountRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1f\n" +
+	"\vunbanned_by\x18\x02 \x01(\tR\n" +
+	"unbannedBy\"\x16\n" +
+	"\x14UnbanAccountResponse\"J\n" +
+	"\x1fListGenderChangeRequestsRequest\x12'\n" +
+	"\x0fonly_unresolved\x18\x01 \x01(\bR\x0eonlyUnresolved\"b\n" +
+	" ListGenderChangeRequestsResponse\x12>\n" +
+	"\brequests\x18\x01 \x03(\v2\".moderation.v1.GenderChangeRequestR\brequests\"}\n" +
+	"!ResolveGenderChangeRequestRequest\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x01 \x01(\tR\trequestId\x12\x18\n" +
+	"\aapprove\x18\x02 \x01(\bR\aapprove\x12\x1f\n" +
+	"\vresolved_by\x18\x03 \x01(\tR\n" +
+	"resolvedBy\"$\n" +
+	"\"ResolveGenderChangeRequestResponse2\xd6\a\n" +
 	"\x11ModerationService\x12Q\n" +
 	"\n" +
 	"FileReport\x12 .moderation.v1.FileReportRequest\x1a!.moderation.v1.FileReportResponse\x12N\n" +
-	"\tBlockUser\x12\x1f.moderation.v1.BlockUserRequest\x1a .moderation.v1.BlockUserResponseBPZNgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/moderation/v1;moderationv1b\x06proto3"
+	"\tBlockUser\x12\x1f.moderation.v1.BlockUserRequest\x1a .moderation.v1.BlockUserResponse\x12Q\n" +
+	"\n" +
+	"ListBlocks\x12 .moderation.v1.ListBlocksRequest\x1a!.moderation.v1.ListBlocksResponse\x12l\n" +
+	"\x13RequestGenderChange\x12).moderation.v1.RequestGenderChangeRequest\x1a*.moderation.v1.RequestGenderChangeResponse\x12T\n" +
+	"\vListReports\x12!.moderation.v1.ListReportsRequest\x1a\".moderation.v1.ListReportsResponse\x12Z\n" +
+	"\rResolveReport\x12#.moderation.v1.ResolveReportRequest\x1a$.moderation.v1.ResolveReportResponse\x12Q\n" +
+	"\n" +
+	"BanAccount\x12 .moderation.v1.BanAccountRequest\x1a!.moderation.v1.BanAccountResponse\x12W\n" +
+	"\fUnbanAccount\x12\".moderation.v1.UnbanAccountRequest\x1a#.moderation.v1.UnbanAccountResponse\x12{\n" +
+	"\x18ListGenderChangeRequests\x12..moderation.v1.ListGenderChangeRequestsRequest\x1a/.moderation.v1.ListGenderChangeRequestsResponse\x12\x81\x01\n" +
+	"\x1aResolveGenderChangeRequest\x120.moderation.v1.ResolveGenderChangeRequestRequest\x1a1.moderation.v1.ResolveGenderChangeRequestResponseBPZNgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/moderation/v1;moderationv1b\x06proto3"
 
 var (
 	file_moderation_v1_moderation_proto_rawDescOnce sync.Once
@@ -264,23 +1267,62 @@ func file_moderation_v1_moderation_proto_rawDescGZIP() []byte {
 	return file_moderation_v1_moderation_proto_rawDescData
 }
 
-var file_moderation_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_moderation_v1_moderation_proto_msgTypes = make([]protoimpl.MessageInfo, 22)
 var file_moderation_v1_moderation_proto_goTypes = []any{
-	(*FileReportRequest)(nil),  // 0: moderation.v1.FileReportRequest
-	(*FileReportResponse)(nil), // 1: moderation.v1.FileReportResponse
-	(*BlockUserRequest)(nil),   // 2: moderation.v1.BlockUserRequest
-	(*BlockUserResponse)(nil),  // 3: moderation.v1.BlockUserResponse
+	(*Report)(nil),                             // 0: moderation.v1.Report
+	(*GenderChangeRequest)(nil),                // 1: moderation.v1.GenderChangeRequest
+	(*FileReportRequest)(nil),                  // 2: moderation.v1.FileReportRequest
+	(*FileReportResponse)(nil),                 // 3: moderation.v1.FileReportResponse
+	(*BlockUserRequest)(nil),                   // 4: moderation.v1.BlockUserRequest
+	(*BlockUserResponse)(nil),                  // 5: moderation.v1.BlockUserResponse
+	(*ListBlocksRequest)(nil),                  // 6: moderation.v1.ListBlocksRequest
+	(*ListBlocksResponse)(nil),                 // 7: moderation.v1.ListBlocksResponse
+	(*RequestGenderChangeRequest)(nil),         // 8: moderation.v1.RequestGenderChangeRequest
+	(*RequestGenderChangeResponse)(nil),        // 9: moderation.v1.RequestGenderChangeResponse
+	(*ListReportsRequest)(nil),                 // 10: moderation.v1.ListReportsRequest
+	(*ListReportsResponse)(nil),                // 11: moderation.v1.ListReportsResponse
+	(*ResolveReportRequest)(nil),               // 12: moderation.v1.ResolveReportRequest
+	(*ResolveReportResponse)(nil),              // 13: moderation.v1.ResolveReportResponse
+	(*BanAccountRequest)(nil),                  // 14: moderation.v1.BanAccountRequest
+	(*BanAccountResponse)(nil),                 // 15: moderation.v1.BanAccountResponse
+	(*UnbanAccountRequest)(nil),                // 16: moderation.v1.UnbanAccountRequest
+	(*UnbanAccountResponse)(nil),               // 17: moderation.v1.UnbanAccountResponse
+	(*ListGenderChangeRequestsRequest)(nil),    // 18: moderation.v1.ListGenderChangeRequestsRequest
+	(*ListGenderChangeRequestsResponse)(nil),   // 19: moderation.v1.ListGenderChangeRequestsResponse
+	(*ResolveGenderChangeRequestRequest)(nil),  // 20: moderation.v1.ResolveGenderChangeRequestRequest
+	(*ResolveGenderChangeRequestResponse)(nil), // 21: moderation.v1.ResolveGenderChangeRequestResponse
+	(v1.Gender)(0),                             // 22: identity.v1.Gender
 }
 var file_moderation_v1_moderation_proto_depIdxs = []int32{
-	0, // 0: moderation.v1.ModerationService.FileReport:input_type -> moderation.v1.FileReportRequest
-	2, // 1: moderation.v1.ModerationService.BlockUser:input_type -> moderation.v1.BlockUserRequest
-	1, // 2: moderation.v1.ModerationService.FileReport:output_type -> moderation.v1.FileReportResponse
-	3, // 3: moderation.v1.ModerationService.BlockUser:output_type -> moderation.v1.BlockUserResponse
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	22, // 0: moderation.v1.GenderChangeRequest.requested_gender:type_name -> identity.v1.Gender
+	22, // 1: moderation.v1.RequestGenderChangeRequest.requested_gender:type_name -> identity.v1.Gender
+	0,  // 2: moderation.v1.ListReportsResponse.reports:type_name -> moderation.v1.Report
+	1,  // 3: moderation.v1.ListGenderChangeRequestsResponse.requests:type_name -> moderation.v1.GenderChangeRequest
+	2,  // 4: moderation.v1.ModerationService.FileReport:input_type -> moderation.v1.FileReportRequest
+	4,  // 5: moderation.v1.ModerationService.BlockUser:input_type -> moderation.v1.BlockUserRequest
+	6,  // 6: moderation.v1.ModerationService.ListBlocks:input_type -> moderation.v1.ListBlocksRequest
+	8,  // 7: moderation.v1.ModerationService.RequestGenderChange:input_type -> moderation.v1.RequestGenderChangeRequest
+	10, // 8: moderation.v1.ModerationService.ListReports:input_type -> moderation.v1.ListReportsRequest
+	12, // 9: moderation.v1.ModerationService.ResolveReport:input_type -> moderation.v1.ResolveReportRequest
+	14, // 10: moderation.v1.ModerationService.BanAccount:input_type -> moderation.v1.BanAccountRequest
+	16, // 11: moderation.v1.ModerationService.UnbanAccount:input_type -> moderation.v1.UnbanAccountRequest
+	18, // 12: moderation.v1.ModerationService.ListGenderChangeRequests:input_type -> moderation.v1.ListGenderChangeRequestsRequest
+	20, // 13: moderation.v1.ModerationService.ResolveGenderChangeRequest:input_type -> moderation.v1.ResolveGenderChangeRequestRequest
+	3,  // 14: moderation.v1.ModerationService.FileReport:output_type -> moderation.v1.FileReportResponse
+	5,  // 15: moderation.v1.ModerationService.BlockUser:output_type -> moderation.v1.BlockUserResponse
+	7,  // 16: moderation.v1.ModerationService.ListBlocks:output_type -> moderation.v1.ListBlocksResponse
+	9,  // 17: moderation.v1.ModerationService.RequestGenderChange:output_type -> moderation.v1.RequestGenderChangeResponse
+	11, // 18: moderation.v1.ModerationService.ListReports:output_type -> moderation.v1.ListReportsResponse
+	13, // 19: moderation.v1.ModerationService.ResolveReport:output_type -> moderation.v1.ResolveReportResponse
+	15, // 20: moderation.v1.ModerationService.BanAccount:output_type -> moderation.v1.BanAccountResponse
+	17, // 21: moderation.v1.ModerationService.UnbanAccount:output_type -> moderation.v1.UnbanAccountResponse
+	19, // 22: moderation.v1.ModerationService.ListGenderChangeRequests:output_type -> moderation.v1.ListGenderChangeRequestsResponse
+	21, // 23: moderation.v1.ModerationService.ResolveGenderChangeRequest:output_type -> moderation.v1.ResolveGenderChangeRequestResponse
+	14, // [14:24] is the sub-list for method output_type
+	4,  // [4:14] is the sub-list for method input_type
+	4,  // [4:4] is the sub-list for extension type_name
+	4,  // [4:4] is the sub-list for extension extendee
+	0,  // [0:4] is the sub-list for field type_name
 }
 
 func init() { file_moderation_v1_moderation_proto_init() }
@@ -294,7 +1336,7 @@ func file_moderation_v1_moderation_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_moderation_v1_moderation_proto_rawDesc), len(file_moderation_v1_moderation_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   22,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

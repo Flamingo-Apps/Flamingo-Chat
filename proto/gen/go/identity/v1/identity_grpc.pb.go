@@ -19,20 +19,43 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
-	IdentityService_CreateAccount_FullMethodName   = "/identity.v1.IdentityService/CreateAccount"
-	IdentityService_VerifyBadge_FullMethodName     = "/identity.v1.IdentityService/VerifyBadge"
-	IdentityService_GetAccount_FullMethodName      = "/identity.v1.IdentityService/GetAccount"
-	IdentityService_UpdatePseudonym_FullMethodName = "/identity.v1.IdentityService/UpdatePseudonym"
+	IdentityService_CreateAccount_FullMethodName    = "/identity.v1.IdentityService/CreateAccount"
+	IdentityService_GetAccount_FullMethodName       = "/identity.v1.IdentityService/GetAccount"
+	IdentityService_UpdatePseudonym_FullMethodName  = "/identity.v1.IdentityService/UpdatePseudonym"
+	IdentityService_VerifyBadge_FullMethodName      = "/identity.v1.IdentityService/VerifyBadge"
+	IdentityService_SignInWithGoogle_FullMethodName = "/identity.v1.IdentityService/SignInWithGoogle"
+	IdentityService_SetGender_FullMethodName        = "/identity.v1.IdentityService/SetGender"
+	IdentityService_AdminSetGender_FullMethodName   = "/identity.v1.IdentityService/AdminSetGender"
+	IdentityService_TouchAccount_FullMethodName     = "/identity.v1.IdentityService/TouchAccount"
 )
 
 // IdentityServiceClient is the client API for IdentityService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
+//
+// See docs/ARCHITECTURE.md §4 for the account model this implements.
 type IdentityServiceClient interface {
-	CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*Account, error)
-	VerifyBadge(ctx context.Context, in *VerifyBadgeRequest, opts ...grpc.CallOption) (*Account, error)
-	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*Account, error)
-	UpdatePseudonym(ctx context.Context, in *UpdatePseudonymRequest, opts ...grpc.CallOption) (*Account, error)
+	CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error)
+	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
+	UpdatePseudonym(ctx context.Context, in *UpdatePseudonymRequest, opts ...grpc.CallOption) (*UpdatePseudonymResponse, error)
+	// Deprecated: superseded by SignInWithGoogle (DEC-0027, DEC-0041). Kept,
+	// with its existing implementation and tests, until the pull request
+	// that implements SignInWithGoogle removes both together rather than
+	// breaking the build in a pull request that only touches contracts.
+	VerifyBadge(ctx context.Context, in *VerifyBadgeRequest, opts ...grpc.CallOption) (*VerifyBadgeResponse, error)
+	// Covers all three sign-in cases in one call: an existing verified
+	// account, upgrading a guest account in place, or creating a new
+	// verified account. See docs/ARCHITECTURE.md §4.2 (DEC-0041).
+	SignInWithGoogle(ctx context.Context, in *SignInWithGoogleRequest, opts ...grpc.CallOption) (*SignInWithGoogleResponse, error)
+	// Gender is chosen once; a second call fails (DEC-0028).
+	SetGender(ctx context.Context, in *SetGenderRequest, opts ...grpc.CallOption) (*SetGenderResponse, error)
+	// Only for the admin tool, after a reviewed change request (DEC-0028,
+	// DEC-0029) - never reachable from the gateway.
+	AdminSetGender(ctx context.Context, in *AdminSetGenderRequest, opts ...grpc.CallOption) (*AdminSetGenderResponse, error)
+	// Keeps last_seen_at current for guest-account cleanup (DEC-0026).
+	// Identity itself throttles the actual write to at most once an hour
+	// per account (docs/ARCHITECTURE.md §4.3); callers do not need to.
+	TouchAccount(ctx context.Context, in *TouchAccountRequest, opts ...grpc.CallOption) (*TouchAccountResponse, error)
 }
 
 type identityServiceClient struct {
@@ -43,9 +66,9 @@ func NewIdentityServiceClient(cc grpc.ClientConnInterface) IdentityServiceClient
 	return &identityServiceClient{cc}
 }
 
-func (c *identityServiceClient) CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*Account, error) {
+func (c *identityServiceClient) CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Account)
+	out := new(CreateAccountResponse)
 	err := c.cc.Invoke(ctx, IdentityService_CreateAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -53,19 +76,9 @@ func (c *identityServiceClient) CreateAccount(ctx context.Context, in *CreateAcc
 	return out, nil
 }
 
-func (c *identityServiceClient) VerifyBadge(ctx context.Context, in *VerifyBadgeRequest, opts ...grpc.CallOption) (*Account, error) {
+func (c *identityServiceClient) GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Account)
-	err := c.cc.Invoke(ctx, IdentityService_VerifyBadge_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *identityServiceClient) GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*Account, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Account)
+	out := new(GetAccountResponse)
 	err := c.cc.Invoke(ctx, IdentityService_GetAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
@@ -73,10 +86,60 @@ func (c *identityServiceClient) GetAccount(ctx context.Context, in *GetAccountRe
 	return out, nil
 }
 
-func (c *identityServiceClient) UpdatePseudonym(ctx context.Context, in *UpdatePseudonymRequest, opts ...grpc.CallOption) (*Account, error) {
+func (c *identityServiceClient) UpdatePseudonym(ctx context.Context, in *UpdatePseudonymRequest, opts ...grpc.CallOption) (*UpdatePseudonymResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(Account)
+	out := new(UpdatePseudonymResponse)
 	err := c.cc.Invoke(ctx, IdentityService_UpdatePseudonym_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) VerifyBadge(ctx context.Context, in *VerifyBadgeRequest, opts ...grpc.CallOption) (*VerifyBadgeResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(VerifyBadgeResponse)
+	err := c.cc.Invoke(ctx, IdentityService_VerifyBadge_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) SignInWithGoogle(ctx context.Context, in *SignInWithGoogleRequest, opts ...grpc.CallOption) (*SignInWithGoogleResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SignInWithGoogleResponse)
+	err := c.cc.Invoke(ctx, IdentityService_SignInWithGoogle_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) SetGender(ctx context.Context, in *SetGenderRequest, opts ...grpc.CallOption) (*SetGenderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SetGenderResponse)
+	err := c.cc.Invoke(ctx, IdentityService_SetGender_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) AdminSetGender(ctx context.Context, in *AdminSetGenderRequest, opts ...grpc.CallOption) (*AdminSetGenderResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(AdminSetGenderResponse)
+	err := c.cc.Invoke(ctx, IdentityService_AdminSetGender_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *identityServiceClient) TouchAccount(ctx context.Context, in *TouchAccountRequest, opts ...grpc.CallOption) (*TouchAccountResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(TouchAccountResponse)
+	err := c.cc.Invoke(ctx, IdentityService_TouchAccount_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -86,11 +149,30 @@ func (c *identityServiceClient) UpdatePseudonym(ctx context.Context, in *UpdateP
 // IdentityServiceServer is the server API for IdentityService service.
 // All implementations must embed UnimplementedIdentityServiceServer
 // for forward compatibility.
+//
+// See docs/ARCHITECTURE.md §4 for the account model this implements.
 type IdentityServiceServer interface {
-	CreateAccount(context.Context, *CreateAccountRequest) (*Account, error)
-	VerifyBadge(context.Context, *VerifyBadgeRequest) (*Account, error)
-	GetAccount(context.Context, *GetAccountRequest) (*Account, error)
-	UpdatePseudonym(context.Context, *UpdatePseudonymRequest) (*Account, error)
+	CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error)
+	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
+	UpdatePseudonym(context.Context, *UpdatePseudonymRequest) (*UpdatePseudonymResponse, error)
+	// Deprecated: superseded by SignInWithGoogle (DEC-0027, DEC-0041). Kept,
+	// with its existing implementation and tests, until the pull request
+	// that implements SignInWithGoogle removes both together rather than
+	// breaking the build in a pull request that only touches contracts.
+	VerifyBadge(context.Context, *VerifyBadgeRequest) (*VerifyBadgeResponse, error)
+	// Covers all three sign-in cases in one call: an existing verified
+	// account, upgrading a guest account in place, or creating a new
+	// verified account. See docs/ARCHITECTURE.md §4.2 (DEC-0041).
+	SignInWithGoogle(context.Context, *SignInWithGoogleRequest) (*SignInWithGoogleResponse, error)
+	// Gender is chosen once; a second call fails (DEC-0028).
+	SetGender(context.Context, *SetGenderRequest) (*SetGenderResponse, error)
+	// Only for the admin tool, after a reviewed change request (DEC-0028,
+	// DEC-0029) - never reachable from the gateway.
+	AdminSetGender(context.Context, *AdminSetGenderRequest) (*AdminSetGenderResponse, error)
+	// Keeps last_seen_at current for guest-account cleanup (DEC-0026).
+	// Identity itself throttles the actual write to at most once an hour
+	// per account (docs/ARCHITECTURE.md §4.3); callers do not need to.
+	TouchAccount(context.Context, *TouchAccountRequest) (*TouchAccountResponse, error)
 	mustEmbedUnimplementedIdentityServiceServer()
 }
 
@@ -101,17 +183,29 @@ type IdentityServiceServer interface {
 // pointer dereference when methods are called.
 type UnimplementedIdentityServiceServer struct{}
 
-func (UnimplementedIdentityServiceServer) CreateAccount(context.Context, *CreateAccountRequest) (*Account, error) {
+func (UnimplementedIdentityServiceServer) CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method CreateAccount not implemented")
 }
-func (UnimplementedIdentityServiceServer) VerifyBadge(context.Context, *VerifyBadgeRequest) (*Account, error) {
-	return nil, status.Error(codes.Unimplemented, "method VerifyBadge not implemented")
-}
-func (UnimplementedIdentityServiceServer) GetAccount(context.Context, *GetAccountRequest) (*Account, error) {
+func (UnimplementedIdentityServiceServer) GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method GetAccount not implemented")
 }
-func (UnimplementedIdentityServiceServer) UpdatePseudonym(context.Context, *UpdatePseudonymRequest) (*Account, error) {
+func (UnimplementedIdentityServiceServer) UpdatePseudonym(context.Context, *UpdatePseudonymRequest) (*UpdatePseudonymResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdatePseudonym not implemented")
+}
+func (UnimplementedIdentityServiceServer) VerifyBadge(context.Context, *VerifyBadgeRequest) (*VerifyBadgeResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method VerifyBadge not implemented")
+}
+func (UnimplementedIdentityServiceServer) SignInWithGoogle(context.Context, *SignInWithGoogleRequest) (*SignInWithGoogleResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SignInWithGoogle not implemented")
+}
+func (UnimplementedIdentityServiceServer) SetGender(context.Context, *SetGenderRequest) (*SetGenderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method SetGender not implemented")
+}
+func (UnimplementedIdentityServiceServer) AdminSetGender(context.Context, *AdminSetGenderRequest) (*AdminSetGenderResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method AdminSetGender not implemented")
+}
+func (UnimplementedIdentityServiceServer) TouchAccount(context.Context, *TouchAccountRequest) (*TouchAccountResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method TouchAccount not implemented")
 }
 func (UnimplementedIdentityServiceServer) mustEmbedUnimplementedIdentityServiceServer() {}
 func (UnimplementedIdentityServiceServer) testEmbeddedByValue()                         {}
@@ -152,24 +246,6 @@ func _IdentityService_CreateAccount_Handler(srv interface{}, ctx context.Context
 	return interceptor(ctx, in, info, handler)
 }
 
-func _IdentityService_VerifyBadge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VerifyBadgeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IdentityServiceServer).VerifyBadge(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: IdentityService_VerifyBadge_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IdentityServiceServer).VerifyBadge(ctx, req.(*VerifyBadgeRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 func _IdentityService_GetAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(GetAccountRequest)
 	if err := dec(in); err != nil {
@@ -206,6 +282,96 @@ func _IdentityService_UpdatePseudonym_Handler(srv interface{}, ctx context.Conte
 	return interceptor(ctx, in, info, handler)
 }
 
+func _IdentityService_VerifyBadge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(VerifyBadgeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).VerifyBadge(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_VerifyBadge_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).VerifyBadge(ctx, req.(*VerifyBadgeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_SignInWithGoogle_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SignInWithGoogleRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).SignInWithGoogle(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_SignInWithGoogle_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).SignInWithGoogle(ctx, req.(*SignInWithGoogleRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_SetGender_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SetGenderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).SetGender(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_SetGender_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).SetGender(ctx, req.(*SetGenderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_AdminSetGender_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(AdminSetGenderRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).AdminSetGender(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_AdminSetGender_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).AdminSetGender(ctx, req.(*AdminSetGenderRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _IdentityService_TouchAccount_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(TouchAccountRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(IdentityServiceServer).TouchAccount(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: IdentityService_TouchAccount_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(IdentityServiceServer).TouchAccount(ctx, req.(*TouchAccountRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // IdentityService_ServiceDesc is the grpc.ServiceDesc for IdentityService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -218,16 +384,32 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 			Handler:    _IdentityService_CreateAccount_Handler,
 		},
 		{
-			MethodName: "VerifyBadge",
-			Handler:    _IdentityService_VerifyBadge_Handler,
-		},
-		{
 			MethodName: "GetAccount",
 			Handler:    _IdentityService_GetAccount_Handler,
 		},
 		{
 			MethodName: "UpdatePseudonym",
 			Handler:    _IdentityService_UpdatePseudonym_Handler,
+		},
+		{
+			MethodName: "VerifyBadge",
+			Handler:    _IdentityService_VerifyBadge_Handler,
+		},
+		{
+			MethodName: "SignInWithGoogle",
+			Handler:    _IdentityService_SignInWithGoogle_Handler,
+		},
+		{
+			MethodName: "SetGender",
+			Handler:    _IdentityService_SetGender_Handler,
+		},
+		{
+			MethodName: "AdminSetGender",
+			Handler:    _IdentityService_AdminSetGender_Handler,
+		},
+		{
+			MethodName: "TouchAccount",
+			Handler:    _IdentityService_TouchAccount_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},

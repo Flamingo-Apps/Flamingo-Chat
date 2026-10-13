@@ -71,13 +71,20 @@ func (RoomType) EnumDescriptor() ([]byte, []int) {
 }
 
 type Room struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Id               string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
-	Type             RoomType               `protobuf:"varint,2,opt,name=type,proto3,enum=chat.v1.RoomType" json:"type,omitempty"`
-	InviteCode       string                 `protobuf:"bytes,3,opt,name=invite_code,json=inviteCode,proto3" json:"invite_code,omitempty"`
-	MemberAccountIds []string               `protobuf:"bytes,4,rep,name=member_account_ids,json=memberAccountIds,proto3" json:"member_account_ids,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	Id             string                 `protobuf:"bytes,1,opt,name=id,proto3" json:"id,omitempty"`
+	Type           RoomType               `protobuf:"varint,2,opt,name=type,proto3,enum=chat.v1.RoomType" json:"type,omitempty"`
+	Name           string                 `protobuf:"bytes,3,opt,name=name,proto3" json:"name,omitempty"`                                             // group rooms only
+	OwnerAccountId string                 `protobuf:"bytes,4,opt,name=owner_account_id,json=ownerAccountId,proto3" json:"owner_account_id,omitempty"` // group rooms only
+	InviteCode     string                 `protobuf:"bytes,5,opt,name=invite_code,json=inviteCode,proto3" json:"invite_code,omitempty"`               // group rooms only
+	// Direct rooms only: true once both participants have voted to keep the
+	// conversation (DEC-0031).
+	Kept          bool  `protobuf:"varint,6,opt,name=kept,proto3" json:"kept,omitempty"`
+	CreatedAtUnix int64 `protobuf:"varint,7,opt,name=created_at_unix,json=createdAtUnix,proto3" json:"created_at_unix,omitempty"`
+	// 0 while the room is still open.
+	EndedAtUnix   int64 `protobuf:"varint,8,opt,name=ended_at_unix,json=endedAtUnix,proto3" json:"ended_at_unix,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *Room) Reset() {
@@ -124,6 +131,20 @@ func (x *Room) GetType() RoomType {
 	return RoomType_ROOM_TYPE_UNSPECIFIED
 }
 
+func (x *Room) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+func (x *Room) GetOwnerAccountId() string {
+	if x != nil {
+		return x.OwnerAccountId
+	}
+	return ""
+}
+
 func (x *Room) GetInviteCode() string {
 	if x != nil {
 		return x.InviteCode
@@ -131,35 +152,53 @@ func (x *Room) GetInviteCode() string {
 	return ""
 }
 
-func (x *Room) GetMemberAccountIds() []string {
+func (x *Room) GetKept() bool {
 	if x != nil {
-		return x.MemberAccountIds
+		return x.Kept
 	}
-	return nil
+	return false
 }
 
-type CreateRoomRequest struct {
-	state            protoimpl.MessageState `protogen:"open.v1"`
-	Type             RoomType               `protobuf:"varint,1,opt,name=type,proto3,enum=chat.v1.RoomType" json:"type,omitempty"`
-	MemberAccountIds []string               `protobuf:"bytes,2,rep,name=member_account_ids,json=memberAccountIds,proto3" json:"member_account_ids,omitempty"`
-	unknownFields    protoimpl.UnknownFields
-	sizeCache        protoimpl.SizeCache
+func (x *Room) GetCreatedAtUnix() int64 {
+	if x != nil {
+		return x.CreatedAtUnix
+	}
+	return 0
 }
 
-func (x *CreateRoomRequest) Reset() {
-	*x = CreateRoomRequest{}
+func (x *Room) GetEndedAtUnix() int64 {
+	if x != nil {
+		return x.EndedAtUnix
+	}
+	return 0
+}
+
+type Message struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	MessageId       string                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
+	RoomId          string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	SenderAccountId string                 `protobuf:"bytes,3,opt,name=sender_account_id,json=senderAccountId,proto3" json:"sender_account_id,omitempty"`
+	SenderPseudonym string                 `protobuf:"bytes,4,opt,name=sender_pseudonym,json=senderPseudonym,proto3" json:"sender_pseudonym,omitempty"`
+	Body            string                 `protobuf:"bytes,5,opt,name=body,proto3" json:"body,omitempty"`
+	SentAtUnix      int64                  `protobuf:"varint,6,opt,name=sent_at_unix,json=sentAtUnix,proto3" json:"sent_at_unix,omitempty"`
+	unknownFields   protoimpl.UnknownFields
+	sizeCache       protoimpl.SizeCache
+}
+
+func (x *Message) Reset() {
+	*x = Message{}
 	mi := &file_chat_v1_chat_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *CreateRoomRequest) String() string {
+func (x *Message) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*CreateRoomRequest) ProtoMessage() {}
+func (*Message) ProtoMessage() {}
 
-func (x *CreateRoomRequest) ProtoReflect() protoreflect.Message {
+func (x *Message) ProtoReflect() protoreflect.Message {
 	mi := &file_chat_v1_chat_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
@@ -171,21 +210,234 @@ func (x *CreateRoomRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use CreateRoomRequest.ProtoReflect.Descriptor instead.
-func (*CreateRoomRequest) Descriptor() ([]byte, []int) {
+// Deprecated: Use Message.ProtoReflect.Descriptor instead.
+func (*Message) Descriptor() ([]byte, []int) {
 	return file_chat_v1_chat_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *CreateRoomRequest) GetType() RoomType {
+func (x *Message) GetMessageId() string {
 	if x != nil {
-		return x.Type
+		return x.MessageId
 	}
-	return RoomType_ROOM_TYPE_UNSPECIFIED
+	return ""
 }
 
-func (x *CreateRoomRequest) GetMemberAccountIds() []string {
+func (x *Message) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *Message) GetSenderAccountId() string {
+	if x != nil {
+		return x.SenderAccountId
+	}
+	return ""
+}
+
+func (x *Message) GetSenderPseudonym() string {
+	if x != nil {
+		return x.SenderPseudonym
+	}
+	return ""
+}
+
+func (x *Message) GetBody() string {
+	if x != nil {
+		return x.Body
+	}
+	return ""
+}
+
+func (x *Message) GetSentAtUnix() int64 {
+	if x != nil {
+		return x.SentAtUnix
+	}
+	return 0
+}
+
+type CreateGroupRoomRequest struct {
+	state          protoimpl.MessageState `protogen:"open.v1"`
+	OwnerAccountId string                 `protobuf:"bytes,1,opt,name=owner_account_id,json=ownerAccountId,proto3" json:"owner_account_id,omitempty"`
+	Name           string                 `protobuf:"bytes,2,opt,name=name,proto3" json:"name,omitempty"`
+	unknownFields  protoimpl.UnknownFields
+	sizeCache      protoimpl.SizeCache
+}
+
+func (x *CreateGroupRoomRequest) Reset() {
+	*x = CreateGroupRoomRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[2]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateGroupRoomRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateGroupRoomRequest) ProtoMessage() {}
+
+func (x *CreateGroupRoomRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[2]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateGroupRoomRequest.ProtoReflect.Descriptor instead.
+func (*CreateGroupRoomRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{2}
+}
+
+func (x *CreateGroupRoomRequest) GetOwnerAccountId() string {
+	if x != nil {
+		return x.OwnerAccountId
+	}
+	return ""
+}
+
+func (x *CreateGroupRoomRequest) GetName() string {
+	if x != nil {
+		return x.Name
+	}
+	return ""
+}
+
+type CreateGroupRoomResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateGroupRoomResponse) Reset() {
+	*x = CreateGroupRoomResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateGroupRoomResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateGroupRoomResponse) ProtoMessage() {}
+
+func (x *CreateGroupRoomResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateGroupRoomResponse.ProtoReflect.Descriptor instead.
+func (*CreateGroupRoomResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *CreateGroupRoomResponse) GetRoom() *Room {
+	if x != nil {
+		return x.Room
+	}
+	return nil
+}
+
+type CreateDirectRoomRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Exactly two members.
+	MemberAccountIds []string `protobuf:"bytes,1,rep,name=member_account_ids,json=memberAccountIds,proto3" json:"member_account_ids,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
+}
+
+func (x *CreateDirectRoomRequest) Reset() {
+	*x = CreateDirectRoomRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[4]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateDirectRoomRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateDirectRoomRequest) ProtoMessage() {}
+
+func (x *CreateDirectRoomRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[4]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateDirectRoomRequest.ProtoReflect.Descriptor instead.
+func (*CreateDirectRoomRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{4}
+}
+
+func (x *CreateDirectRoomRequest) GetMemberAccountIds() []string {
 	if x != nil {
 		return x.MemberAccountIds
+	}
+	return nil
+}
+
+type CreateDirectRoomResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *CreateDirectRoomResponse) Reset() {
+	*x = CreateDirectRoomResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[5]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *CreateDirectRoomResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*CreateDirectRoomResponse) ProtoMessage() {}
+
+func (x *CreateDirectRoomResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[5]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use CreateDirectRoomResponse.ProtoReflect.Descriptor instead.
+func (*CreateDirectRoomResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{5}
+}
+
+func (x *CreateDirectRoomResponse) GetRoom() *Room {
+	if x != nil {
+		return x.Room
 	}
 	return nil
 }
@@ -200,7 +452,7 @@ type JoinRoomByCodeRequest struct {
 
 func (x *JoinRoomByCodeRequest) Reset() {
 	*x = JoinRoomByCodeRequest{}
-	mi := &file_chat_v1_chat_proto_msgTypes[2]
+	mi := &file_chat_v1_chat_proto_msgTypes[6]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -212,7 +464,7 @@ func (x *JoinRoomByCodeRequest) String() string {
 func (*JoinRoomByCodeRequest) ProtoMessage() {}
 
 func (x *JoinRoomByCodeRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chat_v1_chat_proto_msgTypes[2]
+	mi := &file_chat_v1_chat_proto_msgTypes[6]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -225,7 +477,7 @@ func (x *JoinRoomByCodeRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use JoinRoomByCodeRequest.ProtoReflect.Descriptor instead.
 func (*JoinRoomByCodeRequest) Descriptor() ([]byte, []int) {
-	return file_chat_v1_chat_proto_rawDescGZIP(), []int{2}
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{6}
 }
 
 func (x *JoinRoomByCodeRequest) GetAccountId() string {
@@ -242,18 +494,454 @@ func (x *JoinRoomByCodeRequest) GetInviteCode() string {
 	return ""
 }
 
-type SendMessageRequest struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	SenderAccountId string                 `protobuf:"bytes,2,opt,name=sender_account_id,json=senderAccountId,proto3" json:"sender_account_id,omitempty"`
-	Body            string                 `protobuf:"bytes,3,opt,name=body,proto3" json:"body,omitempty"`
+type JoinRoomByCodeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Room          *Room                  `protobuf:"bytes,1,opt,name=room,proto3" json:"room,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *JoinRoomByCodeResponse) Reset() {
+	*x = JoinRoomByCodeResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[7]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *JoinRoomByCodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*JoinRoomByCodeResponse) ProtoMessage() {}
+
+func (x *JoinRoomByCodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[7]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use JoinRoomByCodeResponse.ProtoReflect.Descriptor instead.
+func (*JoinRoomByCodeResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{7}
+}
+
+func (x *JoinRoomByCodeResponse) GetRoom() *Room {
+	if x != nil {
+		return x.Room
+	}
+	return nil
+}
+
+type LeaveRoomRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	RoomId        string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LeaveRoomRequest) Reset() {
+	*x = LeaveRoomRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[8]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeaveRoomRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeaveRoomRequest) ProtoMessage() {}
+
+func (x *LeaveRoomRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[8]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeaveRoomRequest.ProtoReflect.Descriptor instead.
+func (*LeaveRoomRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{8}
+}
+
+func (x *LeaveRoomRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *LeaveRoomRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+type LeaveRoomResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *LeaveRoomResponse) Reset() {
+	*x = LeaveRoomResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[9]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *LeaveRoomResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*LeaveRoomResponse) ProtoMessage() {}
+
+func (x *LeaveRoomResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[9]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use LeaveRoomResponse.ProtoReflect.Descriptor instead.
+func (*LeaveRoomResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{9}
+}
+
+type RotateInviteCodeRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	RoomId string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	// Must be the room's owner; anyone else is rejected.
+	RequestedByAccountId string `protobuf:"bytes,2,opt,name=requested_by_account_id,json=requestedByAccountId,proto3" json:"requested_by_account_id,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *RotateInviteCodeRequest) Reset() {
+	*x = RotateInviteCodeRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[10]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RotateInviteCodeRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RotateInviteCodeRequest) ProtoMessage() {}
+
+func (x *RotateInviteCodeRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[10]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RotateInviteCodeRequest.ProtoReflect.Descriptor instead.
+func (*RotateInviteCodeRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{10}
+}
+
+func (x *RotateInviteCodeRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *RotateInviteCodeRequest) GetRequestedByAccountId() string {
+	if x != nil {
+		return x.RequestedByAccountId
+	}
+	return ""
+}
+
+type RotateInviteCodeResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	InviteCode    string                 `protobuf:"bytes,1,opt,name=invite_code,json=inviteCode,proto3" json:"invite_code,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RotateInviteCodeResponse) Reset() {
+	*x = RotateInviteCodeResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[11]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RotateInviteCodeResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RotateInviteCodeResponse) ProtoMessage() {}
+
+func (x *RotateInviteCodeResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[11]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RotateInviteCodeResponse.ProtoReflect.Descriptor instead.
+func (*RotateInviteCodeResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{11}
+}
+
+func (x *RotateInviteCodeResponse) GetInviteCode() string {
+	if x != nil {
+		return x.InviteCode
+	}
+	return ""
+}
+
+type ListMyRoomsRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyRoomsRequest) Reset() {
+	*x = ListMyRoomsRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[12]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyRoomsRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyRoomsRequest) ProtoMessage() {}
+
+func (x *ListMyRoomsRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[12]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyRoomsRequest.ProtoReflect.Descriptor instead.
+func (*ListMyRoomsRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{12}
+}
+
+func (x *ListMyRoomsRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+type ListMyRoomsResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Rooms         []*Room                `protobuf:"bytes,1,rep,name=rooms,proto3" json:"rooms,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMyRoomsResponse) Reset() {
+	*x = ListMyRoomsResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMyRoomsResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMyRoomsResponse) ProtoMessage() {}
+
+func (x *ListMyRoomsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMyRoomsResponse.ProtoReflect.Descriptor instead.
+func (*ListMyRoomsResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *ListMyRoomsResponse) GetRooms() []*Room {
+	if x != nil {
+		return x.Rooms
+	}
+	return nil
+}
+
+type ListMessagesRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	RoomId string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	// Must be a current or former member; checked before returning anything.
+	AccountId string `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// Pagination cursor: messages strictly before this id. Empty means the
+	// newest page (docs/ARCHITECTURE.md §5.1).
+	BeforeMessageId string `protobuf:"bytes,3,opt,name=before_message_id,json=beforeMessageId,proto3" json:"before_message_id,omitempty"`
+	Limit           int32  `protobuf:"varint,4,opt,name=limit,proto3" json:"limit,omitempty"`
 	unknownFields   protoimpl.UnknownFields
 	sizeCache       protoimpl.SizeCache
 }
 
+func (x *ListMessagesRequest) Reset() {
+	*x = ListMessagesRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMessagesRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMessagesRequest) ProtoMessage() {}
+
+func (x *ListMessagesRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMessagesRequest.ProtoReflect.Descriptor instead.
+func (*ListMessagesRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *ListMessagesRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *ListMessagesRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *ListMessagesRequest) GetBeforeMessageId() string {
+	if x != nil {
+		return x.BeforeMessageId
+	}
+	return ""
+}
+
+func (x *ListMessagesRequest) GetLimit() int32 {
+	if x != nil {
+		return x.Limit
+	}
+	return 0
+}
+
+type ListMessagesResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Messages      []*Message             `protobuf:"bytes,1,rep,name=messages,proto3" json:"messages,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *ListMessagesResponse) Reset() {
+	*x = ListMessagesResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[15]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *ListMessagesResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*ListMessagesResponse) ProtoMessage() {}
+
+func (x *ListMessagesResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[15]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use ListMessagesResponse.ProtoReflect.Descriptor instead.
+func (*ListMessagesResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{15}
+}
+
+func (x *ListMessagesResponse) GetMessages() []*Message {
+	if x != nil {
+		return x.Messages
+	}
+	return nil
+}
+
+type SendMessageRequest struct {
+	state           protoimpl.MessageState `protogen:"open.v1"`
+	RoomId          string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	SenderAccountId string                 `protobuf:"bytes,2,opt,name=sender_account_id,json=senderAccountId,proto3" json:"sender_account_id,omitempty"`
+	SenderPseudonym string                 `protobuf:"bytes,3,opt,name=sender_pseudonym,json=senderPseudonym,proto3" json:"sender_pseudonym,omitempty"`
+	Body            string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
+	// Set by the client so a retried send after a dropped response is never
+	// recorded twice (docs/ARCHITECTURE.md §5.2 and §7, DEC-0047).
+	ClientMsgId   string `protobuf:"bytes,5,opt,name=client_msg_id,json=clientMsgId,proto3" json:"client_msg_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
 func (x *SendMessageRequest) Reset() {
 	*x = SendMessageRequest{}
-	mi := &file_chat_v1_chat_proto_msgTypes[3]
+	mi := &file_chat_v1_chat_proto_msgTypes[16]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -265,7 +953,7 @@ func (x *SendMessageRequest) String() string {
 func (*SendMessageRequest) ProtoMessage() {}
 
 func (x *SendMessageRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chat_v1_chat_proto_msgTypes[3]
+	mi := &file_chat_v1_chat_proto_msgTypes[16]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -278,7 +966,7 @@ func (x *SendMessageRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMessageRequest.ProtoReflect.Descriptor instead.
 func (*SendMessageRequest) Descriptor() ([]byte, []int) {
-	return file_chat_v1_chat_proto_rawDescGZIP(), []int{3}
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{16}
 }
 
 func (x *SendMessageRequest) GetRoomId() string {
@@ -295,9 +983,23 @@ func (x *SendMessageRequest) GetSenderAccountId() string {
 	return ""
 }
 
+func (x *SendMessageRequest) GetSenderPseudonym() string {
+	if x != nil {
+		return x.SenderPseudonym
+	}
+	return ""
+}
+
 func (x *SendMessageRequest) GetBody() string {
 	if x != nil {
 		return x.Body
+	}
+	return ""
+}
+
+func (x *SendMessageRequest) GetClientMsgId() string {
+	if x != nil {
+		return x.ClientMsgId
 	}
 	return ""
 }
@@ -312,7 +1014,7 @@ type SendMessageResponse struct {
 
 func (x *SendMessageResponse) Reset() {
 	*x = SendMessageResponse{}
-	mi := &file_chat_v1_chat_proto_msgTypes[4]
+	mi := &file_chat_v1_chat_proto_msgTypes[17]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -324,7 +1026,7 @@ func (x *SendMessageResponse) String() string {
 func (*SendMessageResponse) ProtoMessage() {}
 
 func (x *SendMessageResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_chat_v1_chat_proto_msgTypes[4]
+	mi := &file_chat_v1_chat_proto_msgTypes[17]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -337,7 +1039,7 @@ func (x *SendMessageResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use SendMessageResponse.ProtoReflect.Descriptor instead.
 func (*SendMessageResponse) Descriptor() ([]byte, []int) {
-	return file_chat_v1_chat_proto_rawDescGZIP(), []int{4}
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{17}
 }
 
 func (x *SendMessageResponse) GetMessageId() string {
@@ -354,28 +1056,29 @@ func (x *SendMessageResponse) GetSentAtUnix() int64 {
 	return 0
 }
 
-type StreamRoomEventsRequest struct {
+type VoteKeepRequest struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *StreamRoomEventsRequest) Reset() {
-	*x = StreamRoomEventsRequest{}
-	mi := &file_chat_v1_chat_proto_msgTypes[5]
+func (x *VoteKeepRequest) Reset() {
+	*x = VoteKeepRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[18]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *StreamRoomEventsRequest) String() string {
+func (x *VoteKeepRequest) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*StreamRoomEventsRequest) ProtoMessage() {}
+func (*VoteKeepRequest) ProtoMessage() {}
 
-func (x *StreamRoomEventsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_chat_v1_chat_proto_msgTypes[5]
+func (x *VoteKeepRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[18]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -386,44 +1089,48 @@ func (x *StreamRoomEventsRequest) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use StreamRoomEventsRequest.ProtoReflect.Descriptor instead.
-func (*StreamRoomEventsRequest) Descriptor() ([]byte, []int) {
-	return file_chat_v1_chat_proto_rawDescGZIP(), []int{5}
+// Deprecated: Use VoteKeepRequest.ProtoReflect.Descriptor instead.
+func (*VoteKeepRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{18}
 }
 
-func (x *StreamRoomEventsRequest) GetRoomId() string {
+func (x *VoteKeepRequest) GetRoomId() string {
 	if x != nil {
 		return x.RoomId
 	}
 	return ""
 }
 
-type RoomEvent struct {
-	state           protoimpl.MessageState `protogen:"open.v1"`
-	MessageId       string                 `protobuf:"bytes,1,opt,name=message_id,json=messageId,proto3" json:"message_id,omitempty"`
-	RoomId          string                 `protobuf:"bytes,2,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	SenderAccountId string                 `protobuf:"bytes,3,opt,name=sender_account_id,json=senderAccountId,proto3" json:"sender_account_id,omitempty"`
-	Body            string                 `protobuf:"bytes,4,opt,name=body,proto3" json:"body,omitempty"`
-	SentAtUnix      int64                  `protobuf:"varint,5,opt,name=sent_at_unix,json=sentAtUnix,proto3" json:"sent_at_unix,omitempty"`
-	unknownFields   protoimpl.UnknownFields
-	sizeCache       protoimpl.SizeCache
+func (x *VoteKeepRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
 }
 
-func (x *RoomEvent) Reset() {
-	*x = RoomEvent{}
-	mi := &file_chat_v1_chat_proto_msgTypes[6]
+type VoteKeepResponse struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// True once both participants have voted keep (DEC-0031).
+	Kept          bool `protobuf:"varint,1,opt,name=kept,proto3" json:"kept,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *VoteKeepResponse) Reset() {
+	*x = VoteKeepResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[19]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *RoomEvent) String() string {
+func (x *VoteKeepResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*RoomEvent) ProtoMessage() {}
+func (*VoteKeepResponse) ProtoMessage() {}
 
-func (x *RoomEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_chat_v1_chat_proto_msgTypes[6]
+func (x *VoteKeepResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[19]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -434,94 +1141,321 @@ func (x *RoomEvent) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use RoomEvent.ProtoReflect.Descriptor instead.
-func (*RoomEvent) Descriptor() ([]byte, []int) {
-	return file_chat_v1_chat_proto_rawDescGZIP(), []int{6}
+// Deprecated: Use VoteKeepResponse.ProtoReflect.Descriptor instead.
+func (*VoteKeepResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{19}
 }
 
-func (x *RoomEvent) GetMessageId() string {
+func (x *VoteKeepResponse) GetKept() bool {
 	if x != nil {
-		return x.MessageId
+		return x.Kept
 	}
-	return ""
+	return false
 }
 
-func (x *RoomEvent) GetRoomId() string {
+type EndDirectRoomRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	Reason        string                 `protobuf:"bytes,3,opt,name=reason,proto3" json:"reason,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndDirectRoomRequest) Reset() {
+	*x = EndDirectRoomRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndDirectRoomRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndDirectRoomRequest) ProtoMessage() {}
+
+func (x *EndDirectRoomRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndDirectRoomRequest.ProtoReflect.Descriptor instead.
+func (*EndDirectRoomRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *EndDirectRoomRequest) GetRoomId() string {
 	if x != nil {
 		return x.RoomId
 	}
 	return ""
 }
 
-func (x *RoomEvent) GetSenderAccountId() string {
+func (x *EndDirectRoomRequest) GetAccountId() string {
 	if x != nil {
-		return x.SenderAccountId
+		return x.AccountId
 	}
 	return ""
 }
 
-func (x *RoomEvent) GetBody() string {
+func (x *EndDirectRoomRequest) GetReason() string {
 	if x != nil {
-		return x.Body
+		return x.Reason
 	}
 	return ""
 }
 
-func (x *RoomEvent) GetSentAtUnix() int64 {
+type EndDirectRoomResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *EndDirectRoomResponse) Reset() {
+	*x = EndDirectRoomResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[21]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *EndDirectRoomResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*EndDirectRoomResponse) ProtoMessage() {}
+
+func (x *EndDirectRoomResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[21]
 	if x != nil {
-		return x.SentAtUnix
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
 	}
-	return 0
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use EndDirectRoomResponse.ProtoReflect.Descriptor instead.
+func (*EndDirectRoomResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{21}
+}
+
+type RemoveMemberRequest struct {
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	RoomId string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	// The member being removed.
+	AccountId string `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// The room's owner, or the admin tool acting on a ban.
+	RequestedByAccountId string `protobuf:"bytes,3,opt,name=requested_by_account_id,json=requestedByAccountId,proto3" json:"requested_by_account_id,omitempty"`
+	unknownFields        protoimpl.UnknownFields
+	sizeCache            protoimpl.SizeCache
+}
+
+func (x *RemoveMemberRequest) Reset() {
+	*x = RemoveMemberRequest{}
+	mi := &file_chat_v1_chat_proto_msgTypes[22]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveMemberRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveMemberRequest) ProtoMessage() {}
+
+func (x *RemoveMemberRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[22]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveMemberRequest.ProtoReflect.Descriptor instead.
+func (*RemoveMemberRequest) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{22}
+}
+
+func (x *RemoveMemberRequest) GetRoomId() string {
+	if x != nil {
+		return x.RoomId
+	}
+	return ""
+}
+
+func (x *RemoveMemberRequest) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *RemoveMemberRequest) GetRequestedByAccountId() string {
+	if x != nil {
+		return x.RequestedByAccountId
+	}
+	return ""
+}
+
+type RemoveMemberResponse struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RemoveMemberResponse) Reset() {
+	*x = RemoveMemberResponse{}
+	mi := &file_chat_v1_chat_proto_msgTypes[23]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RemoveMemberResponse) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RemoveMemberResponse) ProtoMessage() {}
+
+func (x *RemoveMemberResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_chat_v1_chat_proto_msgTypes[23]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RemoveMemberResponse.ProtoReflect.Descriptor instead.
+func (*RemoveMemberResponse) Descriptor() ([]byte, []int) {
+	return file_chat_v1_chat_proto_rawDescGZIP(), []int{23}
 }
 
 var File_chat_v1_chat_proto protoreflect.FileDescriptor
 
 const file_chat_v1_chat_proto_rawDesc = "" +
 	"\n" +
-	"\x12chat/v1/chat.proto\x12\achat.v1\"\x8c\x01\n" +
+	"\x12chat/v1/chat.proto\x12\achat.v1\"\xfc\x01\n" +
 	"\x04Room\x12\x0e\n" +
 	"\x02id\x18\x01 \x01(\tR\x02id\x12%\n" +
-	"\x04type\x18\x02 \x01(\x0e2\x11.chat.v1.RoomTypeR\x04type\x12\x1f\n" +
-	"\vinvite_code\x18\x03 \x01(\tR\n" +
-	"inviteCode\x12,\n" +
-	"\x12member_account_ids\x18\x04 \x03(\tR\x10memberAccountIds\"h\n" +
-	"\x11CreateRoomRequest\x12%\n" +
-	"\x04type\x18\x01 \x01(\x0e2\x11.chat.v1.RoomTypeR\x04type\x12,\n" +
-	"\x12member_account_ids\x18\x02 \x03(\tR\x10memberAccountIds\"W\n" +
+	"\x04type\x18\x02 \x01(\x0e2\x11.chat.v1.RoomTypeR\x04type\x12\x12\n" +
+	"\x04name\x18\x03 \x01(\tR\x04name\x12(\n" +
+	"\x10owner_account_id\x18\x04 \x01(\tR\x0eownerAccountId\x12\x1f\n" +
+	"\vinvite_code\x18\x05 \x01(\tR\n" +
+	"inviteCode\x12\x12\n" +
+	"\x04kept\x18\x06 \x01(\bR\x04kept\x12&\n" +
+	"\x0fcreated_at_unix\x18\a \x01(\x03R\rcreatedAtUnix\x12\"\n" +
+	"\rended_at_unix\x18\b \x01(\x03R\vendedAtUnix\"\xce\x01\n" +
+	"\aMessage\x12\x1d\n" +
+	"\n" +
+	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x17\n" +
+	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12*\n" +
+	"\x11sender_account_id\x18\x03 \x01(\tR\x0fsenderAccountId\x12)\n" +
+	"\x10sender_pseudonym\x18\x04 \x01(\tR\x0fsenderPseudonym\x12\x12\n" +
+	"\x04body\x18\x05 \x01(\tR\x04body\x12 \n" +
+	"\fsent_at_unix\x18\x06 \x01(\x03R\n" +
+	"sentAtUnix\"V\n" +
+	"\x16CreateGroupRoomRequest\x12(\n" +
+	"\x10owner_account_id\x18\x01 \x01(\tR\x0eownerAccountId\x12\x12\n" +
+	"\x04name\x18\x02 \x01(\tR\x04name\"<\n" +
+	"\x17CreateGroupRoomResponse\x12!\n" +
+	"\x04room\x18\x01 \x01(\v2\r.chat.v1.RoomR\x04room\"G\n" +
+	"\x17CreateDirectRoomRequest\x12,\n" +
+	"\x12member_account_ids\x18\x01 \x03(\tR\x10memberAccountIds\"=\n" +
+	"\x18CreateDirectRoomResponse\x12!\n" +
+	"\x04room\x18\x01 \x01(\v2\r.chat.v1.RoomR\x04room\"W\n" +
 	"\x15JoinRoomByCodeRequest\x12\x1d\n" +
 	"\n" +
 	"account_id\x18\x01 \x01(\tR\taccountId\x12\x1f\n" +
 	"\vinvite_code\x18\x02 \x01(\tR\n" +
-	"inviteCode\"m\n" +
+	"inviteCode\";\n" +
+	"\x16JoinRoomByCodeResponse\x12!\n" +
+	"\x04room\x18\x01 \x01(\v2\r.chat.v1.RoomR\x04room\"J\n" +
+	"\x10LeaveRoomRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x12\x17\n" +
+	"\aroom_id\x18\x02 \x01(\tR\x06roomId\"\x13\n" +
+	"\x11LeaveRoomResponse\"i\n" +
+	"\x17RotateInviteCodeRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x125\n" +
+	"\x17requested_by_account_id\x18\x02 \x01(\tR\x14requestedByAccountId\";\n" +
+	"\x18RotateInviteCodeResponse\x12\x1f\n" +
+	"\vinvite_code\x18\x01 \x01(\tR\n" +
+	"inviteCode\"3\n" +
+	"\x12ListMyRoomsRequest\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\":\n" +
+	"\x13ListMyRoomsResponse\x12#\n" +
+	"\x05rooms\x18\x01 \x03(\v2\r.chat.v1.RoomR\x05rooms\"\x8f\x01\n" +
+	"\x13ListMessagesRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12*\n" +
+	"\x11before_message_id\x18\x03 \x01(\tR\x0fbeforeMessageId\x12\x14\n" +
+	"\x05limit\x18\x04 \x01(\x05R\x05limit\"D\n" +
+	"\x14ListMessagesResponse\x12,\n" +
+	"\bmessages\x18\x01 \x03(\v2\x10.chat.v1.MessageR\bmessages\"\xbc\x01\n" +
 	"\x12SendMessageRequest\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12*\n" +
-	"\x11sender_account_id\x18\x02 \x01(\tR\x0fsenderAccountId\x12\x12\n" +
-	"\x04body\x18\x03 \x01(\tR\x04body\"V\n" +
+	"\x11sender_account_id\x18\x02 \x01(\tR\x0fsenderAccountId\x12)\n" +
+	"\x10sender_pseudonym\x18\x03 \x01(\tR\x0fsenderPseudonym\x12\x12\n" +
+	"\x04body\x18\x04 \x01(\tR\x04body\x12\"\n" +
+	"\rclient_msg_id\x18\x05 \x01(\tR\vclientMsgId\"V\n" +
 	"\x13SendMessageResponse\x12\x1d\n" +
 	"\n" +
 	"message_id\x18\x01 \x01(\tR\tmessageId\x12 \n" +
 	"\fsent_at_unix\x18\x02 \x01(\x03R\n" +
-	"sentAtUnix\"2\n" +
-	"\x17StreamRoomEventsRequest\x12\x17\n" +
-	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"\xa5\x01\n" +
-	"\tRoomEvent\x12\x1d\n" +
+	"sentAtUnix\"I\n" +
+	"\x0fVoteKeepRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
-	"message_id\x18\x01 \x01(\tR\tmessageId\x12\x17\n" +
-	"\aroom_id\x18\x02 \x01(\tR\x06roomId\x12*\n" +
-	"\x11sender_account_id\x18\x03 \x01(\tR\x0fsenderAccountId\x12\x12\n" +
-	"\x04body\x18\x04 \x01(\tR\x04body\x12 \n" +
-	"\fsent_at_unix\x18\x05 \x01(\x03R\n" +
-	"sentAtUnix*P\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\"&\n" +
+	"\x10VoteKeepResponse\x12\x12\n" +
+	"\x04kept\x18\x01 \x01(\bR\x04kept\"f\n" +
+	"\x14EndDirectRoomRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x16\n" +
+	"\x06reason\x18\x03 \x01(\tR\x06reason\"\x17\n" +
+	"\x15EndDirectRoomResponse\"\x84\x01\n" +
+	"\x13RemoveMemberRequest\x12\x17\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
+	"\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x125\n" +
+	"\x17requested_by_account_id\x18\x03 \x01(\tR\x14requestedByAccountId\"\x16\n" +
+	"\x14RemoveMemberResponse*P\n" +
 	"\bRoomType\x12\x19\n" +
 	"\x15ROOM_TYPE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10ROOM_TYPE_DIRECT\x10\x01\x12\x13\n" +
-	"\x0fROOM_TYPE_GROUP\x10\x022\x9d\x02\n" +
-	"\vChatService\x127\n" +
-	"\n" +
-	"CreateRoom\x12\x1a.chat.v1.CreateRoomRequest\x1a\r.chat.v1.Room\x12?\n" +
-	"\x0eJoinRoomByCode\x12\x1e.chat.v1.JoinRoomByCodeRequest\x1a\r.chat.v1.Room\x12H\n" +
-	"\vSendMessage\x12\x1b.chat.v1.SendMessageRequest\x1a\x1c.chat.v1.SendMessageResponse\x12J\n" +
-	"\x10StreamRoomEvents\x12 .chat.v1.StreamRoomEventsRequest\x1a\x12.chat.v1.RoomEvent0\x01BDZBgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1;chatv1b\x06proto3"
+	"\x0fROOM_TYPE_GROUP\x10\x022\xeb\x06\n" +
+	"\vChatService\x12T\n" +
+	"\x0fCreateGroupRoom\x12\x1f.chat.v1.CreateGroupRoomRequest\x1a .chat.v1.CreateGroupRoomResponse\x12W\n" +
+	"\x10CreateDirectRoom\x12 .chat.v1.CreateDirectRoomRequest\x1a!.chat.v1.CreateDirectRoomResponse\x12Q\n" +
+	"\x0eJoinRoomByCode\x12\x1e.chat.v1.JoinRoomByCodeRequest\x1a\x1f.chat.v1.JoinRoomByCodeResponse\x12B\n" +
+	"\tLeaveRoom\x12\x19.chat.v1.LeaveRoomRequest\x1a\x1a.chat.v1.LeaveRoomResponse\x12W\n" +
+	"\x10RotateInviteCode\x12 .chat.v1.RotateInviteCodeRequest\x1a!.chat.v1.RotateInviteCodeResponse\x12H\n" +
+	"\vListMyRooms\x12\x1b.chat.v1.ListMyRoomsRequest\x1a\x1c.chat.v1.ListMyRoomsResponse\x12K\n" +
+	"\fListMessages\x12\x1c.chat.v1.ListMessagesRequest\x1a\x1d.chat.v1.ListMessagesResponse\x12H\n" +
+	"\vSendMessage\x12\x1b.chat.v1.SendMessageRequest\x1a\x1c.chat.v1.SendMessageResponse\x12?\n" +
+	"\bVoteKeep\x12\x18.chat.v1.VoteKeepRequest\x1a\x19.chat.v1.VoteKeepResponse\x12N\n" +
+	"\rEndDirectRoom\x12\x1d.chat.v1.EndDirectRoomRequest\x1a\x1e.chat.v1.EndDirectRoomResponse\x12K\n" +
+	"\fRemoveMember\x12\x1c.chat.v1.RemoveMemberRequest\x1a\x1d.chat.v1.RemoveMemberResponseBDZBgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1;chatv1b\x06proto3"
 
 var (
 	file_chat_v1_chat_proto_rawDescOnce sync.Once
@@ -536,33 +1470,68 @@ func file_chat_v1_chat_proto_rawDescGZIP() []byte {
 }
 
 var file_chat_v1_chat_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
-var file_chat_v1_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 7)
+var file_chat_v1_chat_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_chat_v1_chat_proto_goTypes = []any{
-	(RoomType)(0),                   // 0: chat.v1.RoomType
-	(*Room)(nil),                    // 1: chat.v1.Room
-	(*CreateRoomRequest)(nil),       // 2: chat.v1.CreateRoomRequest
-	(*JoinRoomByCodeRequest)(nil),   // 3: chat.v1.JoinRoomByCodeRequest
-	(*SendMessageRequest)(nil),      // 4: chat.v1.SendMessageRequest
-	(*SendMessageResponse)(nil),     // 5: chat.v1.SendMessageResponse
-	(*StreamRoomEventsRequest)(nil), // 6: chat.v1.StreamRoomEventsRequest
-	(*RoomEvent)(nil),               // 7: chat.v1.RoomEvent
+	(RoomType)(0),                    // 0: chat.v1.RoomType
+	(*Room)(nil),                     // 1: chat.v1.Room
+	(*Message)(nil),                  // 2: chat.v1.Message
+	(*CreateGroupRoomRequest)(nil),   // 3: chat.v1.CreateGroupRoomRequest
+	(*CreateGroupRoomResponse)(nil),  // 4: chat.v1.CreateGroupRoomResponse
+	(*CreateDirectRoomRequest)(nil),  // 5: chat.v1.CreateDirectRoomRequest
+	(*CreateDirectRoomResponse)(nil), // 6: chat.v1.CreateDirectRoomResponse
+	(*JoinRoomByCodeRequest)(nil),    // 7: chat.v1.JoinRoomByCodeRequest
+	(*JoinRoomByCodeResponse)(nil),   // 8: chat.v1.JoinRoomByCodeResponse
+	(*LeaveRoomRequest)(nil),         // 9: chat.v1.LeaveRoomRequest
+	(*LeaveRoomResponse)(nil),        // 10: chat.v1.LeaveRoomResponse
+	(*RotateInviteCodeRequest)(nil),  // 11: chat.v1.RotateInviteCodeRequest
+	(*RotateInviteCodeResponse)(nil), // 12: chat.v1.RotateInviteCodeResponse
+	(*ListMyRoomsRequest)(nil),       // 13: chat.v1.ListMyRoomsRequest
+	(*ListMyRoomsResponse)(nil),      // 14: chat.v1.ListMyRoomsResponse
+	(*ListMessagesRequest)(nil),      // 15: chat.v1.ListMessagesRequest
+	(*ListMessagesResponse)(nil),     // 16: chat.v1.ListMessagesResponse
+	(*SendMessageRequest)(nil),       // 17: chat.v1.SendMessageRequest
+	(*SendMessageResponse)(nil),      // 18: chat.v1.SendMessageResponse
+	(*VoteKeepRequest)(nil),          // 19: chat.v1.VoteKeepRequest
+	(*VoteKeepResponse)(nil),         // 20: chat.v1.VoteKeepResponse
+	(*EndDirectRoomRequest)(nil),     // 21: chat.v1.EndDirectRoomRequest
+	(*EndDirectRoomResponse)(nil),    // 22: chat.v1.EndDirectRoomResponse
+	(*RemoveMemberRequest)(nil),      // 23: chat.v1.RemoveMemberRequest
+	(*RemoveMemberResponse)(nil),     // 24: chat.v1.RemoveMemberResponse
 }
 var file_chat_v1_chat_proto_depIdxs = []int32{
-	0, // 0: chat.v1.Room.type:type_name -> chat.v1.RoomType
-	0, // 1: chat.v1.CreateRoomRequest.type:type_name -> chat.v1.RoomType
-	2, // 2: chat.v1.ChatService.CreateRoom:input_type -> chat.v1.CreateRoomRequest
-	3, // 3: chat.v1.ChatService.JoinRoomByCode:input_type -> chat.v1.JoinRoomByCodeRequest
-	4, // 4: chat.v1.ChatService.SendMessage:input_type -> chat.v1.SendMessageRequest
-	6, // 5: chat.v1.ChatService.StreamRoomEvents:input_type -> chat.v1.StreamRoomEventsRequest
-	1, // 6: chat.v1.ChatService.CreateRoom:output_type -> chat.v1.Room
-	1, // 7: chat.v1.ChatService.JoinRoomByCode:output_type -> chat.v1.Room
-	5, // 8: chat.v1.ChatService.SendMessage:output_type -> chat.v1.SendMessageResponse
-	7, // 9: chat.v1.ChatService.StreamRoomEvents:output_type -> chat.v1.RoomEvent
-	6, // [6:10] is the sub-list for method output_type
-	2, // [2:6] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	0,  // 0: chat.v1.Room.type:type_name -> chat.v1.RoomType
+	1,  // 1: chat.v1.CreateGroupRoomResponse.room:type_name -> chat.v1.Room
+	1,  // 2: chat.v1.CreateDirectRoomResponse.room:type_name -> chat.v1.Room
+	1,  // 3: chat.v1.JoinRoomByCodeResponse.room:type_name -> chat.v1.Room
+	1,  // 4: chat.v1.ListMyRoomsResponse.rooms:type_name -> chat.v1.Room
+	2,  // 5: chat.v1.ListMessagesResponse.messages:type_name -> chat.v1.Message
+	3,  // 6: chat.v1.ChatService.CreateGroupRoom:input_type -> chat.v1.CreateGroupRoomRequest
+	5,  // 7: chat.v1.ChatService.CreateDirectRoom:input_type -> chat.v1.CreateDirectRoomRequest
+	7,  // 8: chat.v1.ChatService.JoinRoomByCode:input_type -> chat.v1.JoinRoomByCodeRequest
+	9,  // 9: chat.v1.ChatService.LeaveRoom:input_type -> chat.v1.LeaveRoomRequest
+	11, // 10: chat.v1.ChatService.RotateInviteCode:input_type -> chat.v1.RotateInviteCodeRequest
+	13, // 11: chat.v1.ChatService.ListMyRooms:input_type -> chat.v1.ListMyRoomsRequest
+	15, // 12: chat.v1.ChatService.ListMessages:input_type -> chat.v1.ListMessagesRequest
+	17, // 13: chat.v1.ChatService.SendMessage:input_type -> chat.v1.SendMessageRequest
+	19, // 14: chat.v1.ChatService.VoteKeep:input_type -> chat.v1.VoteKeepRequest
+	21, // 15: chat.v1.ChatService.EndDirectRoom:input_type -> chat.v1.EndDirectRoomRequest
+	23, // 16: chat.v1.ChatService.RemoveMember:input_type -> chat.v1.RemoveMemberRequest
+	4,  // 17: chat.v1.ChatService.CreateGroupRoom:output_type -> chat.v1.CreateGroupRoomResponse
+	6,  // 18: chat.v1.ChatService.CreateDirectRoom:output_type -> chat.v1.CreateDirectRoomResponse
+	8,  // 19: chat.v1.ChatService.JoinRoomByCode:output_type -> chat.v1.JoinRoomByCodeResponse
+	10, // 20: chat.v1.ChatService.LeaveRoom:output_type -> chat.v1.LeaveRoomResponse
+	12, // 21: chat.v1.ChatService.RotateInviteCode:output_type -> chat.v1.RotateInviteCodeResponse
+	14, // 22: chat.v1.ChatService.ListMyRooms:output_type -> chat.v1.ListMyRoomsResponse
+	16, // 23: chat.v1.ChatService.ListMessages:output_type -> chat.v1.ListMessagesResponse
+	18, // 24: chat.v1.ChatService.SendMessage:output_type -> chat.v1.SendMessageResponse
+	20, // 25: chat.v1.ChatService.VoteKeep:output_type -> chat.v1.VoteKeepResponse
+	22, // 26: chat.v1.ChatService.EndDirectRoom:output_type -> chat.v1.EndDirectRoomResponse
+	24, // 27: chat.v1.ChatService.RemoveMember:output_type -> chat.v1.RemoveMemberResponse
+	17, // [17:28] is the sub-list for method output_type
+	6,  // [6:17] is the sub-list for method input_type
+	6,  // [6:6] is the sub-list for extension type_name
+	6,  // [6:6] is the sub-list for extension extendee
+	0,  // [0:6] is the sub-list for field type_name
 }
 
 func init() { file_chat_v1_chat_proto_init() }
@@ -576,7 +1545,7 @@ func file_chat_v1_chat_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_chat_v1_chat_proto_rawDesc), len(file_chat_v1_chat_proto_rawDesc)),
 			NumEnums:      1,
-			NumMessages:   7,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

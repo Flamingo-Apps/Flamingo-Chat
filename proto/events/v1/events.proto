@@ -1,0 +1,121 @@
+syntax = "proto3";
+
+package events.v1;
+
+option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/events/v1;eventsv1";
+
+// Kafka payloads for the three topics docs/ARCHITECTURE.md §5.4 defines
+// (DEC-0043). Each topic's envelope carries one of that topic's event
+// kinds behind a oneof, plus an id and a timestamp. Trace context travels
+// in the Kafka record's own headers, not in this payload, so a trace
+// survives crossing the broker without needing a field here for it.
+//
+// This file defines no RPCs, so none of buf's RPC naming rules apply to
+// it - these are plain data messages, versioned here the same way the
+// gRPC contracts are, with no schema registry (DEC-0043).
+
+// Produced by Chat to the "chat.events" topic, keyed by room_id so one
+// room's events stay in order.
+message ChatEvent {
+  string event_id = 1;
+  int64 occurred_at_unix = 2;
+  oneof payload {
+    MessageSent message_sent = 3;
+    MemberJoined member_joined = 4;
+    MemberLeft member_left = 5;
+    KeepVote keep_vote = 6;
+    RoomKept room_kept = 7;
+    RoomEnded room_ended = 8;
+  }
+}
+
+message MessageSent {
+  string message_id = 1;
+  string room_id = 2;
+  string sender_account_id = 3;
+  string sender_pseudonym = 4;
+  string body = 5;
+  int64 sent_at_unix = 6;
+}
+
+message MemberJoined {
+  string room_id = 1;
+  string account_id = 2;
+}
+
+message MemberLeft {
+  string room_id = 1;
+  string account_id = 2;
+}
+
+message KeepVote {
+  string room_id = 1;
+  string account_id = 2;
+}
+
+message RoomKept {
+  string room_id = 1;
+}
+
+message RoomEnded {
+  string room_id = 1;
+  string reason = 2;
+}
+
+// Produced by Matching to the "matching.events" topic, keyed by room_id.
+message MatchingEvent {
+  string event_id = 1;
+  int64 occurred_at_unix = 2;
+  oneof payload {
+    MatchFound match_found = 3;
+    MatchEnded match_ended = 4;
+  }
+}
+
+message MatchFound {
+  string room_id = 1;
+  string account_id_a = 2;
+  string account_id_b = 3;
+  string pseudonym_a = 4;
+  string pseudonym_b = 5;
+}
+
+message MatchEnded {
+  string room_id = 1;
+  // Who ended it (Next, or leaving) - so the other side's gateway knows
+  // whose action this was.
+  string account_id = 2;
+}
+
+// Produced by Moderation to the "moderation.events" topic, keyed by
+// account_id.
+message ModerationEvent {
+  string event_id = 1;
+  int64 occurred_at_unix = 2;
+  oneof payload {
+    ReportFiled report_filed = 3;
+    UserBlocked user_blocked = 4;
+    AccountBanned account_banned = 5;
+    AccountUnbanned account_unbanned = 6;
+  }
+}
+
+message ReportFiled {
+  string report_id = 1;
+  string reporter_account_id = 2;
+  string reported_account_id = 3;
+}
+
+message UserBlocked {
+  string account_id = 1;
+  string blocked_account_id = 2;
+}
+
+message AccountBanned {
+  string account_id = 1;
+  string reason = 2;
+}
+
+message AccountUnbanned {
+  string account_id = 1;
+}

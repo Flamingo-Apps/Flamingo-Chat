@@ -21,18 +21,128 @@ const (
 	_ = protoimpl.EnforceVersion(protoimpl.MaxVersion - 20)
 )
 
-type HeartbeatRequest struct {
+type Category int32
+
+const (
+	Category_CATEGORY_UNSPECIFIED Category = 0
+	Category_CATEGORY_GUEST       Category = 1
+	Category_CATEGORY_MALE        Category = 2
+	Category_CATEGORY_FEMALE      Category = 3
+	// Verified, but gender is "prefer not to say" - counted in the total
+	// and in "verified", never in male or female (PRD: live counts).
+	Category_CATEGORY_VERIFIED_OTHER Category = 4
+)
+
+// Enum value maps for Category.
+var (
+	Category_name = map[int32]string{
+		0: "CATEGORY_UNSPECIFIED",
+		1: "CATEGORY_GUEST",
+		2: "CATEGORY_MALE",
+		3: "CATEGORY_FEMALE",
+		4: "CATEGORY_VERIFIED_OTHER",
+	}
+	Category_value = map[string]int32{
+		"CATEGORY_UNSPECIFIED":    0,
+		"CATEGORY_GUEST":          1,
+		"CATEGORY_MALE":           2,
+		"CATEGORY_FEMALE":         3,
+		"CATEGORY_VERIFIED_OTHER": 4,
+	}
+)
+
+func (x Category) Enum() *Category {
+	p := new(Category)
+	*p = x
+	return p
+}
+
+func (x Category) String() string {
+	return protoimpl.X.EnumStringOf(x.Descriptor(), protoreflect.EnumNumber(x))
+}
+
+func (Category) Descriptor() protoreflect.EnumDescriptor {
+	return file_presence_v1_presence_proto_enumTypes[0].Descriptor()
+}
+
+func (Category) Type() protoreflect.EnumType {
+	return &file_presence_v1_presence_proto_enumTypes[0]
+}
+
+func (x Category) Number() protoreflect.EnumNumber {
+	return protoreflect.EnumNumber(x)
+}
+
+// Deprecated: Use Category.Descriptor instead.
+func (Category) EnumDescriptor() ([]byte, []int) {
+	return file_presence_v1_presence_proto_rawDescGZIP(), []int{0}
+}
+
+type HeartbeatEntry struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	AccountId     string                 `protobuf:"bytes,1,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
-	BadgeVerified bool                   `protobuf:"varint,2,opt,name=badge_verified,json=badgeVerified,proto3" json:"badge_verified,omitempty"`
-	Gender        int32                  `protobuf:"varint,3,opt,name=gender,proto3" json:"gender,omitempty"`
+	Category      Category               `protobuf:"varint,2,opt,name=category,proto3,enum=presence.v1.Category" json:"category,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *HeartbeatEntry) Reset() {
+	*x = HeartbeatEntry{}
+	mi := &file_presence_v1_presence_proto_msgTypes[0]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *HeartbeatEntry) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*HeartbeatEntry) ProtoMessage() {}
+
+func (x *HeartbeatEntry) ProtoReflect() protoreflect.Message {
+	mi := &file_presence_v1_presence_proto_msgTypes[0]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use HeartbeatEntry.ProtoReflect.Descriptor instead.
+func (*HeartbeatEntry) Descriptor() ([]byte, []int) {
+	return file_presence_v1_presence_proto_rawDescGZIP(), []int{0}
+}
+
+func (x *HeartbeatEntry) GetAccountId() string {
+	if x != nil {
+		return x.AccountId
+	}
+	return ""
+}
+
+func (x *HeartbeatEntry) GetCategory() Category {
+	if x != nil {
+		return x.Category
+	}
+	return Category_CATEGORY_UNSPECIFIED
+}
+
+type HeartbeatRequest struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// One gateway instance's currently connected accounts, sent as a batch
+	// so the number of calls scales with gateway instances, not connected
+	// users.
+	Entries       []*HeartbeatEntry `protobuf:"bytes,1,rep,name=entries,proto3" json:"entries,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *HeartbeatRequest) Reset() {
 	*x = HeartbeatRequest{}
-	mi := &file_presence_v1_presence_proto_msgTypes[0]
+	mi := &file_presence_v1_presence_proto_msgTypes[1]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -44,7 +154,7 @@ func (x *HeartbeatRequest) String() string {
 func (*HeartbeatRequest) ProtoMessage() {}
 
 func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_presence_v1_presence_proto_msgTypes[0]
+	mi := &file_presence_v1_presence_proto_msgTypes[1]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -57,40 +167,25 @@ func (x *HeartbeatRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatRequest.ProtoReflect.Descriptor instead.
 func (*HeartbeatRequest) Descriptor() ([]byte, []int) {
-	return file_presence_v1_presence_proto_rawDescGZIP(), []int{0}
+	return file_presence_v1_presence_proto_rawDescGZIP(), []int{1}
 }
 
-func (x *HeartbeatRequest) GetAccountId() string {
+func (x *HeartbeatRequest) GetEntries() []*HeartbeatEntry {
 	if x != nil {
-		return x.AccountId
+		return x.Entries
 	}
-	return ""
-}
-
-func (x *HeartbeatRequest) GetBadgeVerified() bool {
-	if x != nil {
-		return x.BadgeVerified
-	}
-	return false
-}
-
-func (x *HeartbeatRequest) GetGender() int32 {
-	if x != nil {
-		return x.Gender
-	}
-	return 0
+	return nil
 }
 
 type HeartbeatResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Ok            bool                   `protobuf:"varint,1,opt,name=ok,proto3" json:"ok,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
 func (x *HeartbeatResponse) Reset() {
 	*x = HeartbeatResponse{}
-	mi := &file_presence_v1_presence_proto_msgTypes[1]
+	mi := &file_presence_v1_presence_proto_msgTypes[2]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -102,7 +197,7 @@ func (x *HeartbeatResponse) String() string {
 func (*HeartbeatResponse) ProtoMessage() {}
 
 func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
-	mi := &file_presence_v1_presence_proto_msgTypes[1]
+	mi := &file_presence_v1_presence_proto_msgTypes[2]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -115,14 +210,7 @@ func (x *HeartbeatResponse) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use HeartbeatResponse.ProtoReflect.Descriptor instead.
 func (*HeartbeatResponse) Descriptor() ([]byte, []int) {
-	return file_presence_v1_presence_proto_rawDescGZIP(), []int{1}
-}
-
-func (x *HeartbeatResponse) GetOk() bool {
-	if x != nil {
-		return x.Ok
-	}
-	return false
+	return file_presence_v1_presence_proto_rawDescGZIP(), []int{2}
 }
 
 type GetLiveCountsRequest struct {
@@ -133,7 +221,7 @@ type GetLiveCountsRequest struct {
 
 func (x *GetLiveCountsRequest) Reset() {
 	*x = GetLiveCountsRequest{}
-	mi := &file_presence_v1_presence_proto_msgTypes[2]
+	mi := &file_presence_v1_presence_proto_msgTypes[3]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -145,7 +233,7 @@ func (x *GetLiveCountsRequest) String() string {
 func (*GetLiveCountsRequest) ProtoMessage() {}
 
 func (x *GetLiveCountsRequest) ProtoReflect() protoreflect.Message {
-	mi := &file_presence_v1_presence_proto_msgTypes[2]
+	mi := &file_presence_v1_presence_proto_msgTypes[3]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -158,33 +246,34 @@ func (x *GetLiveCountsRequest) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use GetLiveCountsRequest.ProtoReflect.Descriptor instead.
 func (*GetLiveCountsRequest) Descriptor() ([]byte, []int) {
-	return file_presence_v1_presence_proto_rawDescGZIP(), []int{2}
+	return file_presence_v1_presence_proto_rawDescGZIP(), []int{3}
 }
 
-type LiveCounts struct {
+type GetLiveCountsResponse struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Unverified    int64                  `protobuf:"varint,1,opt,name=unverified,proto3" json:"unverified,omitempty"`
-	Male          int64                  `protobuf:"varint,2,opt,name=male,proto3" json:"male,omitempty"`
-	Female        int64                  `protobuf:"varint,3,opt,name=female,proto3" json:"female,omitempty"`
+	Total         int64                  `protobuf:"varint,1,opt,name=total,proto3" json:"total,omitempty"`
+	Guests        int64                  `protobuf:"varint,2,opt,name=guests,proto3" json:"guests,omitempty"`
+	Male          int64                  `protobuf:"varint,3,opt,name=male,proto3" json:"male,omitempty"`
+	Female        int64                  `protobuf:"varint,4,opt,name=female,proto3" json:"female,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
 
-func (x *LiveCounts) Reset() {
-	*x = LiveCounts{}
-	mi := &file_presence_v1_presence_proto_msgTypes[3]
+func (x *GetLiveCountsResponse) Reset() {
+	*x = GetLiveCountsResponse{}
+	mi := &file_presence_v1_presence_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
 
-func (x *LiveCounts) String() string {
+func (x *GetLiveCountsResponse) String() string {
 	return protoimpl.X.MessageStringOf(x)
 }
 
-func (*LiveCounts) ProtoMessage() {}
+func (*GetLiveCountsResponse) ProtoMessage() {}
 
-func (x *LiveCounts) ProtoReflect() protoreflect.Message {
-	mi := &file_presence_v1_presence_proto_msgTypes[3]
+func (x *GetLiveCountsResponse) ProtoReflect() protoreflect.Message {
+	mi := &file_presence_v1_presence_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -195,26 +284,33 @@ func (x *LiveCounts) ProtoReflect() protoreflect.Message {
 	return mi.MessageOf(x)
 }
 
-// Deprecated: Use LiveCounts.ProtoReflect.Descriptor instead.
-func (*LiveCounts) Descriptor() ([]byte, []int) {
-	return file_presence_v1_presence_proto_rawDescGZIP(), []int{3}
+// Deprecated: Use GetLiveCountsResponse.ProtoReflect.Descriptor instead.
+func (*GetLiveCountsResponse) Descriptor() ([]byte, []int) {
+	return file_presence_v1_presence_proto_rawDescGZIP(), []int{4}
 }
 
-func (x *LiveCounts) GetUnverified() int64 {
+func (x *GetLiveCountsResponse) GetTotal() int64 {
 	if x != nil {
-		return x.Unverified
+		return x.Total
 	}
 	return 0
 }
 
-func (x *LiveCounts) GetMale() int64 {
+func (x *GetLiveCountsResponse) GetGuests() int64 {
+	if x != nil {
+		return x.Guests
+	}
+	return 0
+}
+
+func (x *GetLiveCountsResponse) GetMale() int64 {
 	if x != nil {
 		return x.Male
 	}
 	return 0
 }
 
-func (x *LiveCounts) GetFemale() int64 {
+func (x *GetLiveCountsResponse) GetFemale() int64 {
 	if x != nil {
 		return x.Female
 	}
@@ -225,25 +321,29 @@ var File_presence_v1_presence_proto protoreflect.FileDescriptor
 
 const file_presence_v1_presence_proto_rawDesc = "" +
 	"\n" +
-	"\x1apresence/v1/presence.proto\x12\vpresence.v1\"p\n" +
-	"\x10HeartbeatRequest\x12\x1d\n" +
+	"\x1apresence/v1/presence.proto\x12\vpresence.v1\"b\n" +
+	"\x0eHeartbeatEntry\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x01 \x01(\tR\taccountId\x12%\n" +
-	"\x0ebadge_verified\x18\x02 \x01(\bR\rbadgeVerified\x12\x16\n" +
-	"\x06gender\x18\x03 \x01(\x05R\x06gender\"#\n" +
-	"\x11HeartbeatResponse\x12\x0e\n" +
-	"\x02ok\x18\x01 \x01(\bR\x02ok\"\x16\n" +
-	"\x14GetLiveCountsRequest\"X\n" +
-	"\n" +
-	"LiveCounts\x12\x1e\n" +
-	"\n" +
-	"unverified\x18\x01 \x01(\x03R\n" +
-	"unverified\x12\x12\n" +
-	"\x04male\x18\x02 \x01(\x03R\x04male\x12\x16\n" +
-	"\x06female\x18\x03 \x01(\x03R\x06female2\xaa\x01\n" +
+	"account_id\x18\x01 \x01(\tR\taccountId\x121\n" +
+	"\bcategory\x18\x02 \x01(\x0e2\x15.presence.v1.CategoryR\bcategory\"I\n" +
+	"\x10HeartbeatRequest\x125\n" +
+	"\aentries\x18\x01 \x03(\v2\x1b.presence.v1.HeartbeatEntryR\aentries\"\x13\n" +
+	"\x11HeartbeatResponse\"\x16\n" +
+	"\x14GetLiveCountsRequest\"q\n" +
+	"\x15GetLiveCountsResponse\x12\x14\n" +
+	"\x05total\x18\x01 \x01(\x03R\x05total\x12\x16\n" +
+	"\x06guests\x18\x02 \x01(\x03R\x06guests\x12\x12\n" +
+	"\x04male\x18\x03 \x01(\x03R\x04male\x12\x16\n" +
+	"\x06female\x18\x04 \x01(\x03R\x06female*}\n" +
+	"\bCategory\x12\x18\n" +
+	"\x14CATEGORY_UNSPECIFIED\x10\x00\x12\x12\n" +
+	"\x0eCATEGORY_GUEST\x10\x01\x12\x11\n" +
+	"\rCATEGORY_MALE\x10\x02\x12\x13\n" +
+	"\x0fCATEGORY_FEMALE\x10\x03\x12\x1b\n" +
+	"\x17CATEGORY_VERIFIED_OTHER\x10\x042\xb5\x01\n" +
 	"\x0fPresenceService\x12J\n" +
-	"\tHeartbeat\x12\x1d.presence.v1.HeartbeatRequest\x1a\x1e.presence.v1.HeartbeatResponse\x12K\n" +
-	"\rGetLiveCounts\x12!.presence.v1.GetLiveCountsRequest\x1a\x17.presence.v1.LiveCountsBLZJgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1;presencev1b\x06proto3"
+	"\tHeartbeat\x12\x1d.presence.v1.HeartbeatRequest\x1a\x1e.presence.v1.HeartbeatResponse\x12V\n" +
+	"\rGetLiveCounts\x12!.presence.v1.GetLiveCountsRequest\x1a\".presence.v1.GetLiveCountsResponseBLZJgithub.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1;presencev1b\x06proto3"
 
 var (
 	file_presence_v1_presence_proto_rawDescOnce sync.Once
@@ -257,23 +357,28 @@ func file_presence_v1_presence_proto_rawDescGZIP() []byte {
 	return file_presence_v1_presence_proto_rawDescData
 }
 
-var file_presence_v1_presence_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_presence_v1_presence_proto_enumTypes = make([]protoimpl.EnumInfo, 1)
+var file_presence_v1_presence_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_presence_v1_presence_proto_goTypes = []any{
-	(*HeartbeatRequest)(nil),     // 0: presence.v1.HeartbeatRequest
-	(*HeartbeatResponse)(nil),    // 1: presence.v1.HeartbeatResponse
-	(*GetLiveCountsRequest)(nil), // 2: presence.v1.GetLiveCountsRequest
-	(*LiveCounts)(nil),           // 3: presence.v1.LiveCounts
+	(Category)(0),                 // 0: presence.v1.Category
+	(*HeartbeatEntry)(nil),        // 1: presence.v1.HeartbeatEntry
+	(*HeartbeatRequest)(nil),      // 2: presence.v1.HeartbeatRequest
+	(*HeartbeatResponse)(nil),     // 3: presence.v1.HeartbeatResponse
+	(*GetLiveCountsRequest)(nil),  // 4: presence.v1.GetLiveCountsRequest
+	(*GetLiveCountsResponse)(nil), // 5: presence.v1.GetLiveCountsResponse
 }
 var file_presence_v1_presence_proto_depIdxs = []int32{
-	0, // 0: presence.v1.PresenceService.Heartbeat:input_type -> presence.v1.HeartbeatRequest
-	2, // 1: presence.v1.PresenceService.GetLiveCounts:input_type -> presence.v1.GetLiveCountsRequest
-	1, // 2: presence.v1.PresenceService.Heartbeat:output_type -> presence.v1.HeartbeatResponse
-	3, // 3: presence.v1.PresenceService.GetLiveCounts:output_type -> presence.v1.LiveCounts
-	2, // [2:4] is the sub-list for method output_type
-	0, // [0:2] is the sub-list for method input_type
-	0, // [0:0] is the sub-list for extension type_name
-	0, // [0:0] is the sub-list for extension extendee
-	0, // [0:0] is the sub-list for field type_name
+	0, // 0: presence.v1.HeartbeatEntry.category:type_name -> presence.v1.Category
+	1, // 1: presence.v1.HeartbeatRequest.entries:type_name -> presence.v1.HeartbeatEntry
+	2, // 2: presence.v1.PresenceService.Heartbeat:input_type -> presence.v1.HeartbeatRequest
+	4, // 3: presence.v1.PresenceService.GetLiveCounts:input_type -> presence.v1.GetLiveCountsRequest
+	3, // 4: presence.v1.PresenceService.Heartbeat:output_type -> presence.v1.HeartbeatResponse
+	5, // 5: presence.v1.PresenceService.GetLiveCounts:output_type -> presence.v1.GetLiveCountsResponse
+	4, // [4:6] is the sub-list for method output_type
+	2, // [2:4] is the sub-list for method input_type
+	2, // [2:2] is the sub-list for extension type_name
+	2, // [2:2] is the sub-list for extension extendee
+	0, // [0:2] is the sub-list for field type_name
 }
 
 func init() { file_presence_v1_presence_proto_init() }
@@ -286,13 +391,14 @@ func file_presence_v1_presence_proto_init() {
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_presence_v1_presence_proto_rawDesc), len(file_presence_v1_presence_proto_rawDesc)),
-			NumEnums:      0,
-			NumMessages:   4,
+			NumEnums:      1,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},
 		GoTypes:           file_presence_v1_presence_proto_goTypes,
 		DependencyIndexes: file_presence_v1_presence_proto_depIdxs,
+		EnumInfos:         file_presence_v1_presence_proto_enumTypes,
 		MessageInfos:      file_presence_v1_presence_proto_msgTypes,
 	}.Build()
 	File_presence_v1_presence_proto = out.File

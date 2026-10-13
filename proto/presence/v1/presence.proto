@@ -4,25 +4,42 @@ package presence.v1;
 
 option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1;presencev1";
 
+// See docs/ARCHITECTURE.md §3.4 (DEC-0045) for the batching and aging
+// behaviour this supports.
 service PresenceService {
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
-  rpc GetLiveCounts(GetLiveCountsRequest) returns (LiveCounts);
+  rpc GetLiveCounts(GetLiveCountsRequest) returns (GetLiveCountsResponse);
+}
+
+enum Category {
+  CATEGORY_UNSPECIFIED = 0;
+  CATEGORY_GUEST = 1;
+  CATEGORY_MALE = 2;
+  CATEGORY_FEMALE = 3;
+  // Verified, but gender is "prefer not to say" - counted in the total
+  // and in "verified", never in male or female (PRD: live counts).
+  CATEGORY_VERIFIED_OTHER = 4;
+}
+
+message HeartbeatEntry {
+  string account_id = 1;
+  Category category = 2;
 }
 
 message HeartbeatRequest {
-  string account_id = 1;
-  bool badge_verified = 2;
-  int32 gender = 3;
+  // One gateway instance's currently connected accounts, sent as a batch
+  // so the number of calls scales with gateway instances, not connected
+  // users.
+  repeated HeartbeatEntry entries = 1;
 }
 
-message HeartbeatResponse {
-  bool ok = 1;
-}
+message HeartbeatResponse {}
 
 message GetLiveCountsRequest {}
 
-message LiveCounts {
-  int64 unverified = 1;
-  int64 male = 2;
-  int64 female = 3;
+message GetLiveCountsResponse {
+  int64 total = 1;
+  int64 guests = 2;
+  int64 male = 3;
+  int64 female = 4;
 }

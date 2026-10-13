@@ -41,7 +41,8 @@ Order within each group is set once the architecture is agreed.
 ### Repository
 
 - [x] CI checks: formatting, `go vet`, race detector, linter, vulnerability scan, decision log validation (DEC-0051, DEC-0052)
-- [ ] CI: proto lint and breaking-change check (comes with the protocol redesign, since the current `.proto` files do not yet pass `buf lint`)
+- [x] CI: `buf lint`, passing now that the protocol redesign follows its naming rules
+- [ ] CI: `buf breaking`, enabled in the pull request immediately after the protocol redesign lands (it would fail against its own, intentionally breaking, base otherwise)
 - [x] Branch protection on `main`: pull requests only, CI required
 - [x] Private vulnerability reporting enabled
 - [x] Squash merging only, applied as a repository setting (DEC-0022)

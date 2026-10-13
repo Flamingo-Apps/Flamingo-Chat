@@ -4,25 +4,55 @@ package matching.v1;
 
 option go_package = "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1;matchingv1";
 
+import "identity/v1/identity.proto";
+
+// See docs/ARCHITECTURE.md §3.2 for the matching algorithm. RequestMatch
+// is unary, not a stream (DEC-0038): a result that arrives later reaches
+// the client through the gateway's WebSocket, over the same path
+// regardless of how quickly a match is actually found, rather than a
+// long-lived call tying a waiting client to one Matching instance.
 service MatchingService {
-  rpc RequestMatch(RequestMatchRequest) returns (stream MatchEvent);
+  rpc RequestMatch(RequestMatchRequest) returns (RequestMatchResponse);
+
+  // Ends the caller's current direct room and immediately queues them
+  // again - the chat UI's "Next" button.
+  rpc Next(NextRequest) returns (NextResponse);
+
   rpc CancelMatch(CancelMatchRequest) returns (CancelMatchResponse);
 }
 
-enum MatchStatus {
-  MATCH_STATUS_UNSPECIFIED = 0;
-  MATCH_STATUS_QUEUED = 1;
-  MATCH_STATUS_MATCHED = 2;
+enum Preference {
+  PREFERENCE_UNSPECIFIED = 0;
+  PREFERENCE_ANY = 1;
+  PREFERENCE_MALE = 2;
+  PREFERENCE_FEMALE = 3;
 }
 
 message RequestMatchRequest {
   string account_id = 1;
+  Preference preference = 2;
+  // The account's own tier and gender, passed by the gateway (DEC-0014) -
+  // Matching trusts these rather than looking them up itself, the same
+  // trust boundary every other internal call relies on.
+  bool verified = 3;
+  identity.v1.Gender gender = 4;
+  string pseudonym = 5;
 }
 
-message MatchEvent {
-  MatchStatus status = 1;
-  string room_id = 2;
-  string matched_account_id = 3;
+message RequestMatchResponse {
+  // Always true when this call returns successfully. A match, once
+  // found, is delivered asynchronously over the gateway's WebSocket -
+  // see docs/ARCHITECTURE.md §3.2 and DEC-0038.
+  bool queued = 1;
+}
+
+message NextRequest {
+  string account_id = 1;
+  string current_room_id = 2;
+}
+
+message NextResponse {
+  bool queued = 1;
 }
 
 message CancelMatchRequest {
