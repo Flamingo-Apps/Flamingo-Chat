@@ -1,11 +1,10 @@
 name: flamingo-chat
 
-# Local dev only. Ports are published to localhost so services running via
-# `go run` on the host (not yet containerized - no Dockerfiles exist yet)
-# can reach these directly. Jaeger and per-service containers get added
-# here in later phases (observability / infra), per SYSTEM_DESIGN.md §7-8.
-# Production Postgres is a managed instance, not this container - see
-# SYSTEM_DESIGN.md §7.
+# Local dev only, and on its way out - see docs/ARCHITECTURE.md §9: Tilt and
+# a local Kubernetes cluster replace this file once that lands. Until then:
+# ports are published to localhost so services running via `go run` on the
+# host (not yet containerized) can reach these directly. Production Postgres
+# is not this container - see docs/ARCHITECTURE.md §12.
 
 services:
   postgres:

@@ -26,7 +26,7 @@ The backend is a set of Go services that talk to each other over gRPC. Only the 
 
 Postgres is the source of truth. Redis carries live message delivery and presence. Kafka will carry durable events between services; the local setup still runs RabbitMQ until that change lands. The web frontend will live in `web/`.
 
-The design is described in [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md), and the reasons behind each choice are in [docs/decisions.jsonl](docs/decisions.jsonl).
+The design is described in [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md), and the reasons behind each choice are in [docs/decisions.jsonl](docs/decisions.jsonl).
 
 ## Run it locally
 
@@ -56,7 +56,7 @@ cd services/identity && go test ./...
 ## Documentation
 
 - [docs/PRD.md](docs/PRD.md): what is being built, for whom, and what is out of scope
-- [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md): services, data flows and contracts
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): services, data flows and contracts
 - [docs/PLAN.md](docs/PLAN.md): build order and progress
 - [docs/decisions.jsonl](docs/decisions.jsonl): decision and incident log
 
