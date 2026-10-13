@@ -1,7 +1,7 @@
 // Package store defines Identity's persistence boundary. Business logic
 // (internal/server) depends only on the AccountStore interface, never on
 // Postgres directly - this is the same "swappable storage" pattern
-// SYSTEM_DESIGN.md applies to Chat's message store, extended here to
+// docs/ARCHITECTURE.md applies to every service's store, extended here to
 // accounts, and it's what makes the in-memory fake used in server_test.go
 // possible without a real database.
 package store

@@ -26,13 +26,13 @@ If something has to slip, the launch date slips. Safety features and monitoring 
 
 These are decided before the related work starts. (DEC-0016)
 
-- [ ] Screens and flows for the web app, and the frontend framework
-- [ ] Architecture: how the services talk to each other, Kafka topics, what Redis holds
-- [ ] Infrastructure: cluster layout, cost against the trial credit, deploy pipeline
-- [ ] Monitoring design
+- [x] Frontend framework: React, Vite and TypeScript (DEC-0040). Screens are sketched in `docs/ARCHITECTURE.md` §10; a finished visual design is still open.
+- [x] Architecture: how the services talk to each other, Kafka topics, what Redis holds - in `docs/ARCHITECTURE.md` (sections 4 to 7 and 11 are proposed, pending review; everything else is agreed)
+- [ ] Infrastructure: cluster layout, cost against the trial credit, deploy pipeline (`docs/ARCHITECTURE.md` §12)
+- [ ] Monitoring design (the stack and dashboards; code-level hooks are in `docs/ARCHITECTURE.md` §8)
 - [x] License: Apache 2.0 (DEC-0035)
 - [ ] Domain name
-- [ ] `docs/ARCHITECTURE.md`, replacing `SYSTEM_DESIGN.md` and `architecture/gateway.md`
+- [x] `docs/ARCHITECTURE.md`, replacing `SYSTEM_DESIGN.md` and `architecture/gateway.md`
 
 ## v1
 

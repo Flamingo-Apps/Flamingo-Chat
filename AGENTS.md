@@ -16,7 +16,7 @@ It has two goals, and both matter:
 - [docs/PRD.md](docs/PRD.md): what is being built and for whom.
 - [docs/PLAN.md](docs/PLAN.md): what is done and what is next.
 - [docs/decisions.jsonl](docs/decisions.jsonl): why things are the way they are.
-- [docs/SYSTEM_DESIGN.md](docs/SYSTEM_DESIGN.md) and [docs/architecture/gateway.md](docs/architecture/gateway.md): the current design. Parts are out of date; each file says which. `docs/ARCHITECTURE.md` will replace both.
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): how the system is built and why. Sections marked Proposed are drafted, not yet reviewed with the maintainer - check before treating one as settled.
 
 If what you are about to build contradicts one of these, stop and raise it. Either the document is stale or you are about to undo a decision that was made for a reason.
 
