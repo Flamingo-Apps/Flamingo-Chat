@@ -71,7 +71,7 @@ func (s *Signer) Verify(tokenString string) (accountID string, needsRefresh bool
 		return s.key, nil
 	})
 	if err != nil || !token.Valid {
-		return "", false, fmt.Errorf("%w: %v", ErrInvalid, err)
+		return "", false, fmt.Errorf("%w: %w", ErrInvalid, err)
 	}
 	if claims.Subject == "" {
 		return "", false, fmt.Errorf("%w: missing subject", ErrInvalid)
