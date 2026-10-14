@@ -56,10 +56,7 @@ services = [
     # values file) - nothing to port-forward, since it has no server of
     # its own (DEC-0066).
     {'name': 'delivery-worker', 'port': None, 'deps': ['redis', 'kafka']},
-    # persistence-worker is deliberately not deployed here yet - it has no
-    # consume loop until docs/ARCHITECTURE.md's Chat/worker PRs land, so
-    # today it would just log one line and exit, which Kubernetes would
-    # restart in a pointless loop. It joins this list in that PR.
+    {'name': 'persistence-worker', 'port': None, 'deps': ['postgres', 'kafka']},
 ]
 
 for svc in services:
