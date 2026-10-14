@@ -5,3 +5,23 @@ protocol: http
 port: 8080
 env:
   HTTP_PORT: "8080"
+  IDENTITY_ADDR: "identity:50051"
+  CHAT_ADDR: "chat:50053"
+  MATCHING_ADDR: "matching:50052"
+  PRESENCE_ADDR: "presence:50054"
+  MODERATION_ADDR: "moderation:50055"
+  REDIS_URL: "redis://redis:6379/0"
+  # Local development only (DEC-0014 says this comes from a Kubernetes
+  # secret in a real deployment) - an obviously fake, never-used-outside-
+  # this-cluster placeholder, the same pattern postgres-dev-credentials
+  # already uses.
+  SESSION_SIGNING_KEY: "local-dev-not-a-real-secret-do-not-use-in-production"
+  # Empty disables Turnstile verification for guest signup
+  # (docs/ARCHITECTURE.md §4.4) - there is no Turnstile secret for local
+  # development.
+  TURNSTILE_SECRET: ""
+  # The client dev server's own origin - matches whatever `web/`'s Vite
+  # dev server listens on once it exists (T11); same-origin requests
+  # (the request's own Host header) are always allowed regardless of
+  # this list.
+  WS_ORIGIN_PATTERNS: "localhost:*"

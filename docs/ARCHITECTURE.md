@@ -145,7 +145,7 @@ During a random chat, either user can send `keep_chat`. Chat records the vote an
   3. Gateways check `banned` on sign-in, on WebSocket connect, and on every send.
   4. A verified account is one per Google account, so signing in again with the same Google account reaches the same banned account.
 
-## 4. Accounts and sessions (Proposed)
+## 4. Accounts and sessions (Proposed; built, pending review - DEC-0071 to DEC-0076)
 
 ### 4.1 Accounts
 
@@ -192,7 +192,7 @@ The response says whether the account still needs a gender choice.
 
 ## 5. Contracts
 
-### 5.1 HTTP API (Proposed)
+### 5.1 HTTP API (Proposed; built, pending review - DEC-0072)
 
 JSON over HTTPS, prefix `/v1`. Authenticated endpoints take `Authorization: Bearer <session token>`.
 
@@ -217,7 +217,7 @@ JSON over HTTPS, prefix `/v1`. Authenticated endpoints take `Authorization: Bear
 
 Errors use `{error: {code, message}}`, with HTTP status codes mapped from gRPC codes.
 
-### 5.2 WebSocket protocol (Proposed)
+### 5.2 WebSocket protocol (Proposed; built, pending review - DEC-0073 to DEC-0075)
 
 The endpoint is `GET /v1/ws`. Each frame is a JSON object with a `type` field. The first client frame must be `auth` within 5 seconds; a token is never put in the URL, where it would end up in logs.
 
