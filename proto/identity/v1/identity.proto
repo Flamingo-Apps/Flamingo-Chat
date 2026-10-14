@@ -10,12 +10,6 @@ service IdentityService {
   rpc GetAccount(GetAccountRequest) returns (GetAccountResponse);
   rpc UpdatePseudonym(UpdatePseudonymRequest) returns (UpdatePseudonymResponse);
 
-  // Deprecated: superseded by SignInWithGoogle (DEC-0027, DEC-0041). Kept,
-  // with its existing implementation and tests, until the pull request
-  // that implements SignInWithGoogle removes both together rather than
-  // breaking the build in a pull request that only touches contracts.
-  rpc VerifyBadge(VerifyBadgeRequest) returns (VerifyBadgeResponse);
-
   // Covers all three sign-in cases in one call: an existing verified
   // account, upgrading a guest account in place, or creating a new
   // verified account. See docs/ARCHITECTURE.md §4.2 (DEC-0041).
@@ -45,7 +39,8 @@ enum Gender {
 message Account {
   string id = 1;
   string pseudonym = 2;
-  bool badge_verified = 3;
+  reserved 3;
+  reserved "badge_verified";
   Gender gender = 4;
   int64 created_at_unix = 5;
   // True once SignInWithGoogle has linked this account to a Google
@@ -80,19 +75,6 @@ message UpdatePseudonymRequest {
 }
 
 message UpdatePseudonymResponse {
-  Account account = 1;
-}
-
-message VerifyBadgeRequest {
-  string account_id = 1;
-  // OAuth ID token (JWT) from the client's college-email login, e.g. Google
-  // Sign-In. Identity verifies this itself rather than trusting a bare
-  // email string, since a bare string can't prove ownership.
-  string id_token = 2;
-  Gender gender = 3;
-}
-
-message VerifyBadgeResponse {
   Account account = 1;
 }
 

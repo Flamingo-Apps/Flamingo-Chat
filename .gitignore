@@ -28,3 +28,6 @@ services/*/persistence-worker
 
 # OS
 .DS_Store
+
+# Personal Claude Code settings (not team-wide; see .claude/settings.json for those)
+.claude/settings.local.json

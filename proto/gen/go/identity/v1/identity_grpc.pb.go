@@ -22,7 +22,6 @@ const (
 	IdentityService_CreateAccount_FullMethodName    = "/identity.v1.IdentityService/CreateAccount"
 	IdentityService_GetAccount_FullMethodName       = "/identity.v1.IdentityService/GetAccount"
 	IdentityService_UpdatePseudonym_FullMethodName  = "/identity.v1.IdentityService/UpdatePseudonym"
-	IdentityService_VerifyBadge_FullMethodName      = "/identity.v1.IdentityService/VerifyBadge"
 	IdentityService_SignInWithGoogle_FullMethodName = "/identity.v1.IdentityService/SignInWithGoogle"
 	IdentityService_SetGender_FullMethodName        = "/identity.v1.IdentityService/SetGender"
 	IdentityService_AdminSetGender_FullMethodName   = "/identity.v1.IdentityService/AdminSetGender"
@@ -38,11 +37,6 @@ type IdentityServiceClient interface {
 	CreateAccount(ctx context.Context, in *CreateAccountRequest, opts ...grpc.CallOption) (*CreateAccountResponse, error)
 	GetAccount(ctx context.Context, in *GetAccountRequest, opts ...grpc.CallOption) (*GetAccountResponse, error)
 	UpdatePseudonym(ctx context.Context, in *UpdatePseudonymRequest, opts ...grpc.CallOption) (*UpdatePseudonymResponse, error)
-	// Deprecated: superseded by SignInWithGoogle (DEC-0027, DEC-0041). Kept,
-	// with its existing implementation and tests, until the pull request
-	// that implements SignInWithGoogle removes both together rather than
-	// breaking the build in a pull request that only touches contracts.
-	VerifyBadge(ctx context.Context, in *VerifyBadgeRequest, opts ...grpc.CallOption) (*VerifyBadgeResponse, error)
 	// Covers all three sign-in cases in one call: an existing verified
 	// account, upgrading a guest account in place, or creating a new
 	// verified account. See docs/ARCHITECTURE.md §4.2 (DEC-0041).
@@ -90,16 +84,6 @@ func (c *identityServiceClient) UpdatePseudonym(ctx context.Context, in *UpdateP
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(UpdatePseudonymResponse)
 	err := c.cc.Invoke(ctx, IdentityService_UpdatePseudonym_FullMethodName, in, out, cOpts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
-func (c *identityServiceClient) VerifyBadge(ctx context.Context, in *VerifyBadgeRequest, opts ...grpc.CallOption) (*VerifyBadgeResponse, error) {
-	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	out := new(VerifyBadgeResponse)
-	err := c.cc.Invoke(ctx, IdentityService_VerifyBadge_FullMethodName, in, out, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -155,11 +139,6 @@ type IdentityServiceServer interface {
 	CreateAccount(context.Context, *CreateAccountRequest) (*CreateAccountResponse, error)
 	GetAccount(context.Context, *GetAccountRequest) (*GetAccountResponse, error)
 	UpdatePseudonym(context.Context, *UpdatePseudonymRequest) (*UpdatePseudonymResponse, error)
-	// Deprecated: superseded by SignInWithGoogle (DEC-0027, DEC-0041). Kept,
-	// with its existing implementation and tests, until the pull request
-	// that implements SignInWithGoogle removes both together rather than
-	// breaking the build in a pull request that only touches contracts.
-	VerifyBadge(context.Context, *VerifyBadgeRequest) (*VerifyBadgeResponse, error)
 	// Covers all three sign-in cases in one call: an existing verified
 	// account, upgrading a guest account in place, or creating a new
 	// verified account. See docs/ARCHITECTURE.md §4.2 (DEC-0041).
@@ -191,9 +170,6 @@ func (UnimplementedIdentityServiceServer) GetAccount(context.Context, *GetAccoun
 }
 func (UnimplementedIdentityServiceServer) UpdatePseudonym(context.Context, *UpdatePseudonymRequest) (*UpdatePseudonymResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method UpdatePseudonym not implemented")
-}
-func (UnimplementedIdentityServiceServer) VerifyBadge(context.Context, *VerifyBadgeRequest) (*VerifyBadgeResponse, error) {
-	return nil, status.Error(codes.Unimplemented, "method VerifyBadge not implemented")
 }
 func (UnimplementedIdentityServiceServer) SignInWithGoogle(context.Context, *SignInWithGoogleRequest) (*SignInWithGoogleResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method SignInWithGoogle not implemented")
@@ -278,24 +254,6 @@ func _IdentityService_UpdatePseudonym_Handler(srv interface{}, ctx context.Conte
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(IdentityServiceServer).UpdatePseudonym(ctx, req.(*UpdatePseudonymRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
-func _IdentityService_VerifyBadge_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(VerifyBadgeRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(IdentityServiceServer).VerifyBadge(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: IdentityService_VerifyBadge_FullMethodName,
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(IdentityServiceServer).VerifyBadge(ctx, req.(*VerifyBadgeRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -390,10 +348,6 @@ var IdentityService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "UpdatePseudonym",
 			Handler:    _IdentityService_UpdatePseudonym_Handler,
-		},
-		{
-			MethodName: "VerifyBadge",
-			Handler:    _IdentityService_VerifyBadge_Handler,
 		},
 		{
 			MethodName: "SignInWithGoogle",

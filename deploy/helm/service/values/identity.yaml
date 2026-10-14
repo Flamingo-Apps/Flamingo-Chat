@@ -8,14 +8,23 @@ env:
   POSTGRES_URL: "postgres://flamingo:flamingo@postgres:5432/flamingo?sslmode=disable"
   COLLEGE_EMAIL_DOMAIN: "kiit.ac.in"
   # Public client ID (not a secret - see docs/decisions.jsonl DEC-0027/DEC-0030
-  # and AGENTS.md's environment notes). Verification itself needs a real
-  # Google ID token from a browser, which local development doesn't have -
-  # that gap is closed by the development-only fake verifier, DEC-0049,
-  # not built yet.
+  # and AGENTS.md's environment notes). Only used when DEV_FAKE_GOOGLE is
+  # unset; local development uses the fake verifier below instead, since
+  # there's no browser here to get a real Google ID token from.
   COLLEGE_OAUTH_CLIENT_ID: "155057367000-e6fvpmf6g3up2p20133i7jhnd0nc3hfn.apps.googleusercontent.com"
+  # Local development only (DEC-0049) - never set this outside a local
+  # cluster. Accepts tokens shaped "fake:<sub>:<email>" instead of
+  # requiring a real Google-signed JWT.
+  DEV_FAKE_GOOGLE: "1"
 resources:
   requests:
     cpu: 50m
     memory: 48Mi
   limits:
     memory: 192Mi
+cronJob:
+  name: cleanup-guests
+  # Once a day, off the hour to avoid a thundering herd with other cron
+  # jobs that default to the hour or midnight (DEC-0026).
+  schedule: "17 3 * * *"
+  args: ["cleanup-guests"]

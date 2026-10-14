@@ -1,0 +1,28 @@
+{{- if .Values.cronJob }}
+# Runs the same image as the Deployment with a different command, rather
+# than a separate image - see docs/ARCHITECTURE.md §9 and
+# services/identity/main.go's cleanup-guests mode.
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ .Values.name }}-{{ .Values.cronJob.name }}
+spec:
+  schedule: {{ .Values.cronJob.schedule | quote }}
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: {{ .Values.cronJob.name }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args: {{ .Values.cronJob.args | toJson }}
+              {{- if .Values.env }}
+              env:
+                {{- range $k, $v := .Values.env }}
+                - name: {{ $k }}
+                  value: {{ $v | quote }}
+                {{- end }}
+              {{- end }}
+{{- end }}
