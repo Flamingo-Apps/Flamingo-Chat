@@ -1,0 +1,9 @@
+name: delivery-worker
+image:
+  repository: flamingo/delivery-worker
+# No port of its own - a pure Kafka consumer publishing to Redis, not a
+# server (DEC-0066).
+protocol: worker
+env:
+  KAFKA_BROKERS: "kafka:9092"
+  REDIS_URL: "redis://redis:6379/0"

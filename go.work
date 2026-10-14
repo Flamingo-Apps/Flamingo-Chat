@@ -4,6 +4,7 @@ use (
 	./pkg
 	./proto/gen/go
 	./services/chat
+	./services/delivery-worker
 	./services/gateway
 	./services/identity
 	./services/matching

@@ -32,7 +32,7 @@ jobs:
     steps:
       - id: list
         run: |
-          echo 'modules=["pkg","proto/gen/go","services/gateway","services/identity","services/matching","services/chat","services/presence","services/moderation","services/persistence-worker"]' >> "$GITHUB_OUTPUT"
+          echo 'modules=["pkg","proto/gen/go","services/gateway","services/identity","services/matching","services/chat","services/presence","services/moderation","services/persistence-worker","services/delivery-worker"]' >> "$GITHUB_OUTPUT"
 
   build-and-test:
     name: build-and-test (${{ matrix.module }})
