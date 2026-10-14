@@ -10,6 +10,9 @@ image:
 # since Kubernetes 1.27), which calls the standard grpc.health.v1.Health
 # service every service already registers via pkg/grpclog's neighbour,
 # health.NewServer(). "http" services are checked on /healthz instead.
+# "worker" is for a service with no server of its own at all (a Kafka
+# consumer such as delivery-worker or persistence-worker) - no Service
+# object, no ports, no probe (DEC-0066); port is ignored for it.
 protocol: grpc
 port: 50051
 

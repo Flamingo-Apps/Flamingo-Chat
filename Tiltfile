@@ -52,6 +52,10 @@ services = [
     {'name': 'matching', 'port': 50052, 'deps': ['redis', 'kafka']},
     {'name': 'presence', 'port': 50054, 'deps': ['redis']},
     {'name': 'moderation', 'port': 50055, 'deps': ['postgres', 'kafka']},
+    # 'port': None marks a worker service (protocol: worker in its own
+    # values file) - nothing to port-forward, since it has no server of
+    # its own (DEC-0066).
+    {'name': 'delivery-worker', 'port': None, 'deps': ['redis', 'kafka']},
     # persistence-worker is deliberately not deployed here yet - it has no
     # consume loop until docs/ARCHITECTURE.md's Chat/worker PRs land, so
     # today it would just log one line and exit, which Kubernetes would
@@ -72,7 +76,7 @@ for svc in services:
     ))
     k8s_resource(
         name,
-        port_forwards='%d:%d' % (svc['port'], svc['port']),
+        port_forwards='%d:%d' % (svc['port'], svc['port']) if svc['port'] else [],
         resource_deps=svc['deps'],
         labels=['services'],
     )

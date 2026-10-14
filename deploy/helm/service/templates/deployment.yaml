@@ -18,9 +18,11 @@ spec:
         - name: {{ .Values.name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
+          {{- if ne .Values.protocol "worker" }}
           ports:
             - name: {{ .Values.protocol }}
               containerPort: {{ .Values.port }}
+          {{- end }}
           {{- if .Values.env }}
           env:
             {{- range $k, $v := .Values.env }}
@@ -46,7 +48,7 @@ spec:
               port: {{ .Values.port }}
             initialDelaySeconds: 5
             periodSeconds: 10
-          {{- else }}
+          {{- else if eq .Values.protocol "http" }}
           readinessProbe:
             httpGet:
               path: /healthz
@@ -60,5 +62,12 @@ spec:
             initialDelaySeconds: 5
             periodSeconds: 10
           {{- end }}
+          {{/*
+            "worker" services (a Kafka consumer with no server of its own -
+            delivery-worker, persistence-worker) get no probe at all: there
+            is no port to check, and a crashed consumer process already
+            exits non-zero, which the Deployment's restartPolicy handles
+            without a probe's help (DEC-0066).
+          */}}
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
