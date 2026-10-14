@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"net"
 	"os"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -24,20 +25,28 @@ import (
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/identity/migrations"
 )
 
-func main() {
-	ctx := context.Background()
+// guestRetentionDays is how long a guest account can go without activity
+// before cleanup-guests removes it (DEC-0026).
+const guestRetentionDays = 60
 
-	port := config.String("GRPC_PORT", "50051")
+func main() {
+	// A second mode on the same binary, run as a Kubernetes CronJob
+	// (deploy/helm/service's cronjob.yaml) rather than as a separate
+	// image - see docs/ARCHITECTURE.md §9.
+	if len(os.Args) > 1 && os.Args[1] == "cleanup-guests" {
+		runCleanupGuests()
+		return
+	}
+	runServer()
+}
+
+func connectAndMigrate(ctx context.Context) *pgxpool.Pool {
 	postgresURL := config.String("POSTGRES_URL", "postgres://flamingo:flamingo@localhost:5432/flamingo?sslmode=disable")
-	collegeDomain := config.String("COLLEGE_EMAIL_DOMAIN", "kiit.ac.in")
-	oauthClientID := config.String("COLLEGE_OAUTH_CLIENT_ID", "")
-	oauthIssuer := config.String("OAUTH_ISSUER_URL", "https://accounts.google.com")
 
 	pool, err := pgxpool.New(ctx, postgresURL)
 	if err != nil {
 		log.Fatalf("pgxpool.New: %v", err)
 	}
-	defer pool.Close()
 
 	// stdlib.OpenDBFromPool wraps the existing pool as a *sql.DB just for
 	// golang-migrate's sake (it predates pgx v5's native interface and
@@ -50,12 +59,47 @@ func main() {
 	if err := sqlDB.Close(); err != nil {
 		log.Printf("migrations: closing db handle: %v", err)
 	}
+	return pool
+}
 
-	var verifier verify.BadgeVerifier
-	if oauthClientID == "" {
-		log.Println("WARNING: COLLEGE_OAUTH_CLIENT_ID is not set - VerifyBadge will reject every request until it is configured")
+func runCleanupGuests() {
+	ctx := context.Background()
+	pool := connectAndMigrate(ctx)
+	defer pool.Close()
+
+	accountStore := store.NewPostgres(pool)
+	n, err := accountStore.DeleteStaleGuests(ctx, guestRetentionDays*24*time.Hour)
+	if err != nil {
+		log.Fatalf("cleanup-guests: %v", err)
+	}
+	log.Printf("cleanup-guests: removed %d guest account(s) inactive for over %d days", n, guestRetentionDays)
+}
+
+func runServer() {
+	ctx := context.Background()
+
+	port := config.String("GRPC_PORT", "50051")
+	collegeDomain := config.String("COLLEGE_EMAIL_DOMAIN", "kiit.ac.in")
+	oauthClientID := config.String("COLLEGE_OAUTH_CLIENT_ID", "")
+	oauthIssuer := config.String("OAUTH_ISSUER_URL", "https://accounts.google.com")
+	devFakeGoogle := config.String("DEV_FAKE_GOOGLE", "") != ""
+
+	pool := connectAndMigrate(ctx)
+	defer pool.Close()
+
+	var verifier verify.GoogleVerifier
+	switch {
+	case devFakeGoogle:
+		// Never for anything but local development (DEC-0049) - accepts
+		// tokens shaped "fake:<sub>:<email>" instead of a real
+		// Google-signed JWT, so SignInWithGoogle can be exercised without
+		// a browser.
+		log.Println("WARNING: DEV_FAKE_GOOGLE is set - accepting fabricated sign-in tokens instead of verifying real ones. Never set this outside local development.")
+		verifier = verify.Fake{}
+	case oauthClientID == "":
+		log.Println("WARNING: COLLEGE_OAUTH_CLIENT_ID is not set - SignInWithGoogle will reject every request until it is configured")
 		verifier = verify.Disabled{}
-	} else {
+	default:
 		v, err := verify.NewOIDCVerifier(ctx, oauthIssuer, oauthClientID)
 		if err != nil {
 			log.Fatalf("verify.NewOIDCVerifier: %v", err)

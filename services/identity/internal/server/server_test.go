@@ -10,16 +10,21 @@ import (
 
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/identity/internal/store"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/identity/internal/verify"
 )
 
 // fakeStore is an in-memory AccountStore, keyed by ID, with separate
-// pseudonym/email indexes to reproduce the same uniqueness errors Postgres
-// would report. This is what lets server logic be tested without a real
-// database - see store.AccountStore's doc comment.
+// pseudonym/email/sub indexes to reproduce the same uniqueness errors
+// Postgres would report. This is what lets server logic be tested without
+// a real database - see store.AccountStore's doc comment. It does not
+// replicate Touch's one-hour write throttle - that's a database-level
+// optimization, exercised by the integration tests against real Postgres,
+// not something a unit test of the gRPC layer needs to assert on.
 type fakeStore struct {
 	byID        map[string]store.Account
 	byPseudonym map[string]string // pseudonym -> id
-	byEmail     map[string]string // email -> id
+	byEmail     map[string]string // verified email -> id
+	bySub       map[string]string // google sub -> id
 }
 
 func newFakeStore() *fakeStore {
@@ -27,6 +32,7 @@ func newFakeStore() *fakeStore {
 		byID:        map[string]store.Account{},
 		byPseudonym: map[string]string{},
 		byEmail:     map[string]string{},
+		bySub:       map[string]string{},
 	}
 }
 
@@ -34,7 +40,7 @@ func (f *fakeStore) Create(_ context.Context, id, pseudonym string) (store.Accou
 	if _, taken := f.byPseudonym[pseudonym]; taken {
 		return store.Account{}, store.ErrAlreadyExists
 	}
-	acc := store.Account{ID: id, Pseudonym: pseudonym, CreatedAt: time.Unix(0, 0)}
+	acc := store.Account{ID: id, Pseudonym: pseudonym, CreatedAt: time.Unix(0, 0), LastSeenAt: time.Unix(0, 0)}
 	f.byID[id] = acc
 	f.byPseudonym[pseudonym] = id
 	return acc, nil
@@ -63,40 +69,123 @@ func (f *fakeStore) UpdatePseudonym(_ context.Context, id, newPseudonym string) 
 	return acc, nil
 }
 
-func (f *fakeStore) SetVerified(_ context.Context, id string, gender identityv1.Gender, verifiedEmail string) (store.Account, error) {
+func (f *fakeStore) GetByGoogleSub(_ context.Context, sub string) (store.Account, error) {
+	id, ok := f.bySub[sub]
+	if !ok {
+		return store.Account{}, store.ErrNotFound
+	}
+	return f.byID[id], nil
+}
+
+func (f *fakeStore) LinkGoogle(_ context.Context, id, sub, verifiedEmail string) (store.Account, error) {
 	acc, ok := f.byID[id]
 	if !ok {
 		return store.Account{}, store.ErrNotFound
 	}
+	if owner, taken := f.bySub[sub]; taken && owner != id {
+		return store.Account{}, store.ErrAlreadyExists
+	}
 	if owner, taken := f.byEmail[verifiedEmail]; taken && owner != id {
 		return store.Account{}, store.ErrAlreadyExists
 	}
-	acc.BadgeVerified = true
-	acc.Gender = gender
+	acc.GoogleSub = &sub
 	acc.VerifiedEmail = &verifiedEmail
+	f.bySub[sub] = id
 	f.byEmail[verifiedEmail] = id
 	f.byID[id] = acc
 	return acc, nil
 }
 
-// fakeVerifier returns canned (email, emailVerified) pairs per raw token,
-// standing in for a real OIDC provider in tests.
+func (f *fakeStore) CreateVerified(_ context.Context, id, pseudonym, sub, verifiedEmail string) (store.Account, error) {
+	if _, taken := f.byPseudonym[pseudonym]; taken {
+		return store.Account{}, store.ErrAlreadyExists
+	}
+	if _, taken := f.bySub[sub]; taken {
+		return store.Account{}, store.ErrAlreadyExists
+	}
+	if _, taken := f.byEmail[verifiedEmail]; taken {
+		return store.Account{}, store.ErrAlreadyExists
+	}
+	acc := store.Account{
+		ID: id, Pseudonym: pseudonym, GoogleSub: &sub, VerifiedEmail: &verifiedEmail,
+		CreatedAt: time.Unix(0, 0), LastSeenAt: time.Unix(0, 0),
+	}
+	f.byID[id] = acc
+	f.byPseudonym[pseudonym] = id
+	f.bySub[sub] = id
+	f.byEmail[verifiedEmail] = id
+	return acc, nil
+}
+
+func (f *fakeStore) SetGender(_ context.Context, id string, gender identityv1.Gender) (store.Account, error) {
+	acc, ok := f.byID[id]
+	if !ok {
+		return store.Account{}, store.ErrNotFound
+	}
+	if acc.GenderSetAt != nil {
+		return store.Account{}, store.ErrAlreadySet
+	}
+	now := time.Now()
+	acc.Gender = gender
+	acc.GenderSetAt = &now
+	f.byID[id] = acc
+	return acc, nil
+}
+
+func (f *fakeStore) AdminSetGender(_ context.Context, id string, gender identityv1.Gender) (store.Account, error) {
+	acc, ok := f.byID[id]
+	if !ok {
+		return store.Account{}, store.ErrNotFound
+	}
+	acc.Gender = gender
+	if acc.GenderSetAt == nil {
+		now := time.Now()
+		acc.GenderSetAt = &now
+	}
+	f.byID[id] = acc
+	return acc, nil
+}
+
+func (f *fakeStore) Touch(_ context.Context, id string) error {
+	acc, ok := f.byID[id]
+	if !ok {
+		return nil // best-effort - see the doc comment on AccountStore.Touch
+	}
+	acc.LastSeenAt = time.Now()
+	f.byID[id] = acc
+	return nil
+}
+
+func (f *fakeStore) DeleteStaleGuests(_ context.Context, olderThan time.Duration) (int64, error) {
+	var n int64
+	cutoff := time.Now().Add(-olderThan)
+	for id, acc := range f.byID {
+		if acc.GoogleSub == nil && acc.LastSeenAt.Before(cutoff) {
+			delete(f.byID, id)
+			delete(f.byPseudonym, acc.Pseudonym)
+			n++
+		}
+	}
+	return n, nil
+}
+
+// fakeVerifier returns canned GoogleClaims per raw token, standing in for
+// a real OIDC provider in tests.
 type fakeVerifier struct {
 	responses map[string]fakeVerifierResponse
 }
 
 type fakeVerifierResponse struct {
-	email         string
-	emailVerified bool
-	err           error
+	claims verify.GoogleClaims
+	err    error
 }
 
-func (f *fakeVerifier) Verify(_ context.Context, rawIDToken string) (string, bool, error) {
+func (f *fakeVerifier) Verify(_ context.Context, rawIDToken string) (verify.GoogleClaims, error) {
 	r, ok := f.responses[rawIDToken]
 	if !ok {
-		return "", false, errUnknownToken
+		return verify.GoogleClaims{}, errUnknownToken
 	}
-	return r.email, r.emailVerified, r.err
+	return r.claims, r.err
 }
 
 var errUnknownToken = status.Error(codes.InvalidArgument, "unknown test token")
@@ -117,7 +206,7 @@ func TestCreateAccount(t *testing.T) {
 	if err != nil {
 		t.Fatalf("CreateAccount: %v", err)
 	}
-	if acc.GetAccount().GetId() != "acc-1" || acc.GetAccount().GetPseudonym() != "shadow_fox" || acc.GetAccount().GetBadgeVerified() {
+	if acc.GetAccount().GetId() != "acc-1" || acc.GetAccount().GetPseudonym() != "shadow_fox" || acc.GetAccount().GetGoogleLinked() {
 		t.Fatalf("unexpected account: %+v", acc)
 	}
 
@@ -169,103 +258,189 @@ func TestUpdatePseudonym(t *testing.T) {
 	}
 }
 
-func TestVerifyBadge(t *testing.T) {
+func TestSignInWithGoogle(t *testing.T) {
 	verifier := &fakeVerifier{responses: map[string]fakeVerifierResponse{
-		"good-token":       {email: "aro@kiit.ac.in", emailVerified: true},
-		"unverified-email": {email: "aro@kiit.ac.in", emailVerified: false},
-		"wrong-domain":     {email: "aro@gmail.com", emailVerified: true},
-		"already-used-tok": {email: "dup@kiit.ac.in", emailVerified: true},
+		"good-token":    {claims: verify.GoogleClaims{Sub: "sub-1", Email: "aro@kiit.ac.in", EmailVerified: true, HD: "kiit.ac.in"}},
+		"same-sub-tok":  {claims: verify.GoogleClaims{Sub: "sub-1", Email: "aro@kiit.ac.in", EmailVerified: true, HD: "kiit.ac.in"}},
+		"other-sub-tok": {claims: verify.GoogleClaims{Sub: "sub-2", Email: "other@kiit.ac.in", EmailVerified: true, HD: "kiit.ac.in"}},
+		"unverified":    {claims: verify.GoogleClaims{Sub: "sub-3", Email: "x@kiit.ac.in", EmailVerified: false, HD: "kiit.ac.in"}},
+		"wrong-domain":  {claims: verify.GoogleClaims{Sub: "sub-4", Email: "x@gmail.com", EmailVerified: true}},
 	}}
 
-	newServer := func() (*Server, *fakeStore) {
-		st := newFakeStore()
-		s := New(st, verifier, idGen("acc-1", "acc-2"), "kiit.ac.in")
-		return s, st
-	}
-
-	t.Run("success", func(t *testing.T) {
-		s, _ := newServer()
-		if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "shadow_fox"}); err != nil {
-			t.Fatalf("create: %v", err)
-		}
-		acc, err := s.VerifyBadge(context.Background(), &identityv1.VerifyBadgeRequest{
-			AccountId: "acc-1",
-			IdToken:   "good-token",
-			Gender:    identityv1.Gender_GENDER_FEMALE,
-		})
+	t.Run("case C: no guest account creates a new verified account with a generated pseudonym", func(t *testing.T) {
+		s := New(newFakeStore(), verifier, idGen("acc-1"), "kiit.ac.in")
+		resp, err := s.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{IdToken: "good-token"})
 		if err != nil {
-			t.Fatalf("VerifyBadge: %v", err)
+			t.Fatalf("SignInWithGoogle: %v", err)
 		}
-		if !acc.GetAccount().GetBadgeVerified() || acc.GetAccount().GetGender() != identityv1.Gender_GENDER_FEMALE {
+		acc := resp.GetAccount()
+		if acc.GetId() != "acc-1" || !acc.GetGoogleLinked() || acc.GetPseudonym() == "" {
 			t.Fatalf("unexpected account: %+v", acc)
 		}
-	})
-
-	t.Run("unspecified gender rejected", func(t *testing.T) {
-		s, _ := newServer()
-		if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "shadow_fox"}); err != nil {
-			t.Fatalf("create: %v", err)
-		}
-		_, err := s.VerifyBadge(context.Background(), &identityv1.VerifyBadgeRequest{AccountId: "acc-1", IdToken: "good-token"})
-		if status.Code(err) != codes.InvalidArgument {
-			t.Fatalf("expected InvalidArgument, got %v", err)
+		if !resp.GetNeedsGender() {
+			t.Fatalf("expected needs_gender for a brand new account")
 		}
 	})
 
-	t.Run("unverified email rejected", func(t *testing.T) {
-		s, _ := newServer()
+	t.Run("case B: a guest account is upgraded in place", func(t *testing.T) {
+		st := newFakeStore()
+		s := New(st, verifier, idGen("guest-1"), "kiit.ac.in")
 		if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "shadow_fox"}); err != nil {
-			t.Fatalf("create: %v", err)
+			t.Fatalf("create guest: %v", err)
 		}
-		_, err := s.VerifyBadge(context.Background(), &identityv1.VerifyBadgeRequest{
-			AccountId: "acc-1", IdToken: "unverified-email", Gender: identityv1.Gender_GENDER_MALE,
+
+		resp, err := s.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{
+			IdToken: "good-token", GuestAccountId: strPtr("guest-1"),
 		})
-		if status.Code(err) != codes.InvalidArgument {
-			t.Fatalf("expected InvalidArgument, got %v", err)
+		if err != nil {
+			t.Fatalf("SignInWithGoogle: %v", err)
+		}
+		acc := resp.GetAccount()
+		if acc.GetId() != "guest-1" || acc.GetPseudonym() != "shadow_fox" || !acc.GetGoogleLinked() {
+			t.Fatalf("expected the guest account upgraded in place, got %+v", acc)
 		}
 	})
 
-	t.Run("wrong domain rejected", func(t *testing.T) {
-		s, _ := newServer()
-		if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "shadow_fox"}); err != nil {
-			t.Fatalf("create: %v", err)
+	t.Run("case A: an already-linked account signs in again and is returned unchanged", func(t *testing.T) {
+		st := newFakeStore()
+		s := New(st, verifier, idGen("acc-1"), "kiit.ac.in")
+		first, err := s.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{IdToken: "good-token"})
+		if err != nil {
+			t.Fatalf("first sign-in: %v", err)
 		}
-		_, err := s.VerifyBadge(context.Background(), &identityv1.VerifyBadgeRequest{
-			AccountId: "acc-1", IdToken: "wrong-domain", Gender: identityv1.Gender_GENDER_MALE,
-		})
-		if status.Code(err) != codes.PermissionDenied {
-			t.Fatalf("expected PermissionDenied, got %v", err)
+
+		second, err := s.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{IdToken: "same-sub-tok"})
+		if err != nil {
+			t.Fatalf("second sign-in: %v", err)
+		}
+		if second.GetAccount().GetId() != first.GetAccount().GetId() {
+			t.Fatalf("expected the same account both times, got %s then %s", first.GetAccount().GetId(), second.GetAccount().GetId())
 		}
 	})
 
-	t.Run("duplicate verified email rejected", func(t *testing.T) {
-		s, _ := newServer()
-		if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "shadow_fox"}); err != nil {
-			t.Fatalf("create acc-1: %v", err)
+	t.Run("a different google identity on an already-linked guest id is rejected, not merged", func(t *testing.T) {
+		st := newFakeStore()
+		s := New(st, verifier, idGen("acc-1", "guest-2"), "kiit.ac.in")
+		if _, err := s.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{IdToken: "good-token"}); err != nil {
+			t.Fatalf("first sign-in: %v", err)
 		}
-		if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "night_owl"}); err != nil {
-			t.Fatalf("create acc-2: %v", err)
+		if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "other_guest"}); err != nil {
+			t.Fatalf("create second guest: %v", err)
 		}
-		if _, err := s.VerifyBadge(context.Background(), &identityv1.VerifyBadgeRequest{
-			AccountId: "acc-1", IdToken: "already-used-tok", Gender: identityv1.Gender_GENDER_MALE,
-		}); err != nil {
-			t.Fatalf("first verify: %v", err)
-		}
-		_, err := s.VerifyBadge(context.Background(), &identityv1.VerifyBadgeRequest{
-			AccountId: "acc-2", IdToken: "already-used-tok", Gender: identityv1.Gender_GENDER_FEMALE,
+
+		// A second, different Google identity trying to claim the first
+		// one's email is a collision, not a merge - acc-1 already owns it.
+		verifierWithCollision := &fakeVerifier{responses: map[string]fakeVerifierResponse{
+			"colliding-email": {claims: verify.GoogleClaims{Sub: "sub-colliding", Email: "aro@kiit.ac.in", EmailVerified: true, HD: "kiit.ac.in"}},
+		}}
+		s2 := New(st, verifierWithCollision, idGen(), "kiit.ac.in")
+		_, err := s2.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{
+			IdToken: "colliding-email", GuestAccountId: strPtr("guest-2"),
 		})
 		if status.Code(err) != codes.AlreadyExists {
 			t.Fatalf("expected AlreadyExists, got %v", err)
 		}
 	})
 
-	t.Run("account not found", func(t *testing.T) {
-		s, _ := newServer()
-		_, err := s.VerifyBadge(context.Background(), &identityv1.VerifyBadgeRequest{
-			AccountId: "missing", IdToken: "good-token", Gender: identityv1.Gender_GENDER_MALE,
+	t.Run("unverified email rejected", func(t *testing.T) {
+		s := New(newFakeStore(), verifier, idGen(), "kiit.ac.in")
+		_, err := s.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{IdToken: "unverified"})
+		if status.Code(err) != codes.InvalidArgument {
+			t.Fatalf("expected InvalidArgument, got %v", err)
+		}
+	})
+
+	t.Run("wrong hd rejected", func(t *testing.T) {
+		s := New(newFakeStore(), verifier, idGen(), "kiit.ac.in")
+		_, err := s.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{IdToken: "wrong-domain"})
+		if status.Code(err) != codes.PermissionDenied {
+			t.Fatalf("expected PermissionDenied, got %v", err)
+		}
+	})
+
+	t.Run("a guest id that doesn't exist falls through to creating a new account", func(t *testing.T) {
+		s := New(newFakeStore(), verifier, idGen("acc-1"), "kiit.ac.in")
+		resp, err := s.SignInWithGoogle(context.Background(), &identityv1.SignInWithGoogleRequest{
+			IdToken: "other-sub-tok", GuestAccountId: strPtr("no-such-guest"),
 		})
-		if status.Code(err) != codes.NotFound {
-			t.Fatalf("expected NotFound, got %v", err)
+		if err != nil {
+			t.Fatalf("SignInWithGoogle: %v", err)
+		}
+		if resp.GetAccount().GetId() != "acc-1" {
+			t.Fatalf("expected a newly created account, got %+v", resp.GetAccount())
 		}
 	})
 }
+
+func TestSetGender(t *testing.T) {
+	st := newFakeStore()
+	s := New(st, &fakeVerifier{}, idGen("acc-1"), "kiit.ac.in")
+	if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "shadow_fox"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	resp, err := s.SetGender(context.Background(), &identityv1.SetGenderRequest{AccountId: "acc-1", Gender: identityv1.Gender_GENDER_FEMALE})
+	if err != nil {
+		t.Fatalf("SetGender: %v", err)
+	}
+	if !resp.GetAccount().GetGenderChosen() || resp.GetAccount().GetGender() != identityv1.Gender_GENDER_FEMALE {
+		t.Fatalf("unexpected account: %+v", resp.GetAccount())
+	}
+
+	_, err = s.SetGender(context.Background(), &identityv1.SetGenderRequest{AccountId: "acc-1", Gender: identityv1.Gender_GENDER_MALE})
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition on a second call, got %v", err)
+	}
+
+	if _, err := s.SetGender(context.Background(), &identityv1.SetGenderRequest{AccountId: "acc-1", Gender: identityv1.Gender_GENDER_UNSPECIFIED}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for unspecified gender, got %v", err)
+	}
+
+	if _, err := s.SetGender(context.Background(), &identityv1.SetGenderRequest{AccountId: "missing", Gender: identityv1.Gender_GENDER_MALE}); status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestAdminSetGender(t *testing.T) {
+	st := newFakeStore()
+	s := New(st, &fakeVerifier{}, idGen("acc-1"), "kiit.ac.in")
+	if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "shadow_fox"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := s.SetGender(context.Background(), &identityv1.SetGenderRequest{AccountId: "acc-1", Gender: identityv1.Gender_GENDER_FEMALE}); err != nil {
+		t.Fatalf("initial SetGender: %v", err)
+	}
+
+	// Unlike SetGender, a second (admin) change is allowed.
+	resp, err := s.AdminSetGender(context.Background(), &identityv1.AdminSetGenderRequest{
+		AccountId: "acc-1", Gender: identityv1.Gender_GENDER_PREFER_NOT_TO_SAY, Reason: "user requested correction",
+	})
+	if err != nil {
+		t.Fatalf("AdminSetGender: %v", err)
+	}
+	if resp.GetAccount().GetGender() != identityv1.Gender_GENDER_PREFER_NOT_TO_SAY {
+		t.Fatalf("unexpected account: %+v", resp.GetAccount())
+	}
+
+	if _, err := s.AdminSetGender(context.Background(), &identityv1.AdminSetGenderRequest{AccountId: "missing", Gender: identityv1.Gender_GENDER_MALE}); status.Code(err) != codes.NotFound {
+		t.Fatalf("expected NotFound, got %v", err)
+	}
+}
+
+func TestTouchAccount(t *testing.T) {
+	st := newFakeStore()
+	s := New(st, &fakeVerifier{}, idGen("acc-1"), "kiit.ac.in")
+	if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "shadow_fox"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+
+	if _, err := s.TouchAccount(context.Background(), &identityv1.TouchAccountRequest{AccountId: "acc-1"}); err != nil {
+		t.Fatalf("TouchAccount: %v", err)
+	}
+	// A missing account is not an error (DEC-0026, best-effort liveness signal).
+	if _, err := s.TouchAccount(context.Background(), &identityv1.TouchAccountRequest{AccountId: "missing"}); err != nil {
+		t.Fatalf("TouchAccount for a missing account should not error, got %v", err)
+	}
+}
+
+func strPtr(s string) *string { return &s }

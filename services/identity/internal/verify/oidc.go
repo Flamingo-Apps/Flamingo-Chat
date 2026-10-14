@@ -35,18 +35,27 @@ func NewOIDCVerifier(ctx context.Context, issuerURL, clientID string) (*OIDCVeri
 	return &OIDCVerifier{verifier: verifier}, nil
 }
 
-func (v *OIDCVerifier) Verify(ctx context.Context, rawIDToken string) (string, bool, error) {
+func (v *OIDCVerifier) Verify(ctx context.Context, rawIDToken string) (GoogleClaims, error) {
 	idToken, err := v.verifier.Verify(ctx, rawIDToken)
 	if err != nil {
-		return "", false, fmt.Errorf("verify: %w", err)
+		return GoogleClaims{}, fmt.Errorf("verify: %w", err)
 	}
 
 	var claims struct {
 		Email         string `json:"email"`
 		EmailVerified bool   `json:"email_verified"`
+		HD            string `json:"hd"`
 	}
 	if err := idToken.Claims(&claims); err != nil {
-		return "", false, fmt.Errorf("verify: claims: %w", err)
+		return GoogleClaims{}, fmt.Errorf("verify: claims: %w", err)
 	}
-	return claims.Email, claims.EmailVerified, nil
+	// Subject is a top-level field on the token (part of the claims every
+	// OIDC provider is required to set), not something to unmarshal from
+	// the custom claims struct above.
+	return GoogleClaims{
+		Sub:           idToken.Subject,
+		Email:         claims.Email,
+		EmailVerified: claims.EmailVerified,
+		HD:            claims.HD,
+	}, nil
 }
