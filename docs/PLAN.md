@@ -56,7 +56,7 @@ Order within each group is set once the architecture is agreed.
 
 - [x] Identity: check the `hd` claim, key accounts on Google's `sub`, one-time gender, sign in to an existing account, delete inactive guests (INC-0006, DEC-0026 to DEC-0028)
 - [ ] Gateway: signup and sign-in over HTTP, session tokens, WebSocket connections, rate limits
-- [ ] Chat: rooms, membership, invite codes, sending messages, "keep chatting"
+- [x] Chat: rooms, membership, invite codes, sending messages, "keep chatting"
 - [ ] Matching: random queue and gender-filtered queue, pairing, skip
 - [ ] Presence: heartbeats and live counts
 - [ ] Moderation: reports, blocks, bans, admin queue, gender change requests
