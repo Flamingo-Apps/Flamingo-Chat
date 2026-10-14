@@ -157,8 +157,12 @@ func TestDeliveryWorkerRoutesAChatEventOntoItsRoomChannel(t *testing.T) {
 
 	select {
 	case redisMsg := <-sub.Channel():
+		payload := []byte(redisMsg.Payload)
+		if len(payload) == 0 || router.EnvelopeKind(payload[0]) != router.ChatEventKind {
+			t.Fatalf("expected the payload to start with the ChatEventKind tag byte, got %v", payload)
+		}
 		got := &eventsv1.ChatEvent{}
-		if err := proto.Unmarshal([]byte(redisMsg.Payload), got); err != nil {
+		if err := proto.Unmarshal(payload[1:], got); err != nil {
 			t.Fatalf("Unmarshal: %v", err)
 		}
 		if !proto.Equal(got, want) {
