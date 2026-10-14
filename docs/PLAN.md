@@ -50,7 +50,7 @@ Order within each group is set once the architecture is agreed.
 ### Local development
 
 - [x] Tilt on a local kind cluster, replacing docker-compose (DEC-0039): `deploy/helm/service` (the shared chart), `deploy/k8s/dev` (Postgres, Redis, Kafka, the topic-creation Job), one `Dockerfile` per service, and the root `Tiltfile`. `tilt ci` brings every workload to healthy, confirmed against a real kind cluster, not only rendered - identity answers a real `grpcurl` call through a port-forward, and the three Kafka topics exist.
-- [x] Wire in the delivery worker now that it has a real consume loop (`protocol: worker` added to the shared chart for a service with no server of its own, DEC-0066); persistence-worker still isn't deployed yet - see the Tiltfile's comment
+- [x] Wire in the delivery worker and the persistence worker now that both have a real consume loop (`protocol: worker` added to the shared chart for a service with no server of its own, DEC-0066)
 
 ### Backend
 
@@ -62,7 +62,7 @@ Order within each group is set once the architecture is agreed.
 - [ ] Moderation: reports, blocks, bans, admin queue, gender change requests
 - [ ] Kafka in place of RabbitMQ for durable events (DEC-0020)
 - [x] Delivery worker: fans chat.events, matching.events and moderation.events out to Redis for live delivery (DEC-0067, DEC-0068)
-- [ ] Persistence worker: saved chat history
+- [x] Persistence worker: saved chat history and an analytics event log (DEC-0069)
 - [ ] Admin command-line tool (DEC-0029)
 - [ ] Log streaming gRPC calls as well as unary ones
 
@@ -73,7 +73,7 @@ Order within each group is set once the architecture is agreed.
 
 ### Infrastructure
 
-- [x] Container images for every service that has one yet (the six gRPC/HTTP services, plus the delivery worker; persistence-worker gets one when it has real logic to run)
+- [x] Container images for every service that has one yet (the six gRPC/HTTP services, plus the delivery worker and the persistence worker)
 - [ ] Kubernetes cluster on Google Cloud, defined as code (DEC-0023)
 - [ ] Deploy pipeline from `main`
 - [ ] Domain and HTTPS (DEC-0033)

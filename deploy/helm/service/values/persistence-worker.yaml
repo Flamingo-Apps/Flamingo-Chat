@@ -1,0 +1,9 @@
+name: persistence-worker
+image:
+  repository: flamingo/persistence-worker
+# No port of its own - a pure Kafka consumer writing to Postgres, not a
+# server (DEC-0066).
+protocol: worker
+env:
+  KAFKA_BROKERS: "kafka:9092"
+  POSTGRES_URL: "postgres://flamingo:flamingo@postgres:5432/flamingo?sslmode=disable"
