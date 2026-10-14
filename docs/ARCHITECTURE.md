@@ -298,6 +298,8 @@ Payloads are protobuf messages from `proto/events/v1`, so their schemas are vers
 | `avoid:{account_id}` | set | Accounts never to match with |
 | `rl:{action}:{subject}:{window}` | string | Rate limit counters |
 
+`room:{room_id}` and `user:{account_id}` each carry more than one `proto/events/v1` envelope type (for example `room:{room_id}` carries both `ChatEvent` and `MatchingEvent`'s `MatchEnded`), and all three envelope types share the same field numbers for `event_id`, `occurred_at_unix` and the start of their own `oneof` - protobuf's wire format alone can't tell a consumer which one a given message is; unmarshaling the wrong type doesn't error, it silently produces a wrongly-interpreted but validly-shaped result (DEC-0070, INC-0009). Every message published to either channel is therefore one tag byte - `1` for `ChatEvent`, `2` for `MatchingEvent`, `3` for `ModerationEvent` - followed by the original Kafka message bytes unchanged. delivery-worker and gateway are separate Go modules and can't share a constant for this, so both implement it against this table.
+
 ## 6. Data model (Proposed)
 
 | Schema | Table | Key columns |

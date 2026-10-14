@@ -1,6 +1,7 @@
 package router
 
 import (
+	"bytes"
 	"testing"
 
 	"google.golang.org/protobuf/proto"
@@ -15,6 +16,12 @@ func mustMarshal(t *testing.T, m proto.Message) []byte {
 		t.Fatalf("proto.Marshal: %v", err)
 	}
 	return b
+}
+
+// wantTagged is what every Target.Payload must look like: the
+// EnvelopeKind tag byte, then the original bytes unchanged.
+func wantTagged(kind EnvelopeKind, value []byte) []byte {
+	return append([]byte{byte(kind)}, value...)
 }
 
 func TestRouteChatEventGoesToItsRoom(t *testing.T) {
@@ -39,8 +46,8 @@ func TestRouteChatEventGoesToItsRoom(t *testing.T) {
 			if len(targets) != 1 || targets[0].Channel != "room:room-1" {
 				t.Fatalf("unexpected targets: %+v", targets)
 			}
-			if string(targets[0].Payload) != string(value) {
-				t.Fatalf("expected the original bytes to be republished unchanged")
+			if !bytes.Equal(targets[0].Payload, wantTagged(ChatEventKind, value)) {
+				t.Fatalf("expected the payload to be the ChatEventKind tag byte plus the original bytes unchanged")
 			}
 		})
 	}
@@ -58,7 +65,8 @@ func TestRouteMatchingEventMatchFoundGoesToBothAccounts(t *testing.T) {
 			MatchFound: &eventsv1.MatchFound{RoomId: "room-1", AccountIdA: "a", AccountIdB: "b"},
 		},
 	}
-	targets, err := RouteMatchingEvent(mustMarshal(t, event))
+	value := mustMarshal(t, event)
+	targets, err := RouteMatchingEvent(value)
 	if err != nil {
 		t.Fatalf("RouteMatchingEvent: %v", err)
 	}
@@ -69,6 +77,11 @@ func TestRouteMatchingEventMatchFoundGoesToBothAccounts(t *testing.T) {
 	if !channels["user:a"] || !channels["user:b"] {
 		t.Fatalf("expected user:a and user:b, got %+v", targets)
 	}
+	for _, target := range targets {
+		if !bytes.Equal(target.Payload, wantTagged(MatchingEventKind, value)) {
+			t.Fatalf("expected the payload to be the MatchingEventKind tag byte plus the original bytes unchanged")
+		}
+	}
 }
 
 func TestRouteMatchingEventMatchEndedGoesToTheRoom(t *testing.T) {
@@ -77,12 +90,16 @@ func TestRouteMatchingEventMatchEndedGoesToTheRoom(t *testing.T) {
 			MatchEnded: &eventsv1.MatchEnded{RoomId: "room-1", AccountId: "a"},
 		},
 	}
-	targets, err := RouteMatchingEvent(mustMarshal(t, event))
+	value := mustMarshal(t, event)
+	targets, err := RouteMatchingEvent(value)
 	if err != nil {
 		t.Fatalf("RouteMatchingEvent: %v", err)
 	}
 	if len(targets) != 1 || targets[0].Channel != "room:room-1" {
 		t.Fatalf("unexpected targets: %+v", targets)
+	}
+	if !bytes.Equal(targets[0].Payload, wantTagged(MatchingEventKind, value)) {
+		t.Fatalf("expected the payload to be the MatchingEventKind tag byte plus the original bytes unchanged")
 	}
 }
 
@@ -92,12 +109,16 @@ func TestRouteModerationEventAccountBannedGoesToTheAccount(t *testing.T) {
 			AccountBanned: &eventsv1.AccountBanned{AccountId: "a", Reason: "spam"},
 		},
 	}
-	targets, err := RouteModerationEvent(mustMarshal(t, event))
+	value := mustMarshal(t, event)
+	targets, err := RouteModerationEvent(value)
 	if err != nil {
 		t.Fatalf("RouteModerationEvent: %v", err)
 	}
 	if len(targets) != 1 || targets[0].Channel != "user:a" {
 		t.Fatalf("unexpected targets: %+v", targets)
+	}
+	if !bytes.Equal(targets[0].Payload, wantTagged(ModerationEventKind, value)) {
+		t.Fatalf("expected the payload to be the ModerationEventKind tag byte plus the original bytes unchanged")
 	}
 }
 
