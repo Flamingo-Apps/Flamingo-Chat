@@ -5,3 +5,4 @@ protocol: grpc
 port: 50054
 env:
   GRPC_PORT: "50054"
+  REDIS_URL: "redis://redis:6379/0"

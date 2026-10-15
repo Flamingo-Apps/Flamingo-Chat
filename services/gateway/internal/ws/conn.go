@@ -18,8 +18,16 @@ import (
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	matchingv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1"
+	presencev1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/presence"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/ratelimit"
 )
+
+// presenceChannel is the global Redis channel every connection
+// subscribes to for live counts (docs/ARCHITECTURE.md §3.4, §5.5) -
+// unlike room:{room_id} and user:{account_id}, there is exactly one of
+// these, shared by every connected account.
+const presenceChannel = "presence"
 
 // authTimeout is how long a client has to send its first (auth) frame
 // before the connection is closed (docs/ARCHITECTURE.md §5.2).
@@ -42,10 +50,16 @@ type Deps struct {
 	Identity    identityv1.IdentityServiceClient
 	Chat        chatv1.ChatServiceClient
 	Matching    matchingv1.MatchingServiceClient
+	Presence    presencev1.PresenceServiceClient
 	Sessions    Sessions
 	RateLimiter RateLimiter
 	Redis       *redis.Client
 	Logger      *slog.Logger
+	// PresenceRegistry is shared across every connection this Handler
+	// accepts (one per gateway process, not one per connection) - a
+	// batched Heartbeat needs to see every connection at once
+	// (docs/ARCHITECTURE.md §3.4).
+	PresenceRegistry *presence.Registry
 }
 
 // Sessions is the subset of internal/session.Signer this package depends
@@ -120,6 +134,7 @@ func (c *conn) run(ctx context.Context) {
 		_ = c.ws.Close(websocket.StatusPolicyViolation, "authentication failed")
 		return
 	}
+	defer c.deps.PresenceRegistry.Remove(c.accountID)
 	defer func() {
 		if c.pubsub != nil {
 			_ = c.pubsub.Close()
@@ -169,6 +184,8 @@ func (c *conn) authenticate(ctx context.Context) error {
 	}
 	c.pseudonym = resp.GetAccount().GetPseudonym()
 
+	c.deps.PresenceRegistry.Set(accountID, presence.CategoryFromAccount(resp.GetAccount()))
+
 	ok := authOKFrame{Account: toAccountJSON(resp.GetAccount())}
 	if needsRefresh {
 		token, err := c.deps.Sessions.Issue(accountID)
@@ -188,6 +205,19 @@ func (c *conn) authenticate(ctx context.Context) error {
 	c.pubsub = c.deps.Redis.Subscribe(ctx, "user:"+accountID)
 	if _, err := c.pubsub.Receive(ctx); err != nil {
 		return fmt.Errorf("ws: confirm subscription: %w", err)
+	}
+	// A second, separate Subscribe+Receive round trip rather than passing
+	// both channels to one Subscribe call - SUBSCRIBE acknowledges
+	// multiple channels with one confirmation message per channel, and
+	// relying on them arriving in request order to know which single
+	// Receive() call confirmed which channel is exactly the kind of
+	// fragile assumption the comment above is already careful to avoid
+	// for "user:"+accountID.
+	if err := c.pubsub.Subscribe(ctx, presenceChannel); err != nil {
+		return fmt.Errorf("ws: subscribe to presence: %w", err)
+	}
+	if _, err := c.pubsub.Receive(ctx); err != nil {
+		return fmt.Errorf("ws: confirm presence subscription: %w", err)
 	}
 	c.subscribed = map[string]bool{}
 

@@ -58,7 +58,7 @@ Order within each group is set once the architecture is agreed.
 - [x] Gateway: signup and sign-in over HTTP, session tokens, WebSocket connections, rate limits (DEC-0071 to DEC-0076)
 - [x] Chat: rooms, membership, invite codes, sending messages, "keep chatting"
 - [x] Matching: random queue and gender-filtered queue, pairing, skip (DEC-0077 to DEC-0079)
-- [ ] Presence: heartbeats and live counts
+- [x] Presence: heartbeats and live counts (DEC-0081, DEC-0082)
 - [ ] Moderation: reports, blocks, bans, admin queue, gender change requests
 - [ ] Kafka in place of RabbitMQ for durable events (DEC-0020)
 - [x] Delivery worker: fans chat.events, matching.events and moderation.events out to Redis for live delivery (DEC-0067, DEC-0068)

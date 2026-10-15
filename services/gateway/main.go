@@ -22,11 +22,15 @@ import (
 	moderationv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/moderation/v1"
 	presencev1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/httpapi"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/presence"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/ratelimit"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/session"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/turnstile"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/ws"
 )
+
+// heartbeatInterval is docs/ARCHITECTURE.md §3.4's "every 15 seconds".
+const heartbeatInterval = 15 * time.Second
 
 func dialService(addr string) *grpc.ClientConn {
 	conn, err := grpc.NewClient(addr, grpc.WithTransportCredentials(insecure.NewCredentials()))
@@ -84,10 +88,17 @@ func main() {
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
+	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
+
+	presenceRegistry := presence.NewRegistry()
+	go presence.RunHeartbeatLoop(ctx, presenceRegistry, presenceClient, heartbeatInterval, logger)
+
 	api := httpapi.NewServer(identityClient, chatClient, presenceClient, moderationClient, sessions, rateLimiter, turnstileVerifier)
 	wsDeps := ws.Deps{
-		Identity: identityClient, Chat: chatClient, Matching: matchingClient,
+		Identity: identityClient, Chat: chatClient, Matching: matchingClient, Presence: presenceClient,
 		Sessions: sessions, RateLimiter: rateLimiter, Redis: redisClient, Logger: logger,
+		PresenceRegistry: presenceRegistry,
 	}
 
 	mux := http.NewServeMux()
@@ -107,8 +118,6 @@ func main() {
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
-	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	go func() {
 		<-ctx.Done()
 		log.Println("gateway shutting down")
@@ -120,9 +129,11 @@ func main() {
 		// returns, same as a hard kill would do to it; the client's own
 		// documented reconnect-with-backoff (docs/ARCHITECTURE.md §5.2)
 		// is what recovers from that, not anything server-side here.
-		// A connection registry that closes every live WebSocket with a
-		// proper close frame first is a real improvement but a separate
-		// piece of work, not part of this pass.
+		// A registry that closes every live WebSocket with a proper close
+		// frame first is a real improvement but a separate piece of work,
+		// not part of this pass - presenceRegistry above tracks connected
+		// accounts for Heartbeat, it doesn't hold the connections
+		// themselves.
 		shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 		if err := srv.Shutdown(shutdownCtx); err != nil {
