@@ -135,10 +135,10 @@ During a random chat, either user can send `keep_chat`. Chat records the vote an
 - Gateways forward the counts to every connected browser.
 - Counts are totals only and never identify anyone. Presence counts are not durable events, so they go straight to Redis, not through Kafka.
 
-### 3.5 Reports, blocks and bans (Proposed)
+### 3.5 Reports, blocks and bans (built, pending review - DEC-0083 to DEC-0085)
 
 - **Report.** Moderation stores it and produces `ReportFiled`.
-- **Block.** Moderation stores it and adds each account to the other's `avoid:{account_id}` set, which Matching reads. The gateway ends the current random chat between them. In group rooms the client hides messages from blocked accounts using `GET /v1/blocks`.
+- **Block.** Moderation stores it and adds each account to the other's `avoid:{account_id}` set, which Matching reads - this alone prevents any future match between them. Ending an already-open direct room with the blocked account at the moment of blocking is not yet implemented (DEC-0085); the room ends normally some other way (`Next`, `End`, or not being kept). In group rooms the client hides messages from blocked accounts using `GET /v1/blocks`.
 - **Ban** (admin tool only).
   1. Moderation stores the ban, adds the account to the Redis `banned` set and produces `AccountBanned`.
   2. The delivery worker sends `kicked` to `user:{account_id}`, and gateways close that user's connections.

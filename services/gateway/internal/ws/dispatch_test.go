@@ -18,7 +18,7 @@ func newTestConn(identity *fakeIdentity, chat *fakeChat, matching *fakeMatching)
 	return &conn{
 		deps: Deps{
 			Identity: identity, Chat: chat, Matching: matching,
-			Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{}, Logger: slog.Default(),
+			Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{}, Banned: &fakeBanned{}, Logger: slog.Default(),
 		},
 		accountID:  "acc-1",
 		pseudonym:  "Fox",
@@ -85,6 +85,21 @@ func TestHandleSendMessagePropagatesAGRPCError(t *testing.T) {
 
 	frame := c.nextFrame(t)
 	if frame["type"] != "error" || frame["client_msg_id"] != "c1" {
+		t.Fatalf("unexpected frame: %+v", frame)
+	}
+}
+
+func TestHandleSendMessageRejectsBannedAccount(t *testing.T) {
+	chat := &fakeChat{sendMessage: func(context.Context, *chatv1.SendMessageRequest) (*chatv1.SendMessageResponse, error) {
+		t.Fatal("Chat.SendMessage should not be called for a banned account")
+		return nil, nil
+	}}
+	c := newTestConn(&fakeIdentity{}, chat, &fakeMatching{})
+	c.deps.Banned = &fakeBanned{banned: true}
+	c.dispatch(context.Background(), []byte(`{"type":"send_message","room_id":"r1","client_msg_id":"c1","body":"hi"}`))
+
+	frame := c.nextFrame(t)
+	if frame["type"] != "error" || frame["code"] != "permissiondenied" {
 		t.Fatalf("unexpected frame: %+v", frame)
 	}
 }

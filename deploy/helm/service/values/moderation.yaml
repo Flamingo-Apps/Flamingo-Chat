@@ -5,3 +5,7 @@ protocol: grpc
 port: 50055
 env:
   GRPC_PORT: "50055"
+  POSTGRES_URL: "postgres://flamingo:flamingo@postgres:5432/flamingo?sslmode=disable"
+  KAFKA_BROKERS: "kafka:9092"
+  REDIS_URL: "redis://redis:6379/0"
+  IDENTITY_ADDR: "identity:50051"

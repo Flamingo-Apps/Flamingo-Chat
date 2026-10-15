@@ -30,6 +30,14 @@ type Sessions interface {
 	Verify(tokenString string) (accountID string, needsRefresh bool, err error)
 }
 
+// BannedChecker is the subset of internal/banned.Redis the HTTP API
+// depends on - the same shape internal/ws.BannedChecker declares,
+// duplicated rather than shared across these two small, independent
+// packages (the convention Sessions and RateLimiter already follow).
+type BannedChecker interface {
+	IsBanned(ctx context.Context, accountID string) (bool, error)
+}
+
 // Server holds every dependency the HTTP handlers need: gRPC clients to
 // the backend services, and the gateway's own session/rate-limit/CAPTCHA
 // pieces.
@@ -41,6 +49,7 @@ type Server struct {
 
 	sessions    Sessions
 	rateLimiter RateLimiter
+	banned      BannedChecker
 	turnstile   turnstile.Verifier
 }
 
@@ -51,6 +60,7 @@ func NewServer(
 	moderation moderationv1.ModerationServiceClient,
 	sessions Sessions,
 	rateLimiter RateLimiter,
+	banned BannedChecker,
 	turnstileVerifier turnstile.Verifier,
 ) *Server {
 	return &Server{
@@ -60,6 +70,7 @@ func NewServer(
 		moderation:  moderation,
 		sessions:    sessions,
 		rateLimiter: rateLimiter,
+		banned:      banned,
 		turnstile:   turnstileVerifier,
 	}
 }

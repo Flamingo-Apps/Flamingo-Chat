@@ -51,7 +51,7 @@ services = [
     {'name': 'chat', 'port': 50053, 'deps': ['postgres', 'redis', 'kafka']},
     {'name': 'matching', 'port': 50052, 'deps': ['redis', 'kafka']},
     {'name': 'presence', 'port': 50054, 'deps': ['redis']},
-    {'name': 'moderation', 'port': 50055, 'deps': ['postgres', 'kafka']},
+    {'name': 'moderation', 'port': 50055, 'deps': ['postgres', 'kafka', 'redis']},
     # 'port': None marks a worker service (protocol: worker in its own
     # values file) - nothing to port-forward, since it has no server of
     # its own (DEC-0066).

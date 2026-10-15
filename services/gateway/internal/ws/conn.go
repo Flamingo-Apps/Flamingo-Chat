@@ -53,6 +53,7 @@ type Deps struct {
 	Presence    presencev1.PresenceServiceClient
 	Sessions    Sessions
 	RateLimiter RateLimiter
+	Banned      BannedChecker
 	Redis       *redis.Client
 	Logger      *slog.Logger
 	// PresenceRegistry is shared across every connection this Handler
@@ -77,6 +78,14 @@ type RateLimiter interface {
 }
 
 var _ RateLimiter = (*ratelimit.Limiter)(nil)
+
+// BannedChecker is the subset of internal/banned.Redis this package
+// depends on - the same shape internal/httpapi.BannedChecker declares,
+// duplicated rather than shared across these two small, independent
+// packages (the convention Sessions and RateLimiter already follow).
+type BannedChecker interface {
+	IsBanned(ctx context.Context, accountID string) (bool, error)
+}
 
 // conn is one WebSocket connection's state, from the auth frame until it
 // closes.
@@ -177,6 +186,12 @@ func (c *conn) authenticate(ctx context.Context) error {
 		return fmt.Errorf("ws: invalid session token: %w", err)
 	}
 	c.accountID = accountID
+
+	if bannedAccount, err := c.deps.Banned.IsBanned(ctx, accountID); err != nil {
+		return fmt.Errorf("ws: check banned: %w", err)
+	} else if bannedAccount {
+		return fmt.Errorf("ws: account is banned")
+	}
 
 	resp, err := c.deps.Identity.GetAccount(ctx, &identityv1.GetAccountRequest{AccountId: accountID})
 	if err != nil {

@@ -35,8 +35,25 @@ func (c *conn) writeLoop(ctx context.Context) {
 			if err != nil {
 				return
 			}
+			// writeLoop is the only goroutine that calls c.ws.Write, so
+			// this is the only place that can be sure a kicked frame
+			// actually went out over the wire before closing - closing
+			// from redisLoop right after enqueueing it would race with
+			// writeLoop still having it queued.
+			if isFrameType(frame, "kicked") {
+				_ = c.ws.Close(websocket.StatusPolicyViolation, "banned")
+				return
+			}
 		}
 	}
+}
+
+func isFrameType(frame []byte, typ string) bool {
+	var env envelope
+	if err := json.Unmarshal(frame, &env); err != nil {
+		return false
+	}
+	return env.Type == typ
 }
 
 // redisLoop forwards every message this connection's pubsub receives,
@@ -142,6 +159,25 @@ func (c *conn) handleSendMessage(ctx context.Context, data []byte) {
 	var frame sendMessageFrame
 	if err := json.Unmarshal(data, &frame); err != nil {
 		c.sendError(codes.InvalidArgument, "malformed send_message frame", "")
+		return
+	}
+
+	// Checked on every send, not just at connect (docs/ARCHITECTURE.md
+	// §3.5) - the Redis-pubsub kicked path (translate.go,
+	// AccountBanned) already closes a connection banned mid-session, but
+	// this catches a message already in flight before that arrives, or a
+	// connection that somehow missed it.
+	if bannedAccount, err := c.deps.Banned.IsBanned(ctx, c.accountID); err != nil {
+		c.sendError(codes.Internal, "banned check failed", frame.ClientMsgID)
+		return
+	} else if bannedAccount {
+		// Refuses the send but doesn't force-close the connection itself -
+		// only writeLoop does that (after a kicked frame it just wrote,
+		// so it's sure the client saw it first); the actual disconnect
+		// for an account banned mid-session comes from the kicked event
+		// BanAccount produces, which every connection is already
+		// subscribed to receive.
+		c.sendError(codes.PermissionDenied, "account is banned", frame.ClientMsgID)
 		return
 	}
 
