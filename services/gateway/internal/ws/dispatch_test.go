@@ -153,6 +153,32 @@ func TestHandleMatchCancelAndNextAndEnd(t *testing.T) {
 	if !gotNext {
 		t.Fatalf("expected Next to be called")
 	}
+	frame := c.nextFrame(t)
+	if frame["type"] != "match_queued" {
+		t.Fatalf("expected a match_queued frame after a successful Next, got %+v", frame)
+	}
+}
+
+// TestHandleMatchNextSendsNoFrameWhenNotReQueued covers DEC-0080 and
+// DEC-0078's graceful degradation together: when Matching has nothing
+// cached to re-enqueue the caller with, Next still ends the room but
+// reports Queued: false - the client already learns the room ended from
+// the room's own match_ended broadcast, so nothing more is sent here.
+func TestHandleMatchNextSendsNoFrameWhenNotReQueued(t *testing.T) {
+	matching := &fakeMatching{
+		next: func(context.Context, *matchingv1.NextRequest) (*matchingv1.NextResponse, error) {
+			return &matchingv1.NextResponse{Queued: false}, nil
+		},
+	}
+	c := newTestConn(&fakeIdentity{}, &fakeChat{}, matching)
+	c.setCurrentMatchRoom("room-current")
+
+	c.dispatch(context.Background(), []byte(`{"type":"match_next"}`))
+	select {
+	case b := <-c.send:
+		t.Fatalf("expected no frame to be sent, got %q", b)
+	default:
+	}
 }
 
 func TestHandleMatchEndWithNoCurrentMatchReturnsAnError(t *testing.T) {

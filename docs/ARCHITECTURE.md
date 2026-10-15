@@ -107,7 +107,7 @@ sequenceDiagram
 - Delivery is at-least-once from Kafka, so a client can receive the same `message_id` twice. Clients drop duplicates by `message_id`.
 - The sender sees their own message through the same path, so every client renders messages from one source.
 
-### 3.2 Matching (Agreed shape; algorithm Proposed)
+### 3.2 Matching (Agreed shape; algorithm built, pending review - DEC-0077 to DEC-0079)
 
 1. The client sends `match_request {preference}`. The gateway calls `Matching.RequestMatch` with the account's tier, gender and pseudonym, which it already holds.
 2. Matching looks for a compatible waiting user in one atomic Redis script. If none, the user joins the queue and gets `match_queued`.
@@ -294,6 +294,7 @@ Payloads are protobuf messages from `proto/events/v1`, so their schemas are vers
 | `mq:any`, `mq:want:{gender}` | sorted set | Waiting users by enqueue time |
 | `mq:entry:{account_id}` | hash | A waiting user's preference, gender and previous partner |
 | `invite:{code}` | string | Invite code to room ID cache |
+| `match:members:{room_id}` | hash | Both accounts' matching attributes (preference, gender, verified, pseudonym) as of when a direct room was created, so `Next` can re-enqueue the caller without the client resending them - `match_next`'s client frame carries none (§5.2). A 24-hour safety-net TTL, since ending a room through `match_end` instead (§3.2) never visits this key to clean it up (DEC-0078). |
 | `banned` | set | Banned account IDs |
 | `avoid:{account_id}` | set | Accounts never to match with |
 | `rl:{action}:{subject}:{window}` | string | Rate limit counters |
