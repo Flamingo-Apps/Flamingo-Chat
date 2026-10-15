@@ -21,6 +21,7 @@ import (
 	matchingv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1"
 	moderationv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/moderation/v1"
 	presencev1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/banned"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/httpapi"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/presence"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/ratelimit"
@@ -94,10 +95,12 @@ func main() {
 	presenceRegistry := presence.NewRegistry()
 	go presence.RunHeartbeatLoop(ctx, presenceRegistry, presenceClient, heartbeatInterval, logger)
 
-	api := httpapi.NewServer(identityClient, chatClient, presenceClient, moderationClient, sessions, rateLimiter, turnstileVerifier)
+	bannedChecker := banned.NewRedis(redisClient)
+
+	api := httpapi.NewServer(identityClient, chatClient, presenceClient, moderationClient, sessions, rateLimiter, bannedChecker, turnstileVerifier)
 	wsDeps := ws.Deps{
 		Identity: identityClient, Chat: chatClient, Matching: matchingClient, Presence: presenceClient,
-		Sessions: sessions, RateLimiter: rateLimiter, Redis: redisClient, Logger: logger,
+		Sessions: sessions, RateLimiter: rateLimiter, Banned: bannedChecker, Redis: redisClient, Logger: logger,
 		PresenceRegistry: presenceRegistry,
 	}
 

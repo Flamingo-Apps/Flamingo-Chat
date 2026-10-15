@@ -175,3 +175,13 @@ type fakeRateLimiter struct{}
 func (f *fakeRateLimiter) Allow(context.Context, string, string, int, time.Duration) (bool, error) {
 	return true, nil
 }
+
+// fakeBanned implements BannedChecker, always reporting not banned
+// unless banned is set.
+type fakeBanned struct {
+	banned bool
+}
+
+func (f *fakeBanned) IsBanned(context.Context, string) (bool, error) {
+	return f.banned, nil
+}

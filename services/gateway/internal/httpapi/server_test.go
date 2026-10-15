@@ -20,6 +20,7 @@ type testServer struct {
 	identity   *fakeIdentity
 	chat       *fakeChat
 	moderation *fakeModeration
+	banned     *fakeBanned
 	mux        *http.ServeMux
 }
 
@@ -28,8 +29,9 @@ func newTestServer() *testServer {
 		identity:   &fakeIdentity{},
 		chat:       &fakeChat{},
 		moderation: &fakeModeration{},
+		banned:     &fakeBanned{},
 	}
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{}, &fakeTurnstile{ok: true})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{}, ts.banned, &fakeTurnstile{ok: true})
 	ts.mux = http.NewServeMux()
 	s.Routes(ts.mux)
 	return ts
@@ -89,7 +91,7 @@ func TestHandleAuthGuestSuccess(t *testing.T) {
 
 func TestHandleAuthGuestRejectsFailedTurnstile(t *testing.T) {
 	ts := newTestServer()
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{}, &fakeTurnstile{ok: false})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{}, ts.banned, &fakeTurnstile{ok: false})
 	mux := http.NewServeMux()
 	s.Routes(mux)
 	ts.mux = mux
@@ -102,7 +104,7 @@ func TestHandleAuthGuestRejectsFailedTurnstile(t *testing.T) {
 
 func TestHandleAuthGuestRejectsOverRateLimit(t *testing.T) {
 	ts := newTestServer()
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, &fakeTurnstile{ok: true})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true})
 	mux := http.NewServeMux()
 	s.Routes(mux)
 	ts.mux = mux
@@ -136,6 +138,29 @@ func TestHandleAuthGooglePassesAlongAnExistingGuestSession(t *testing.T) {
 	}](t, rec)
 	if !resp.NeedsGender {
 		t.Fatalf("expected needs_gender to be true")
+	}
+}
+
+func TestHandleAuthGoogleRejectsBannedAccount(t *testing.T) {
+	ts := newTestServer()
+	ts.identity.signInWithGoogle = func(context.Context, *identityv1.SignInWithGoogleRequest) (*identityv1.SignInWithGoogleResponse, error) {
+		return &identityv1.SignInWithGoogleResponse{Account: &identityv1.Account{Id: "acc-banned"}}, nil
+	}
+	ts.banned.banned = true
+
+	rec := ts.do(t, http.MethodPost, "/v1/auth/google", "", map[string]string{"id_token": "tok"})
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a banned account, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestWithAuth_RejectsBannedAccount(t *testing.T) {
+	ts := newTestServer()
+	ts.banned.banned = true
+
+	rec := ts.do(t, http.MethodGet, "/v1/me", "session-for-acc-1", nil)
+	if rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a banned account, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
 
@@ -189,7 +214,7 @@ func TestErrorMappingReflectsGRPCCode(t *testing.T) {
 
 func TestHandleCreateRoomEnforcesRateLimit(t *testing.T) {
 	ts := newTestServer()
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, &fakeTurnstile{ok: true})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true})
 	mux := http.NewServeMux()
 	s.Routes(mux)
 	ts.mux = mux
@@ -242,7 +267,7 @@ func TestHandleListMessagesPassesQueryParameters(t *testing.T) {
 
 func TestHandleFileReportEnforcesRateLimit(t *testing.T) {
 	ts := newTestServer()
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, &fakeTurnstile{ok: true})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true})
 	mux := http.NewServeMux()
 	s.Routes(mux)
 	ts.mux = mux

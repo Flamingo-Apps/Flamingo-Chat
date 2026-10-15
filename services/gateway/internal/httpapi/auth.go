@@ -31,6 +31,17 @@ func (s *Server) withAuth(next func(w http.ResponseWriter, r *http.Request, acco
 			writeError(w, status.Error(codes.Unauthenticated, "invalid session token"))
 			return
 		}
+		// Checked on every authenticated request, not only sign-in
+		// (docs/ARCHITECTURE.md §3.5) - this covers every endpoint
+		// withAuth wraps in one place rather than each handler
+		// separately.
+		if bannedAccount, err := s.banned.IsBanned(r.Context(), accountID); err != nil {
+			writeError(w, status.Error(codes.Internal, "banned check failed"))
+			return
+		} else if bannedAccount {
+			writeError(w, status.Error(codes.PermissionDenied, "account is banned"))
+			return
+		}
 		next(w, r, accountID)
 	}
 }
@@ -122,7 +133,20 @@ func (s *Server) handleAuthGoogle(w http.ResponseWriter, r *http.Request) {
 		writeError(w, err)
 		return
 	}
-	token, err := s.sessions.Issue(resp.GetAccount().GetId())
+	accountID := resp.GetAccount().GetId()
+	// A Google sign-in can resolve to an existing, possibly banned,
+	// account (DEC-0026: one verified account per Google account) -
+	// checked here, not just by withAuth on later requests, so a banned
+	// account never gets issued a fresh session in the first place
+	// (docs/ARCHITECTURE.md §3.5's "Gateways check banned on sign-in").
+	if bannedAccount, err := s.banned.IsBanned(r.Context(), accountID); err != nil {
+		writeError(w, status.Error(codes.Internal, "banned check failed"))
+		return
+	} else if bannedAccount {
+		writeError(w, status.Error(codes.PermissionDenied, "account is banned"))
+		return
+	}
+	token, err := s.sessions.Issue(accountID)
 	if err != nil {
 		writeError(w, status.Errorf(codes.Internal, "issue session: %v", err))
 		return

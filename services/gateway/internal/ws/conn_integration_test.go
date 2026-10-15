@@ -34,6 +34,7 @@ import (
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
 	eventsv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/events/v1"
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/banned"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/presence"
 )
 
@@ -83,7 +84,7 @@ func TestServeFullConnectionLifecycle(t *testing.T) {
 	}
 	deps := Deps{
 		Identity: identity, Chat: chat, Matching: &fakeMatching{},
-		Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{},
+		Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{}, Banned: &fakeBanned{},
 		Redis: redisClient, Logger: slog.Default(),
 		PresenceRegistry: presence.NewRegistry(),
 	}
@@ -135,10 +136,30 @@ func TestServeFullConnectionLifecycle(t *testing.T) {
 		t.Fatalf("unexpected frame: %+v", frame)
 	}
 
+	// A real presence count published to the global presence channel
+	// (the shape presence's own broadcast.Run publishes - plain JSON, no
+	// envelope-kind tag byte, docs/ARCHITECTURE.md §3.4) should arrive
+	// forwarded as a presence frame - proves authenticate's second
+	// Subscribe+Receive for this channel actually works, not just the
+	// per-account one. Checked before the AccountBanned event below,
+	// since that one legitimately closes the connection (DEC-0083) and
+	// nothing can be read on it afterward.
+	if err := redisClient.Publish(ctx, presenceChannel, `{"total":5,"guests":2,"male":2,"female":1}`).Err(); err != nil {
+		t.Fatalf("Publish presence: %v", err)
+	}
+	frame = readFrame(t, ctx, client)
+	if frame["type"] != "presence" || frame["total"] != float64(5) || frame["guests"] != float64(2) ||
+		frame["male"] != float64(2) || frame["female"] != float64(1) {
+		t.Fatalf("expected a presence frame with the published counts, got %+v", frame)
+	}
+
 	// A real event published to this account's own Redis channel should
 	// arrive translated - proves the subscription, the tag-byte
 	// convention (DEC-0070) and the translation layer all work together
-	// through the real pubsub, not just in isolation.
+	// through the real pubsub, not just in isolation. This is the last
+	// thing this test does with the connection: a kicked frame now
+	// closes it (DEC-0083), proven in detail by
+	// TestKickedFrameClosesTheConnection below.
 	evt := &eventsv1.ModerationEvent{Payload: &eventsv1.ModerationEvent_AccountBanned{
 		AccountBanned: &eventsv1.AccountBanned{AccountId: authID, Reason: "integration test"},
 	}}
@@ -155,21 +176,110 @@ func TestServeFullConnectionLifecycle(t *testing.T) {
 	if frame["type"] != "kicked" || frame["reason"] != "integration test" {
 		t.Fatalf("expected a kicked frame from the published event, got %+v", frame)
 	}
+}
 
-	// A real presence count published to the global presence channel
-	// (the shape presence's own broadcast.Run publishes - plain JSON, no
-	// envelope-kind tag byte, docs/ARCHITECTURE.md §3.4) should arrive
-	// forwarded as a presence frame - proves authenticate's second
-	// Subscribe+Receive for this channel actually works, not just the
-	// per-account one.
-	if err := redisClient.Publish(ctx, presenceChannel, `{"total":5,"guests":2,"male":2,"female":1}`).Err(); err != nil {
-		t.Fatalf("Publish presence: %v", err)
+// TestServeRejectsBannedAccountAtConnect proves authenticate's banned
+// check against a real Redis "banned" set, not just a fake.
+func TestServeRejectsBannedAccountAtConnect(t *testing.T) {
+	redisClient := newTestRedisClient(t)
+	ctx := context.Background()
+	authID := "integration-test-banned-acc"
+	if err := redisClient.SAdd(ctx, "banned", authID).Err(); err != nil {
+		t.Fatalf("seed banned set: %v", err)
 	}
-	frame = readFrame(t, ctx, client)
-	if frame["type"] != "presence" || frame["total"] != float64(5) || frame["guests"] != float64(2) ||
-		frame["male"] != float64(2) || frame["female"] != float64(1) {
-		t.Fatalf("expected a presence frame with the published counts, got %+v", frame)
+	t.Cleanup(func() { _ = redisClient.SRem(context.Background(), "banned", authID).Err() })
+
+	identity := &fakeIdentity{
+		getAccount: func(_ context.Context, req *identityv1.GetAccountRequest) (*identityv1.GetAccountResponse, error) {
+			return &identityv1.GetAccountResponse{Account: &identityv1.Account{Id: req.GetAccountId(), Pseudonym: "Fox"}}, nil
+		},
+	}
+	deps := Deps{
+		Identity: identity, Chat: &fakeChat{}, Matching: &fakeMatching{},
+		Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{}, Banned: banned.NewRedis(redisClient),
+		Redis: redisClient, Logger: slog.Default(),
+		PresenceRegistry: presence.NewRegistry(),
 	}
 
-	_ = client.Close(websocket.StatusNormalClosure, "")
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Serve(deps, nil, w, r)
+	}))
+	defer srv.Close()
+
+	dialCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	client, _, err := websocket.Dial(dialCtx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer func() { _ = client.CloseNow() }()
+
+	if err := client.Write(dialCtx, websocket.MessageText, []byte(`{"type":"auth","token":"session-for-`+authID+`"}`)); err != nil {
+		t.Fatalf("write auth: %v", err)
+	}
+	if _, _, err := client.Read(dialCtx); err == nil {
+		t.Fatal("expected the connection to be closed for a banned account, got a frame instead")
+	}
+}
+
+// TestKickedFrameClosesTheConnection proves a real AccountBanned event
+// arriving mid-session (docs/ARCHITECTURE.md §3.5's "gateways... close
+// that user's connections") actually ends the connection, not just
+// delivers a notification the client could ignore.
+func TestKickedFrameClosesTheConnection(t *testing.T) {
+	redisClient := newTestRedisClient(t)
+	authID := "integration-test-kick-acc"
+
+	identity := &fakeIdentity{
+		getAccount: func(_ context.Context, req *identityv1.GetAccountRequest) (*identityv1.GetAccountResponse, error) {
+			return &identityv1.GetAccountResponse{Account: &identityv1.Account{Id: req.GetAccountId(), Pseudonym: "Fox"}}, nil
+		},
+	}
+	deps := Deps{
+		Identity: identity, Chat: &fakeChat{}, Matching: &fakeMatching{},
+		Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{}, Banned: &fakeBanned{},
+		Redis: redisClient, Logger: slog.Default(),
+		PresenceRegistry: presence.NewRegistry(),
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Serve(deps, nil, w, r)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	client, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer func() { _ = client.CloseNow() }()
+
+	if err := client.Write(ctx, websocket.MessageText, []byte(`{"type":"auth","token":"session-for-`+authID+`"}`)); err != nil {
+		t.Fatalf("write auth: %v", err)
+	}
+	if frame := readFrame(t, ctx, client); frame["type"] != "auth_ok" {
+		t.Fatalf("expected auth_ok, got %+v", frame)
+	}
+
+	evt := &eventsv1.ModerationEvent{Payload: &eventsv1.ModerationEvent_AccountBanned{
+		AccountBanned: &eventsv1.AccountBanned{AccountId: authID, Reason: "integration test"},
+	}}
+	payload, err := proto.Marshal(evt)
+	if err != nil {
+		t.Fatalf("proto.Marshal: %v", err)
+	}
+	tagged := append([]byte{byte(moderationEventKind)}, payload...)
+	if err := redisClient.Publish(ctx, "user:"+authID, tagged).Err(); err != nil {
+		t.Fatalf("Publish: %v", err)
+	}
+
+	if frame := readFrame(t, ctx, client); frame["type"] != "kicked" {
+		t.Fatalf("expected a kicked frame, got %+v", frame)
+	}
+	if _, _, err := client.Read(ctx); err == nil {
+		t.Fatal("expected the connection to be closed after the kicked frame, got another frame instead")
+	}
 }
