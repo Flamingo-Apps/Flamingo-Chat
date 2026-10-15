@@ -358,7 +358,7 @@ The monitoring stack (where metrics, traces and logs are stored and viewed) is d
   - **Chat header:** Next, Keep chatting, Report, Block and End.
 - Phones first. A finished visual design comes later.
 
-## 11. Testing (Proposed)
+## 11. Testing (unit/integration tests Agreed and built; the end-to-end smoke test built, pending review - DEC-0087, DEC-0088)
 
 - **Unit tests:** business logic against in-memory fakes of each repository and client interface, as Identity does now. Run in CI with the race detector.
 - **Integration tests:** behind the `integration` build tag, run against the real Postgres, Redis and Kafka in the local cluster. Fakes do not reproduce real database behaviour. (INC-0003)

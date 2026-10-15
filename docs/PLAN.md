@@ -91,6 +91,7 @@ Running before launch. (DEC-0024)
 
 ### Before launch
 
+- [x] End-to-end smoke test (`tests/e2e`), run against a live Tilt stack (DEC-0087, DEC-0088)
 - [ ] Load test, with the method and results committed (DEC-0025)
 - [ ] Security review
 - [ ] Sign-in re-tested with a KIIT account after publishing to production (DEC-0027)

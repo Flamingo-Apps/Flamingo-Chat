@@ -283,3 +283,84 @@ func TestKickedFrameClosesTheConnection(t *testing.T) {
 		t.Fatal("expected the connection to be closed after the kicked frame, got another frame instead")
 	}
 }
+
+// TestMatchFoundSubscribesToTheNewRoomImmediately proves
+// subscribeToNewRoom's fix: without it, a message published to the new
+// room right after match_found would only arrive once refreshRooms's
+// periodic tick happens to catch up - up to 25 seconds later (DEC-0073)
+// - and Redis pub/sub has no replay, so a connection not yet subscribed
+// at publish time wouldn't just see it late, it would never see it at
+// all. This test's own timeout (well under 25s) would catch a
+// regression back to that behavior.
+func TestMatchFoundSubscribesToTheNewRoomImmediately(t *testing.T) {
+	redisClient := newTestRedisClient(t)
+	authID := "integration-test-matchfound-acc"
+	roomID := "integration-test-matchfound-room"
+
+	identity := &fakeIdentity{
+		getAccount: func(_ context.Context, req *identityv1.GetAccountRequest) (*identityv1.GetAccountResponse, error) {
+			return &identityv1.GetAccountResponse{Account: &identityv1.Account{Id: req.GetAccountId(), Pseudonym: "Fox"}}, nil
+		},
+	}
+	deps := Deps{
+		Identity: identity, Chat: &fakeChat{}, Matching: &fakeMatching{},
+		Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{}, Banned: &fakeBanned{},
+		Redis: redisClient, Logger: slog.Default(),
+		PresenceRegistry: presence.NewRegistry(),
+	}
+
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		Serve(deps, nil, w, r)
+	}))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	wsURL := "ws" + strings.TrimPrefix(srv.URL, "http")
+	client, _, err := websocket.Dial(ctx, wsURL, nil)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	defer func() { _ = client.CloseNow() }()
+
+	if err := client.Write(ctx, websocket.MessageText, []byte(`{"type":"auth","token":"session-for-`+authID+`"}`)); err != nil {
+		t.Fatalf("write auth: %v", err)
+	}
+	if frame := readFrame(t, ctx, client); frame["type"] != "auth_ok" {
+		t.Fatalf("expected auth_ok, got %+v", frame)
+	}
+
+	matchFound := &eventsv1.MatchingEvent{Payload: &eventsv1.MatchingEvent_MatchFound{MatchFound: &eventsv1.MatchFound{
+		RoomId: roomID, AccountIdA: authID, AccountIdB: "integration-test-matchfound-partner",
+		PseudonymA: "Fox", PseudonymB: "Hound",
+	}}}
+	matchFoundPayload, err := proto.Marshal(matchFound)
+	if err != nil {
+		t.Fatalf("proto.Marshal: %v", err)
+	}
+	if err := redisClient.Publish(ctx, "user:"+authID, append([]byte{byte(matchingEventKind)}, matchFoundPayload...)).Err(); err != nil {
+		t.Fatalf("Publish MatchFound: %v", err)
+	}
+	if frame := readFrame(t, ctx, client); frame["type"] != "match_found" || frame["room_id"] != roomID {
+		t.Fatalf("expected match_found for %s, got %+v", roomID, frame)
+	}
+
+	// No sleep, no retry loop - if subscribeToNewRoom's fix regressed,
+	// this message would be published before the subscription actually
+	// exists and would simply never arrive, failing this read outright
+	// rather than just arriving late.
+	messageSent := &eventsv1.ChatEvent{Payload: &eventsv1.ChatEvent_MessageSent{MessageSent: &eventsv1.MessageSent{
+		MessageId: "msg-1", RoomId: roomID, SenderAccountId: "integration-test-matchfound-partner",
+		SenderPseudonym: "Hound", Body: "hello immediately after match",
+	}}}
+	messageSentPayload, err := proto.Marshal(messageSent)
+	if err != nil {
+		t.Fatalf("proto.Marshal: %v", err)
+	}
+	if err := redisClient.Publish(ctx, "room:"+roomID, append([]byte{byte(chatEventKind)}, messageSentPayload...)).Err(); err != nil {
+		t.Fatalf("Publish MessageSent: %v", err)
+	}
+	if frame := readFrame(t, ctx, client); frame["type"] != "message" || frame["body"] != "hello immediately after match" {
+		t.Fatalf("expected the message sent right after match_found to arrive immediately, got %+v", frame)
+	}
+}
