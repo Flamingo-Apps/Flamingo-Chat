@@ -51,6 +51,10 @@ func (c *conn) redisLoop(ctx context.Context) {
 			if !ok {
 				return
 			}
+			if msg.Channel == presenceChannel {
+				c.forwardPresence([]byte(msg.Payload))
+				continue
+			}
 			frame, err := translate([]byte(msg.Payload), c.accountID)
 			if err != nil {
 				c.logger.Warn("translate", "channel", msg.Channel, "err", err)
@@ -63,6 +67,23 @@ func (c *conn) redisLoop(ctx context.Context) {
 			c.enqueue(frame)
 		}
 	}
+}
+
+// forwardPresence re-wraps the presence channel's plain JSON payload
+// (presence's own broadcast.Run - no envelope-kind tag byte, see
+// presenceFrame's doc comment) as a client frame and sends it.
+func (c *conn) forwardPresence(payload []byte) {
+	var counts presenceFrame
+	if err := json.Unmarshal(payload, &counts); err != nil {
+		c.logger.Warn("unmarshal presence payload", "err", err)
+		return
+	}
+	frame, err := withType("presence", counts)
+	if err != nil {
+		c.logger.Warn("encode presence frame", "err", err)
+		return
+	}
+	c.enqueue(frame)
 }
 
 // readLoop reads and dispatches every client frame after auth.

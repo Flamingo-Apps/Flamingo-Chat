@@ -128,7 +128,7 @@ Queue keys are in section 5.5.
 
 During a random chat, either user can send `keep_chat`. Chat records the vote and produces a `KeepVote` event to the room. When both have voted, the room becomes **kept**: it stays open, appears in both users' Inbox, and keeps its history. A random chat that ends without both votes is closed and disappears for both users. Its messages stay on the server for moderation. (DEC-0031)
 
-### 3.4 Presence (Proposed)
+### 3.4 Presence (built, pending review - DEC-0081, DEC-0082)
 
 - Every 15 seconds each gateway instance sends one batched `Heartbeat` with a category per connected account: `GUEST`, `MALE`, `FEMALE` or `VERIFIED_OTHER`.
 - Presence stores each category as a Redis sorted set with the last-heartbeat time as the score. It drops entries older than 45 seconds, and every 5 seconds publishes the counts to the `presence` channel.

@@ -34,6 +34,7 @@ import (
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
 	eventsv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/events/v1"
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/presence"
 )
 
 func newTestRedisClient(t *testing.T) *redis.Client {
@@ -84,6 +85,7 @@ func TestServeFullConnectionLifecycle(t *testing.T) {
 		Identity: identity, Chat: chat, Matching: &fakeMatching{},
 		Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{},
 		Redis: redisClient, Logger: slog.Default(),
+		PresenceRegistry: presence.NewRegistry(),
 	}
 
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -152,6 +154,21 @@ func TestServeFullConnectionLifecycle(t *testing.T) {
 	frame = readFrame(t, ctx, client)
 	if frame["type"] != "kicked" || frame["reason"] != "integration test" {
 		t.Fatalf("expected a kicked frame from the published event, got %+v", frame)
+	}
+
+	// A real presence count published to the global presence channel
+	// (the shape presence's own broadcast.Run publishes - plain JSON, no
+	// envelope-kind tag byte, docs/ARCHITECTURE.md §3.4) should arrive
+	// forwarded as a presence frame - proves authenticate's second
+	// Subscribe+Receive for this channel actually works, not just the
+	// per-account one.
+	if err := redisClient.Publish(ctx, presenceChannel, `{"total":5,"guests":2,"male":2,"female":1}`).Err(); err != nil {
+		t.Fatalf("Publish presence: %v", err)
+	}
+	frame = readFrame(t, ctx, client)
+	if frame["type"] != "presence" || frame["total"] != float64(5) || frame["guests"] != float64(2) ||
+		frame["male"] != float64(2) || frame["female"] != float64(1) {
+		t.Fatalf("expected a presence frame with the published counts, got %+v", frame)
 	}
 
 	_ = client.Close(websocket.StatusNormalClosure, "")

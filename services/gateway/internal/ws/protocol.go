@@ -97,6 +97,18 @@ type keepStatusFrame struct {
 	Kept    bool `json:"kept"`
 }
 
+// presenceFrame is the shape presence's broadcast.Run already publishes
+// to Redis's presence channel verbatim (plain JSON, no envelope-kind tag
+// byte - that channel only ever carries this one kind of message) - this
+// struct exists so redisLoop can re-wrap it with "type" via withType like
+// every other outgoing frame, not to decode a different format.
+type presenceFrame struct {
+	Total  int64 `json:"total"`
+	Guests int64 `json:"guests"`
+	Male   int64 `json:"male"`
+	Female int64 `json:"female"`
+}
+
 type roomJoinedFrame struct {
 	RoomID string `json:"room_id"`
 }
