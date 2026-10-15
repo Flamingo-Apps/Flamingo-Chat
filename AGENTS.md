@@ -47,6 +47,7 @@ deploy/
   helm/service/      one Helm chart for every Go service; values/<name>.yaml per service
   k8s/dev/           plain manifests for local Postgres, Redis and Kafka
 Tiltfile             local development: builds images, deploys everything above
+tools/admin/         command-line tool calling Moderation's admin actions (DEC-0029); not deployed, no Dockerfile
 scripts/             scaffold-service.sh for a new gRPC service, check-decisions.sh
 docs/                PRD, architecture, plan, decision log
 web/                 web frontend (planned, not created yet)
