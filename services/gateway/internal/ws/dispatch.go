@@ -215,10 +215,21 @@ func (c *conn) handleMatchCancel(ctx context.Context) {
 	}
 }
 
+// handleMatchNext mirrors handleMatchRequest's match_queued
+// acknowledgement (DEC-0080) - without it, a client that called Next had
+// no way to tell "ended and re-queued" apart from "ended and now stuck",
+// since match_ended (the room ending) and match_queued (having rejoined
+// the queue) are two separate, independent facts.
 func (c *conn) handleMatchNext(ctx context.Context) {
 	roomID := c.getCurrentMatchRoom()
-	if _, err := c.deps.Matching.Next(ctx, &matchingv1.NextRequest{AccountId: c.accountID, CurrentRoomId: roomID}); err != nil {
+	resp, err := c.deps.Matching.Next(ctx, &matchingv1.NextRequest{AccountId: c.accountID, CurrentRoomId: roomID})
+	if err != nil {
 		c.sendErrorFromStatus(err, "")
+		return
+	}
+	if resp.GetQueued() {
+		b, _ := withType("match_queued", matchQueuedFrame{})
+		c.enqueue(b)
 	}
 }
 

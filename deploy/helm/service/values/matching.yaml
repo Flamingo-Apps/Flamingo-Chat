@@ -5,3 +5,6 @@ protocol: grpc
 port: 50052
 env:
   GRPC_PORT: "50052"
+  CHAT_ADDR: "chat:50053"
+  KAFKA_BROKERS: "kafka:9092"
+  REDIS_URL: "redis://redis:6379/0"
