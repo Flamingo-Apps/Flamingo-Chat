@@ -220,17 +220,19 @@ func TestHandleMatchEndUsesTheTrackedRoom(t *testing.T) {
 	}
 }
 
-func TestTrackMatchRoomUpdatesOnFoundAndClearsOnEnded(t *testing.T) {
+// TestTrackMatchRoomClearsOnEnded covers match_ended's bookkeeping only
+// - match_found's own side effect (subscribing via c.pubsub, see
+// subscribeToNewRoom's doc comment) needs a real pubsub, so it's covered
+// by the integration suite's TestServeFullConnectionLifecycle-adjacent
+// tests instead of here. c.setCurrentMatchRoom seeds the "found" half
+// directly, bypassing trackMatchRoom, so this test never has to touch
+// c.pubsub at all.
+func TestTrackMatchRoomClearsOnEnded(t *testing.T) {
 	c := newTestConn(&fakeIdentity{}, &fakeChat{}, &fakeMatching{})
-
-	found, _ := withType("match_found", matchFoundFrame{RoomID: "room-1"})
-	c.trackMatchRoom(found)
-	if got := c.getCurrentMatchRoom(); got != "room-1" {
-		t.Fatalf("expected room-1, got %q", got)
-	}
+	c.setCurrentMatchRoom("room-1")
 
 	ended, _ := withType("match_ended", matchEndedFrame{RoomID: "room-1"})
-	c.trackMatchRoom(ended)
+	c.trackMatchRoom(context.Background(), ended)
 	if got := c.getCurrentMatchRoom(); got != "" {
 		t.Fatalf("expected the tracked room to be cleared, got %q", got)
 	}

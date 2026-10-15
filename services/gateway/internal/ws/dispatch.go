@@ -80,7 +80,7 @@ func (c *conn) redisLoop(ctx context.Context) {
 			if frame == nil {
 				continue // no client-facing frame for this event - not an error
 			}
-			c.trackMatchRoom(frame)
+			c.trackMatchRoom(ctx, frame)
 			c.enqueue(frame)
 		}
 	}
@@ -308,7 +308,7 @@ func (c *conn) handleMatchEnd(ctx context.Context) {
 // match_ended frames this connection's own redisLoop just translated -
 // the only source gateway has for "what is my current direct room",
 // since match_end's client frame carries no room_id of its own.
-func (c *conn) trackMatchRoom(frame []byte) {
+func (c *conn) trackMatchRoom(ctx context.Context, frame []byte) {
 	var env struct {
 		Type   string `json:"type"`
 		RoomID string `json:"room_id"`
@@ -319,8 +319,34 @@ func (c *conn) trackMatchRoom(frame []byte) {
 	switch env.Type {
 	case "match_found":
 		c.setCurrentMatchRoom(env.RoomID)
+		c.subscribeToNewRoom(ctx, env.RoomID)
 	case "match_ended":
 		c.setCurrentMatchRoom("")
+	}
+}
+
+// subscribeToNewRoom subscribes this connection's pubsub to room:{roomID}
+// right when match_found names it, instead of waiting for refreshRooms's
+// next periodic tick (up to 25 seconds later, DEC-0073) - unlike a room
+// joined over HTTP, which has no live signal to hook into, match_found
+// is itself a live event this connection just received, so there's no
+// reason to wait for one. Like refreshRooms's own subscriptions (and for
+// the same reason: this runs on redisLoop, the same goroutine that's
+// actively ranging over c.pubsub.Channel(), so calling Receive here to
+// wait for Redis's confirmation would race with that read), this does
+// not wait for confirmation - a message published in the brief gap
+// between this call and Redis actually registering it could still be
+// missed, but that window is now milliseconds, not up to 25 seconds.
+func (c *conn) subscribeToNewRoom(ctx context.Context, roomID string) {
+	c.mu.Lock()
+	already := c.subscribed[roomID]
+	c.subscribed[roomID] = true
+	c.mu.Unlock()
+	if already {
+		return
+	}
+	if err := c.pubsub.Subscribe(ctx, "room:"+roomID); err != nil {
+		c.logger.Warn("subscribe to new match room", "room_id", roomID, "err", err)
 	}
 }
 

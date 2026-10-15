@@ -11,5 +11,6 @@ use (
 	./services/moderation
 	./services/persistence-worker
 	./services/presence
+	./tests/e2e
 	./tools/admin
 )
