@@ -63,7 +63,7 @@ Order within each group is set once the architecture is agreed.
 - [ ] Kafka in place of RabbitMQ for durable events (DEC-0020)
 - [x] Delivery worker: fans chat.events, matching.events and moderation.events out to Redis for live delivery (DEC-0067, DEC-0068)
 - [x] Persistence worker: saved chat history and an analytics event log (DEC-0069)
-- [ ] Admin command-line tool (DEC-0029)
+- [x] Admin command-line tool (DEC-0029, DEC-0086)
 - [ ] Log streaming gRPC calls as well as unary ones
 
 ### Frontend
