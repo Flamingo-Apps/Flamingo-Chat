@@ -91,15 +91,31 @@ func TestTranslateRoomKept(t *testing.T) {
 	}
 }
 
+// TestTranslateRoomEnded proves translateChatEvent's RoomEnded case
+// reports you_left/partner_left based on who ended it (EndedByAccountId),
+// the same distinction MatchFound already gives a client for
+// partner/not-partner (DEC-0091) - not EndDirectRoom's original free-text
+// Reason, which no client-facing code reads.
 func TestTranslateRoomEnded(t *testing.T) {
-	evt := &eventsv1.ChatEvent{Payload: &eventsv1.ChatEvent_RoomEnded{RoomEnded: &eventsv1.RoomEnded{RoomId: "r1", Reason: "next"}}}
+	evt := &eventsv1.ChatEvent{Payload: &eventsv1.ChatEvent_RoomEnded{
+		RoomEnded: &eventsv1.RoomEnded{RoomId: "r1", Reason: "next", EndedByAccountId: "a2"},
+	}}
 	out, err := translate(tagged(chatEventKind, mustMarshal(t, evt)), "a1")
 	if err != nil {
 		t.Fatalf("translate: %v", err)
 	}
 	frame := decodeFrame(t, out)
-	if frame["type"] != "match_ended" || frame["room_id"] != "r1" || frame["reason"] != "next" {
-		t.Fatalf("unexpected frame: %+v", frame)
+	if frame["type"] != "match_ended" || frame["room_id"] != "r1" || frame["reason"] != "partner_left" {
+		t.Fatalf("expected partner_left for a different account's EndedByAccountId, got %+v", frame)
+	}
+
+	out, err = translate(tagged(chatEventKind, mustMarshal(t, evt)), "a2")
+	if err != nil {
+		t.Fatalf("translate: %v", err)
+	}
+	frame = decodeFrame(t, out)
+	if frame["reason"] != "you_left" {
+		t.Fatalf("expected you_left when EndedByAccountId matches myAccountID, got %+v", frame)
 	}
 }
 

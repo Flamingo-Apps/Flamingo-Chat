@@ -233,3 +233,17 @@ input, textarea {
   padding: 1rem;
   border-radius: 0.5rem;
 }
+
+.partner-left-prompt {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 2rem 1.5rem;
+  text-align: center;
+}
+
+.partner-left-prompt button {
+  min-width: 10rem;
+}

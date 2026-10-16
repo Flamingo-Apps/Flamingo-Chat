@@ -60,6 +60,13 @@ message RoomKept {
 message RoomEnded {
   string room_id = 1;
   string reason = 2;
+  // Which account's action ended the room - empty for an end that wasn't
+  // caused by either member directly (there is no such path yet, but
+  // this keeps the field meaningful rather than "always the caller").
+  // Lets a client tell "I ended this" apart from "my partner ended
+  // this", the same distinction MatchEnded.account_id already gives the
+  // skip/Next path.
+  string ended_by_account_id = 3;
 }
 
 // Produced by Matching to the "matching.events" topic, keyed by room_id.

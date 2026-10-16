@@ -13,6 +13,7 @@ interface GatewayContextValue {
   send: (frame: ClientFrame) => void
   loadRooms: () => Promise<void>
   loadMessages: (roomId: string) => Promise<void>
+  expireGraceWindow: (roomId: string) => void
 }
 
 const GatewayContext = createContext<GatewayContextValue | null>(null)
@@ -30,6 +31,10 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(SESSION_STORAGE_KEY)
     connectionRef.current?.close()
     dispatch({ type: 'logout' })
+  }, [])
+
+  const expireGraceWindow = useCallback((roomId: string) => {
+    dispatch({ type: 'graceWindowExpired', roomId })
   }, [])
 
   // On first load, a saved token is validated against GET /v1/me rather
@@ -86,7 +91,9 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
   )
 
   return (
-    <GatewayContext.Provider value={{ state, login, logout, send, loadRooms, loadMessages }}>{children}</GatewayContext.Provider>
+    <GatewayContext.Provider value={{ state, login, logout, send, loadRooms, loadMessages, expireGraceWindow }}>
+      {children}
+    </GatewayContext.Provider>
   )
 }
 

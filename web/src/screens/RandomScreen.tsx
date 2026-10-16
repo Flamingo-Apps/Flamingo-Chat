@@ -1,6 +1,7 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import * as api from '../api'
 import { useGateway } from '../gateway'
+import { GRACE_WINDOW_MS } from '../state'
 import type { Preference } from '../types'
 import { ChatView } from './ChatView'
 
@@ -15,6 +16,10 @@ export function RandomScreen() {
   // checkGenderGate) - locked out here rather than letting the request
   // round-trip to a PermissionDenied error.
   const canFilterByGender = Boolean(account?.google_linked && account?.gender_chosen)
+
+  if (state.currentMatch?.partnerLeftAt) {
+    return <PartnerLeftPrompt roomId={state.currentMatch.roomId} partnerLeftAt={state.currentMatch.partnerLeftAt} kept={state.currentMatch.kept} />
+  }
 
   if (state.currentMatch) {
     const match = state.currentMatch
@@ -99,6 +104,48 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
         </form>
       )}
       <button onClick={onClose}>Close</button>
+    </div>
+  )
+}
+
+// PartnerLeftPrompt is shown instead of instantly dropping the chat when
+// the partner leaves/skips before both sides voted to keep (DEC-0091).
+// Rather than the chat just vanishing, the person who stayed gets a
+// short window to vote keep on their own - the partner is confirmed
+// gone and can never complete a mutual vote otherwise, so without this
+// "keep" would be permanently impossible from this point on.
+function PartnerLeftPrompt({ roomId, partnerLeftAt, kept }: { roomId: string; partnerLeftAt: number; kept: boolean }) {
+  const { send, expireGraceWindow } = useGateway()
+  const [remainingMs, setRemainingMs] = useState(() => Math.max(0, partnerLeftAt + GRACE_WINDOW_MS - Date.now()))
+
+  useEffect(() => {
+    if (kept) return
+    const interval = setInterval(() => {
+      const left = partnerLeftAt + GRACE_WINDOW_MS - Date.now()
+      setRemainingMs(Math.max(0, left))
+      if (left <= 0) {
+        clearInterval(interval)
+        expireGraceWindow(roomId)
+      }
+    }, 250)
+    return () => clearInterval(interval)
+  }, [kept, partnerLeftAt, roomId, expireGraceWindow])
+
+  if (kept) {
+    return (
+      <div className="partner-left-prompt">
+        <p>Saved. You can find this conversation in Inbox.</p>
+        <button onClick={() => expireGraceWindow(roomId)}>Back to Random</button>
+      </div>
+    )
+  }
+
+  return (
+    <div className="partner-left-prompt">
+      <p>Your partner left this chat.</p>
+      <p>Keep it anyway? ({Math.ceil(remainingMs / 1000)}s)</p>
+      <button onClick={() => send({ type: 'keep_chat', room_id: roomId })}>Keep this chat</button>
+      <button onClick={() => expireGraceWindow(roomId)}>Discard</button>
     </div>
   )
 }

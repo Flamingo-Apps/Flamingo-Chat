@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"time"
 
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -207,13 +208,14 @@ func (p *Postgres) VoteKeep(ctx context.Context, roomID, accountID string) (bool
 
 	// Locks the room row for the rest of this transaction, so two
 	// concurrent votes for the same room can't both read a stale vote
-	// count and neither one observes "kept".
-	var exists bool
-	if err := tx.QueryRow(ctx, `SELECT EXISTS(SELECT 1 FROM rooms WHERE id = $1 FOR UPDATE)`, roomID).Scan(&exists); err != nil {
+	// count and neither one observes "kept". endedAt also drives the
+	// grace-window solo-keep check below.
+	var endedAt *time.Time
+	if err := tx.QueryRow(ctx, `SELECT ended_at FROM rooms WHERE id = $1 FOR UPDATE`, roomID).Scan(&endedAt); err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return false, ErrNotFound
+		}
 		return false, fmt.Errorf("store: vote keep: lock room: %w", err)
-	}
-	if !exists {
-		return false, ErrNotFound
 	}
 
 	if _, err := tx.Exec(ctx, `
@@ -232,6 +234,14 @@ func (p *Postgres) VoteKeep(ctx context.Context, roomID, accountID string) (bool
 	}
 
 	kept := members > 0 && votes >= members
+	// Grace-window solo keep (DEC-0091): the room already ended, so the
+	// member who left can never vote - requiring votes >= members would
+	// make "keep" permanently impossible once one side is gone. Within
+	// VoteKeepGraceWindow of ending, the remaining member's own vote is
+	// enough on its own.
+	if !kept && endedAt != nil && time.Since(*endedAt) <= VoteKeepGraceWindow {
+		kept = votes >= 1
+	}
 	if kept {
 		if _, err := tx.Exec(ctx, `UPDATE rooms SET kept = true WHERE id = $1`, roomID); err != nil {
 			return false, fmt.Errorf("store: vote keep: set kept: %w", err)
