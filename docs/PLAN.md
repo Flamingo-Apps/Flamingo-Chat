@@ -68,7 +68,8 @@ Order within each group is set once the architecture is agreed.
 
 ### Frontend
 
-- [ ] Web app in `web/`, deployed to Vercel (DEC-0032)
+- [x] Web app in `web/`: auth (guest + Google sign-in), random chat, channels, inbox, reconnecting WebSocket client (DEC-0089, DEC-0090)
+- [ ] Deploy `web/` to Vercel (DEC-0032)
 - [ ] Privacy policy and terms pages
 
 ### Infrastructure
