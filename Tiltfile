@@ -77,3 +77,21 @@ for svc in services:
         resource_deps=svc['deps'],
         labels=['services'],
     )
+
+# ---------------------------------------------------------------------------
+# The web frontend: not containerized, just the Vite dev server running
+# directly on the host (DEC-0040 chose a plain local process over a dev
+# container for this, to keep edit/reload fast). It needs the gateway's
+# port already forwarded to localhost:8080, hence resource_deps.
+# ---------------------------------------------------------------------------
+
+local_resource(
+    'web',
+    cmd='npm install',
+    serve_cmd='npm run dev',
+    dir='web',
+    serve_dir='web',
+    deps=['web/package.json'],
+    resource_deps=['gateway'],
+    labels=['web'],
+)

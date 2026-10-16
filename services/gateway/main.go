@@ -117,7 +117,7 @@ func main() {
 	// WebSocket connection once it's upgraded.
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           mux,
+		Handler:           httpapi.CORS(originPatterns, mux),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
