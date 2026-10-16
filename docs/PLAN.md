@@ -60,11 +60,10 @@ Order within each group is set once the architecture is agreed.
 - [x] Matching: random queue and gender-filtered queue, pairing, skip (DEC-0077 to DEC-0079)
 - [x] Presence: heartbeats and live counts (DEC-0081, DEC-0082)
 - [x] Moderation: reports, blocks, bans, admin queue, gender change requests (DEC-0083 to DEC-0085)
-- [ ] Kafka in place of RabbitMQ for durable events (DEC-0020)
+- [x] Kafka in place of RabbitMQ for durable events (DEC-0020) - delivery-worker and persistence-worker both consume it
 - [x] Delivery worker: fans chat.events, matching.events and moderation.events out to Redis for live delivery (DEC-0067, DEC-0068)
 - [x] Persistence worker: saved chat history and an analytics event log (DEC-0069)
 - [x] Admin command-line tool (DEC-0029, DEC-0086)
-- [ ] Log streaming gRPC calls as well as unary ones
 
 ### Frontend
 
