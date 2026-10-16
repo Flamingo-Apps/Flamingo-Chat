@@ -159,6 +159,58 @@ func TestPostgresVoteKeepRequiresEveryCurrentMember(t *testing.T) {
 	}
 }
 
+// TestPostgresVoteKeepSoloWithinGraceWindowAfterRoomEnded proves
+// DEC-0091's fix against a real Postgres, not just the in-memory fake -
+// the FOR UPDATE row lock and the ended_at comparison are both real
+// database behavior worth confirming directly (DEC-0048).
+func TestPostgresVoteKeepSoloWithinGraceWindowAfterRoomEnded(t *testing.T) {
+	st := newTestPostgres(t)
+	ctx := context.Background()
+	roomID, a, b := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := st.EndDirectRoom(ctx, roomID); err != nil {
+		t.Fatalf("EndDirectRoom: %v", err)
+	}
+
+	kept, err := st.VoteKeep(ctx, roomID, a)
+	if err != nil {
+		t.Fatalf("solo vote: %v", err)
+	}
+	if !kept {
+		t.Fatalf("expected a solo vote to keep the room within the grace window after the other side left")
+	}
+}
+
+// TestPostgresVoteKeepSoloAfterGraceWindowExpiredDoesNotKeep proves the
+// window is a real bound in the database, not just in application code.
+func TestPostgresVoteKeepSoloAfterGraceWindowExpiredDoesNotKeep(t *testing.T) {
+	st := newTestPostgres(t)
+	ctx := context.Background()
+	roomID, a, b := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := st.EndDirectRoom(ctx, roomID); err != nil {
+		t.Fatalf("EndDirectRoom: %v", err)
+	}
+	// Backdate ended_at directly, well outside the grace window - the
+	// fastest way to prove the window's upper bound without an actual
+	// sleep in the test.
+	if _, err := st.pool.Exec(ctx, `UPDATE rooms SET ended_at = now() - interval '1 hour' WHERE id = $1`, roomID); err != nil {
+		t.Fatalf("backdate ended_at: %v", err)
+	}
+
+	kept, err := st.VoteKeep(ctx, roomID, a)
+	if err != nil {
+		t.Fatalf("solo vote: %v", err)
+	}
+	if kept {
+		t.Fatalf("expected a solo vote well outside the grace window to NOT keep the room")
+	}
+}
+
 func TestPostgresVoteKeepReturnsNotFoundForMissingRoom(t *testing.T) {
 	st := newTestPostgres(t)
 	if _, err := st.VoteKeep(context.Background(), uuid.NewString(), uuid.NewString()); !errors.Is(err, ErrNotFound) {

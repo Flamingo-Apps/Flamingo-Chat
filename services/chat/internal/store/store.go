@@ -25,6 +25,14 @@ var ErrNotFound = errors.New("room not found")
 // ErrAlreadyExists is returned on an invite code collision.
 var ErrAlreadyExists = errors.New("invite code already exists")
 
+// VoteKeepGraceWindow is how long after a direct room ends (one side
+// left before both voted to keep) the remaining member can still vote
+// keep alone and have it count - see VoteKeep's doc comment (DEC-0091).
+// The web client's own grace-window countdown (web/src/state.ts)
+// matches this value; the two aren't sharable code across the Go/
+// TypeScript boundary, so keep them in sync by hand if this changes.
+const VoteKeepGraceWindow = 30 * time.Second
+
 // Room is Chat's persistence-layer view of a room. Deliberately separate
 // from the generated chatv1.Room protobuf type, the same separation
 // identity's store.Account keeps from identityv1.Account.
@@ -110,7 +118,10 @@ type RoomStore interface {
 	// VoteKeep records a keep vote for a direct room. Idempotent: voting
 	// again does not count twice. Returns true once every current member
 	// has voted, at which point the room's Kept flag is also set to true
-	// (DEC-0031).
+	// (DEC-0031). If the room has already ended (one side left before
+	// both voted) and it ended within VoteKeepGraceWindow, a single vote
+	// from whoever is left is enough on its own - the other side is
+	// confirmed gone and can never complete a mutual vote (DEC-0091).
 	VoteKeep(ctx context.Context, roomID, accountID string) (kept bool, err error)
 
 	// EndDirectRoom marks a direct room as ended, unless it is already

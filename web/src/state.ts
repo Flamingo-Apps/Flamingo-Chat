@@ -1,6 +1,13 @@
 import type { Account, Message, Room, ServerFrame } from './types'
 import type { ConnectionStatus } from './ws'
 
+// GRACE_WINDOW_MS mirrors the backend's store.VoteKeepGraceWindow
+// (services/chat/internal/store/store.go) - how long after the partner
+// leaves a still-undecided match the person who stayed can still vote
+// to keep it on their own (DEC-0091). Not shareable code across the Go/
+// TypeScript boundary, so keep these two values in sync by hand.
+export const GRACE_WINDOW_MS = 30_000
+
 export interface CurrentMatch {
   roomId: string
   partnerPseudonym: string
@@ -8,6 +15,10 @@ export interface CurrentMatch {
   youKept: boolean
   partnerKept: boolean
   kept: boolean
+  // Set the moment a match_ended frame says the partner left (not us) -
+  // RandomScreen uses it to show a "keep this chat?" countdown instead
+  // of silently dropping the conversation (DEC-0091).
+  partnerLeftAt: number | null
 }
 
 export interface AppState {
@@ -45,6 +56,7 @@ export type Action =
   | { type: 'accountUpdated'; account: Account }
   | { type: 'frame'; frame: ServerFrame }
   | { type: 'clearError' }
+  | { type: 'graceWindowExpired'; roomId: string }
 
 // addMessageDeduped appends msg to list unless a message with the same
 // message_id is already present - docs/ARCHITECTURE.md §5.2 calls for
@@ -88,12 +100,19 @@ function applyFrame(state: AppState, frame: ServerFrame): AppState {
           youKept: false,
           partnerKept: false,
           kept: false,
+          partnerLeftAt: null,
         },
       }
 
     case 'match_ended':
       if (state.currentMatch?.roomId !== frame.room_id) return state
-      return { ...state, currentMatch: null }
+      // We ended it ourselves (End/Next) - our own client already acts
+      // on that locally, so just drop the match as before. If the
+      // partner left, don't drop it yet: RandomScreen shows a grace-
+      // window "keep this chat?" prompt instead (DEC-0091), and this
+      // action only marks when that window started.
+      if (frame.reason === 'you_left') return { ...state, currentMatch: null }
+      return { ...state, currentMatch: { ...state.currentMatch, partnerLeftAt: Date.now() } }
 
     case 'keep_status':
       if (state.currentMatch?.roomId !== frame.room_id) return state
@@ -146,6 +165,13 @@ export function reducer(state: AppState, action: Action): AppState {
       return applyFrame(state, action.frame)
     case 'clearError':
       return { ...state, lastError: null }
+    case 'graceWindowExpired':
+      // Unconditional once the roomId matches - RandomScreen is what
+      // decides whether this should fire at all (it cancels its own
+      // countdown timer once the solo keep vote lands), and also calls
+      // this directly when the user dismisses a "Saved!" confirmation.
+      if (state.currentMatch?.roomId !== action.roomId) return state
+      return { ...state, currentMatch: null }
     default:
       return state
   }

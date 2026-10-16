@@ -34,7 +34,7 @@ func translate(payload []byte, myAccountID string) ([]byte, error) {
 
 	switch kind {
 	case chatEventKind:
-		return translateChatEvent(body)
+		return translateChatEvent(body, myAccountID)
 	case matchingEventKind:
 		return translateMatchingEvent(body, myAccountID)
 	case moderationEventKind:
@@ -44,7 +44,7 @@ func translate(payload []byte, myAccountID string) ([]byte, error) {
 	}
 }
 
-func translateChatEvent(value []byte) ([]byte, error) {
+func translateChatEvent(value []byte, myAccountID string) ([]byte, error) {
 	var evt eventsv1.ChatEvent
 	if err := proto.Unmarshal(value, &evt); err != nil {
 		return nil, fmt.Errorf("ws: unmarshal ChatEvent: %w", err)
@@ -78,7 +78,17 @@ func translateChatEvent(value []byte) ([]byte, error) {
 		// room survived.
 		return withType("keep_status", keepStatusFrame{RoomID: p.RoomKept.GetRoomId(), Kept: true})
 	case *eventsv1.ChatEvent_RoomEnded:
-		return withType("match_ended", matchEndedFrame{RoomID: p.RoomEnded.GetRoomId(), Reason: p.RoomEnded.GetReason()})
+		// Reason here deliberately carries you_left/partner_left, not the
+		// free-text value EndDirectRoom's caller originally passed
+		// ("ended"/"next") - the frontend's grace-window prompt (only
+		// shown to whoever did NOT end it themselves) is the one thing
+		// that reads this field, mirroring MatchEnded's own
+		// you_left/partner_left framing below for the same reason.
+		reason := "partner_left"
+		if p.RoomEnded.GetEndedByAccountId() == myAccountID {
+			reason = "you_left"
+		}
+		return withType("match_ended", matchEndedFrame{RoomID: p.RoomEnded.GetRoomId(), Reason: reason})
 	case *eventsv1.ChatEvent_KeepVote:
 		// A single vote with the room not yet kept has no WS frame of
 		// its own - see keepStatusFrame's doc comment.

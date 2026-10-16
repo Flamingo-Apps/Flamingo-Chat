@@ -9,6 +9,7 @@ import (
 
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
 	eventsv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/events/v1"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/chat/internal/store"
 )
 
 // idGen returns an IDGenerator that hands out the given ids in order,
@@ -286,6 +287,54 @@ func TestVoteKeep(t *testing.T) {
 	}
 	if len(prod.published) != 3 {
 		t.Fatalf("expected a second KeepVote plus a RoomKept event, got %d", len(prod.published))
+	}
+}
+
+// TestVoteKeepSoloWithinGraceWindowAfterRoomEnded proves DEC-0091's fix:
+// once one side has left (ending the room before both voted), the side
+// who stayed can no longer ever complete a mutual vote - the member who
+// left is gone and will never vote. Without the grace-window path, "keep"
+// would be permanently impossible from this point on.
+func TestVoteKeepSoloWithinGraceWindowAfterRoomEnded(t *testing.T) {
+	s, _, _ := newTestServer("room-1", "event-1", "event-2", "event-3")
+	if _, err := s.CreateDirectRoom(context.Background(), &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "b"}}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := s.EndDirectRoom(context.Background(), &chatv1.EndDirectRoomRequest{RoomId: "room-1", AccountId: "b", Reason: "ended"}); err != nil {
+		t.Fatalf("EndDirectRoom: %v", err)
+	}
+
+	resp, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "room-1", AccountId: "a"})
+	if err != nil {
+		t.Fatalf("VoteKeep: %v", err)
+	}
+	if !resp.GetKept() {
+		t.Fatalf("expected a solo vote to keep the room within the grace window after the other side left")
+	}
+}
+
+// TestVoteKeepSoloAfterGraceWindowExpiredDoesNotKeep proves the grace
+// window is an actual bound, not unlimited - a vote arriving long after
+// the room ended should not resurrect it.
+func TestVoteKeepSoloAfterGraceWindowExpiredDoesNotKeep(t *testing.T) {
+	s, st, _ := newTestServer("room-1", "event-1", "event-2", "event-3")
+	if _, err := s.CreateDirectRoom(context.Background(), &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "b"}}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := s.EndDirectRoom(context.Background(), &chatv1.EndDirectRoomRequest{RoomId: "room-1", AccountId: "b", Reason: "ended"}); err != nil {
+		t.Fatalf("EndDirectRoom: %v", err)
+	}
+	room := st.rooms["room-1"]
+	longAgo := room.EndedAt.Add(-2 * store.VoteKeepGraceWindow)
+	room.EndedAt = &longAgo
+	st.rooms["room-1"] = room
+
+	resp, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "room-1", AccountId: "a"})
+	if err != nil {
+		t.Fatalf("VoteKeep: %v", err)
+	}
+	if resp.GetKept() {
+		t.Fatalf("expected a solo vote well outside the grace window to NOT keep the room")
 	}
 }
 

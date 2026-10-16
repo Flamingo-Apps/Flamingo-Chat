@@ -163,6 +163,9 @@ func (f *fakeStore) VoteKeep(_ context.Context, roomID, accountID string) (bool,
 		}
 	}
 	kept := members > 0 && len(f.keepVotes[roomID]) >= members
+	if !kept && room.EndedAt != nil && time.Since(*room.EndedAt) <= store.VoteKeepGraceWindow {
+		kept = len(f.keepVotes[roomID]) >= 1
+	}
 	if kept {
 		room.Kept = true
 		f.rooms[roomID] = room
@@ -175,7 +178,7 @@ func (f *fakeStore) EndDirectRoom(_ context.Context, roomID string) error {
 	if !ok || room.Kept || room.EndedAt != nil {
 		return nil
 	}
-	now := time.Unix(1, 0)
+	now := time.Now()
 	room.EndedAt = &now
 	f.rooms[roomID] = room
 	return nil

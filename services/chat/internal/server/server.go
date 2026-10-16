@@ -307,7 +307,7 @@ func (s *Server) EndDirectRoom(ctx context.Context, req *chatv1.EndDirectRoomReq
 		return nil, status.Errorf(codes.Internal, "end direct room: %v", err)
 	}
 	if err := s.publish(ctx, req.GetRoomId(), &eventsv1.ChatEvent_RoomEnded{
-		RoomEnded: &eventsv1.RoomEnded{RoomId: req.GetRoomId(), Reason: req.GetReason()},
+		RoomEnded: &eventsv1.RoomEnded{RoomId: req.GetRoomId(), Reason: req.GetReason(), EndedByAccountId: req.GetAccountId()},
 	}); err != nil {
 		return nil, status.Errorf(codes.Internal, "end direct room: %v", err)
 	}

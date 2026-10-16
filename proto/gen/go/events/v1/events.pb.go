@@ -470,11 +470,18 @@ func (x *RoomKept) GetRoomId() string {
 }
 
 type RoomEnded struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	Reason        string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
-	unknownFields protoimpl.UnknownFields
-	sizeCache     protoimpl.SizeCache
+	state  protoimpl.MessageState `protogen:"open.v1"`
+	RoomId string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	Reason string                 `protobuf:"bytes,2,opt,name=reason,proto3" json:"reason,omitempty"`
+	// Which account's action ended the room - empty for an end that wasn't
+	// caused by either member directly (there is no such path yet, but
+	// this keeps the field meaningful rather than "always the caller").
+	// Lets a client tell "I ended this" apart from "my partner ended
+	// this", the same distinction MatchEnded.account_id already gives the
+	// skip/Next path.
+	EndedByAccountId string `protobuf:"bytes,3,opt,name=ended_by_account_id,json=endedByAccountId,proto3" json:"ended_by_account_id,omitempty"`
+	unknownFields    protoimpl.UnknownFields
+	sizeCache        protoimpl.SizeCache
 }
 
 func (x *RoomEnded) Reset() {
@@ -517,6 +524,13 @@ func (x *RoomEnded) GetRoomId() string {
 func (x *RoomEnded) GetReason() string {
 	if x != nil {
 		return x.Reason
+	}
+	return ""
+}
+
+func (x *RoomEnded) GetEndedByAccountId() string {
+	if x != nil {
+		return x.EndedByAccountId
 	}
 	return ""
 }
@@ -1130,10 +1144,11 @@ const file_events_v1_events_proto_rawDesc = "" +
 	"\n" +
 	"account_id\x18\x02 \x01(\tR\taccountId\"#\n" +
 	"\bRoomKept\x12\x17\n" +
-	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"<\n" +
+	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"k\n" +
 	"\tRoomEnded\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x16\n" +
-	"\x06reason\x18\x02 \x01(\tR\x06reason\"\xd3\x01\n" +
+	"\x06reason\x18\x02 \x01(\tR\x06reason\x12-\n" +
+	"\x13ended_by_account_id\x18\x03 \x01(\tR\x10endedByAccountId\"\xd3\x01\n" +
 	"\rMatchingEvent\x12\x19\n" +
 	"\bevent_id\x18\x01 \x01(\tR\aeventId\x12(\n" +
 	"\x10occurred_at_unix\x18\x02 \x01(\x03R\x0eoccurredAtUnix\x128\n" +

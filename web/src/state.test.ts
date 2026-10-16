@@ -71,6 +71,7 @@ describe('reducer', () => {
     expect(state.matching).toBe(false)
     expect(state.currentMatch).toEqual({
       roomId: 'room-1', partnerPseudonym: 'Hound', partnerAccountId: 'acc-2', youKept: false, partnerKept: false, kept: false,
+      partnerLeftAt: null,
     })
 
     state = reducer(state, { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: false, kept: false } })
@@ -82,8 +83,29 @@ describe('reducer', () => {
   })
 
   it('ignores keep_status and match_ended for a room that is not the current match', () => {
-    const state = reducer(initialState, { type: 'frame', frame: { type: 'match_ended', room_id: 'some-other-room', reason: 'x' } })
+    const state = reducer(initialState, { type: 'frame', frame: { type: 'match_ended', room_id: 'some-other-room', reason: 'partner_left' } })
     expect(state).toEqual(initialState)
+  })
+
+  it('shows a grace-window prompt instead of dropping the match when the partner leaves (DEC-0091)', () => {
+    let state = reducer(initialState, { type: 'session', account, token: 'tok' })
+    state = reducer(state, {
+      type: 'frame',
+      frame: { type: 'match_found', room_id: 'room-1', partner_account_id: 'acc-2', partner_pseudonym: 'Fox' },
+    })
+
+    state = reducer(state, { type: 'frame', frame: { type: 'match_ended', room_id: 'room-1', reason: 'partner_left' } })
+    expect(state.currentMatch?.roomId).toBe('room-1')
+    expect(state.currentMatch?.partnerLeftAt).not.toBeNull()
+
+    // A solo keep vote landing during the grace window should still work
+    // the same way a normal mutual keep_status does.
+    state = reducer(state, { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: false, kept: true } })
+    expect(state.currentMatch?.kept).toBe(true)
+    expect(state.currentMatch?.roomId).toBe('room-1')
+
+    state = reducer(state, { type: 'graceWindowExpired', roomId: 'room-1' })
+    expect(state.currentMatch).toBeNull()
   })
 
   it('clears everything and records the reason on kicked', () => {
