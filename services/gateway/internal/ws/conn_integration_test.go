@@ -364,3 +364,63 @@ func TestMatchFoundSubscribesToTheNewRoomImmediately(t *testing.T) {
 		t.Fatalf("expected the message sent right after match_found to arrive immediately, got %+v", frame)
 	}
 }
+
+// TestRefreshRoomsDoesNotUnsubscribeAnUndecidedMatch proves INC-0014's
+// fix: ListMyRooms (services/chat/internal/store's ListRoomsForAccount)
+// only ever reports group rooms and direct rooms both sides have already
+// voted to keep, so a random match's direct room is normally absent from
+// it for as long as it is still undecided. Without currentMatchRoomID
+// folded into refreshRooms's own view of "current", its first tick after
+// subscribeToNewRoom (dispatch.go) subscribed that room would read as
+// "no longer a member" and unsubscribe it again - silently ending live
+// delivery, sender included, for the rest of the connection's life. This
+// constructs a conn directly rather than through Serve, since the thing
+// under test is refreshRooms's bookkeeping, not the WebSocket handshake
+// (already covered by the tests above).
+func TestRefreshRoomsDoesNotUnsubscribeAnUndecidedMatch(t *testing.T) {
+	redisClient := newTestRedisClient(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+
+	authID := "integration-test-refresh-acc"
+	roomID := "integration-test-refresh-room"
+
+	pubsub := redisClient.Subscribe(ctx, "user:"+authID)
+	t.Cleanup(func() { _ = pubsub.Close() })
+	if _, err := pubsub.Receive(ctx); err != nil {
+		t.Fatalf("confirm subscribe: %v", err)
+	}
+	if err := pubsub.Subscribe(ctx, "room:"+roomID); err != nil {
+		t.Fatalf("subscribe to room: %v", err)
+	}
+	if _, err := pubsub.Receive(ctx); err != nil {
+		t.Fatalf("confirm room subscribe: %v", err)
+	}
+
+	c := &conn{
+		deps: Deps{
+			// ListMyRooms deliberately configured to mirror the real
+			// store's behavior for an undecided direct room: empty.
+			Chat: &fakeChat{listMyRooms: func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+				return &chatv1.ListMyRoomsResponse{}, nil
+			}},
+			Logger: slog.Default(),
+		},
+		accountID:  authID,
+		pubsub:     pubsub,
+		subscribed: map[string]bool{roomID: true},
+		logger:     slog.Default(),
+	}
+	c.setCurrentMatchRoom(roomID)
+
+	c.refreshRooms(ctx)
+
+	checker := newTestRedisClient(t)
+	numSub, err := checker.PubSubNumSub(ctx, "room:"+roomID).Result()
+	if err != nil {
+		t.Fatalf("PubSubNumSub: %v", err)
+	}
+	if numSub["room:"+roomID] != 1 {
+		t.Fatalf("expected the undecided match's room to still have 1 subscriber after refreshRooms, got %d - refreshRooms incorrectly unsubscribed it", numSub["room:"+roomID])
+	}
+}

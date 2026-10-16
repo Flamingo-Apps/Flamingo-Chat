@@ -38,6 +38,16 @@ function loadGoogleScript(): Promise<void> {
 
 export function GoogleSignInButton({ onToken }: { onToken: (idToken: string) => void }) {
   const containerRef = useRef<HTMLDivElement>(null)
+  // onToken is an inline closure in every caller (TopBar, AuthScreen), so
+  // its identity changes on every parent re-render - which, through
+  // gateway.tsx's context value, is every single incoming WebSocket
+  // frame. Reading it through a ref (always current, never a dependency)
+  // keeps the effect below from re-running on each of those renders -
+  // each run tears down and recreates Google's real iframe-based widget,
+  // which is expensive enough that doing it on every chat message stalls
+  // the tab (INC-0014).
+  const onTokenRef = useRef(onToken)
+  onTokenRef.current = onToken
 
   useEffect(() => {
     let cancelled = false
@@ -49,7 +59,7 @@ export function GoogleSignInButton({ onToken }: { onToken: (idToken: string) => 
         if (cancelled || !container || !window.google) return
         window.google.accounts.id.initialize({
           client_id: CLIENT_ID,
-          callback: (response) => onToken(response.credential),
+          callback: (response) => onTokenRef.current(response.credential),
         })
         window.google.accounts.id.renderButton(container, { type: 'standard', theme: 'outline', size: 'large' })
       })
@@ -62,7 +72,11 @@ export function GoogleSignInButton({ onToken }: { onToken: (idToken: string) => 
       cancelled = true
       if (container) container.innerHTML = ''
     }
-  }, [onToken])
+    // Deliberately empty: this must only run on actual mount/unmount, not
+    // on every re-render of whatever parent happens to pass a new
+    // onToken closure - see the onTokenRef comment above.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return <div ref={containerRef} className="google-signin-button" />
 }
