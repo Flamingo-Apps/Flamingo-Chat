@@ -293,9 +293,23 @@ func (c *conn) refreshRooms(ctx context.Context) {
 		return
 	}
 
-	current := make(map[string]bool, len(resp.GetRooms()))
+	current := make(map[string]bool, len(resp.GetRooms())+1)
 	for _, room := range resp.GetRooms() {
 		current[room.GetId()] = true
+	}
+	// ListMyRooms (services/chat/internal/store's ListRoomsForAccount)
+	// deliberately reports only group rooms and direct rooms both sides
+	// have already voted to keep - an active random match's direct room
+	// has neither side's vote yet most of the time, so it never appears
+	// here. Without this, the very first tick after subscribeToNewRoom
+	// (dispatch.go, INC-0012) subscribed it would see it missing from
+	// "current" and unsubscribe it again as if the client had left -
+	// silently ending live delivery for every still-undecided match,
+	// sender included, for the rest of the connection's life (INC-0014).
+	// currentMatchRoomID is the one place that still knows this room is
+	// active regardless of its kept status.
+	if roomID := c.getCurrentMatchRoom(); roomID != "" {
+		current[roomID] = true
 	}
 
 	c.mu.Lock()
