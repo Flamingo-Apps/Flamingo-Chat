@@ -21,6 +21,7 @@ type testServer struct {
 	chat       *fakeChat
 	moderation *fakeModeration
 	banned     *fakeBanned
+	oauthState *fakeOAuthState
 	mux        *http.ServeMux
 }
 
@@ -30,8 +31,15 @@ func newTestServer() *testServer {
 		chat:       &fakeChat{},
 		moderation: &fakeModeration{},
 		banned:     &fakeBanned{},
+		oauthState: newFakeOAuthState(),
 	}
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{}, ts.banned, &fakeTurnstile{ok: true})
+	s := NewServer(
+		ts.identity, ts.chat, &fakePresence{}, ts.moderation,
+		&fakeSessions{}, &fakeRateLimiter{}, ts.banned, &fakeTurnstile{ok: true},
+		&fakeExchanger{}, ts.oauthState,
+		GoogleOAuthConfig{ClientID: "test-client-id", RedirectURI: "http://localhost:8080/v1/auth/google/callback", FrontendURL: "http://localhost:8000"},
+		false,
+	)
 	ts.mux = http.NewServeMux()
 	s.Routes(ts.mux)
 	return ts
@@ -91,7 +99,7 @@ func TestHandleAuthGuestSuccess(t *testing.T) {
 
 func TestHandleAuthGuestRejectsFailedTurnstile(t *testing.T) {
 	ts := newTestServer()
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{}, ts.banned, &fakeTurnstile{ok: false})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{}, ts.banned, &fakeTurnstile{ok: false}, &fakeExchanger{}, ts.oauthState, GoogleOAuthConfig{ClientID: "test-client-id", RedirectURI: "http://localhost:8080/v1/auth/google/callback", FrontendURL: "http://localhost:8000"}, false)
 	mux := http.NewServeMux()
 	s.Routes(mux)
 	ts.mux = mux
@@ -104,7 +112,7 @@ func TestHandleAuthGuestRejectsFailedTurnstile(t *testing.T) {
 
 func TestHandleAuthGuestRejectsOverRateLimit(t *testing.T) {
 	ts := newTestServer()
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true}, &fakeExchanger{}, ts.oauthState, GoogleOAuthConfig{ClientID: "test-client-id", RedirectURI: "http://localhost:8080/v1/auth/google/callback", FrontendURL: "http://localhost:8000"}, false)
 	mux := http.NewServeMux()
 	s.Routes(mux)
 	ts.mux = mux
@@ -214,7 +222,7 @@ func TestErrorMappingReflectsGRPCCode(t *testing.T) {
 
 func TestHandleCreateRoomEnforcesRateLimit(t *testing.T) {
 	ts := newTestServer()
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true}, &fakeExchanger{}, ts.oauthState, GoogleOAuthConfig{ClientID: "test-client-id", RedirectURI: "http://localhost:8080/v1/auth/google/callback", FrontendURL: "http://localhost:8000"}, false)
 	mux := http.NewServeMux()
 	s.Routes(mux)
 	ts.mux = mux
@@ -267,7 +275,7 @@ func TestHandleListMessagesPassesQueryParameters(t *testing.T) {
 
 func TestHandleFileReportEnforcesRateLimit(t *testing.T) {
 	ts := newTestServer()
-	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true})
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, &fakeRateLimiter{deny: true}, ts.banned, &fakeTurnstile{ok: true}, &fakeExchanger{}, ts.oauthState, GoogleOAuthConfig{ClientID: "test-client-id", RedirectURI: "http://localhost:8080/v1/auth/google/callback", FrontendURL: "http://localhost:8000"}, false)
 	mux := http.NewServeMux()
 	s.Routes(mux)
 	ts.mux = mux

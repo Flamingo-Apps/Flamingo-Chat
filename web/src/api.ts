@@ -35,11 +35,14 @@ export function signUpGuest(pseudonym: string): Promise<{ session_token: string;
   return request('POST', '/v1/auth/guest', undefined, { pseudonym })
 }
 
-export function signInGoogle(
-  idToken: string,
-  guestToken?: string,
-): Promise<{ session_token: string; account: Account; needs_gender: boolean }> {
-  return request('POST', '/v1/auth/google', guestToken, { id_token: idToken })
+// googleSignInURL points the browser at gateway's own server-side OAuth
+// redirect flow (DEC-0092) - a plain navigation, not a fetch, since the
+// browser needs to actually leave this page for Google's consent screen
+// and come back. guestToken upgrades that guest account in place
+// (docs/ARCHITECTURE.md §4.2's case B) rather than creating a second one.
+export function googleSignInURL(guestToken?: string): string {
+  const query = guestToken ? `?guest_token=${encodeURIComponent(guestToken)}` : ''
+  return `${BASE_URL}/v1/auth/google/start${query}`
 }
 
 export function getMe(token: string): Promise<Account> {

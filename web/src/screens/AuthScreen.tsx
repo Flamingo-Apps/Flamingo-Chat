@@ -2,7 +2,6 @@ import { useState } from 'react'
 import * as api from '../api'
 import { useGateway } from '../gateway'
 import { generatePseudonym } from '../pseudonym'
-import { GoogleSignInButton } from './GoogleSignInButton'
 
 export function AuthScreen() {
   const { login } = useGateway()
@@ -22,19 +21,6 @@ export function AuthScreen() {
     }
   }
 
-  async function onGoogleToken(idToken: string) {
-    setLoading(true)
-    setError(null)
-    try {
-      const resp = await api.signInGoogle(idToken)
-      login(resp.account, resp.session_token)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
-    } finally {
-      setLoading(false)
-    }
-  }
-
   return (
     <div className="auth-screen">
       <h1>Flamingo</h1>
@@ -43,7 +29,9 @@ export function AuthScreen() {
         Continue as guest
       </button>
       <div className="auth-screen__divider">or</div>
-      <GoogleSignInButton onToken={onGoogleToken} />
+      <a className="google-signin-link" href={api.googleSignInURL()}>
+        Sign in with Google
+      </a>
       {error && <p className="error-text">{error}</p>}
     </div>
   )

@@ -37,10 +37,24 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
     dispatch({ type: 'graceWindowExpired', roomId })
   }, [])
 
-  // On first load, a saved token is validated against GET /v1/me rather
-  // than trusted outright - it may have expired, or the account may have
-  // been banned since the last visit.
+  // On first load, either pick up a session the Google redirect flow
+  // (DEC-0092) just handed back in the URL fragment, or fall back to a
+  // saved one from localStorage. Either way it's validated against
+  // GET /v1/me rather than trusted outright - it may have expired, or
+  // the account may have been banned since the last visit. The fragment
+  // is used (not a query param) specifically because it's never sent to
+  // any server and never appears in access logs, unlike the rest of the
+  // URL - see oauth_redirect.go's own comment on this same choice.
   useEffect(() => {
+    const hashToken = new URLSearchParams(window.location.hash.slice(1)).get('auth_token')
+    if (hashToken) {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+      api
+        .getMe(hashToken)
+        .then((account) => login(account, hashToken))
+        .catch(() => {})
+      return
+    }
     const saved = localStorage.getItem(SESSION_STORAGE_KEY)
     if (!saved) return
     api
