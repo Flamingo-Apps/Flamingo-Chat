@@ -25,3 +25,16 @@ env:
   # (the request's own Host header) are always allowed regardless of
   # this list.
   WS_ORIGIN_PATTERNS: "localhost:*"
+  # DEC-0092's server-side Google redirect flow. COLLEGE_OAUTH_CLIENT_ID
+  # matches identity's own value exactly (same registered OAuth client -
+  # see that file's comment); GOOGLE_CLIENT_SECRET is irrelevant while
+  # DEV_FAKE_GOOGLE is set, since the fake exchanger never calls Google.
+  # GOOGLE_REDIRECT_URI and FRONTEND_URL match Tilt's own port-forwards
+  # for gateway (8080) and web's dev server (8000).
+  COLLEGE_OAUTH_CLIENT_ID: "155057367000-e6fvpmf6g3up2p20133i7jhnd0nc3hfn.apps.googleusercontent.com"
+  GOOGLE_CLIENT_SECRET: ""
+  GOOGLE_REDIRECT_URI: "http://localhost:8080/v1/auth/google/callback"
+  FRONTEND_URL: "http://localhost:8000"
+  # Local development only (DEC-0049, mirrored as DEC-0092) - never set
+  # this outside a local cluster.
+  DEV_FAKE_GOOGLE: "1"
