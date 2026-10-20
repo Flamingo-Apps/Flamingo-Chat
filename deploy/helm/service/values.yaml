@@ -15,6 +15,10 @@ image:
 # object, no ports, no probe (DEC-0066); port is ignored for it.
 protocol: grpc
 port: 50051
+# Every service, workers included, exposes Prometheus metrics on this
+# port (pkg/metrics, DEC-0093) - declared here so it's always 9090
+# without each values/<name>.yaml repeating it.
+metricsPort: 9090
 
 replicas: 1
 

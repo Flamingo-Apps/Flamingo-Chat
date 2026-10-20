@@ -13,6 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/config"
+	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/metrics"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/delivery-worker/internal/consumer"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/delivery-worker/internal/router"
 )
@@ -37,6 +38,7 @@ func main() {
 	// group so both see every message independently - that's the whole
 	// point of a consumer group per logical consumer).
 	groupID := config.String("KAFKA_CONSUMER_GROUP", "delivery-worker")
+	metricsPort := config.String("METRICS_PORT", "9090")
 
 	redisOpts, err := redis.ParseURL(redisURL)
 	if err != nil {
@@ -64,6 +66,7 @@ func main() {
 	}()
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	go metrics.Serve(":"+metricsPort, logger)
 	handler := consumer.New(map[string]consumer.RouteFunc{
 		"chat.events":       router.RouteChatEvent,
 		"matching.events":   router.RouteMatchingEvent,

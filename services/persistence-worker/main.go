@@ -14,6 +14,7 @@ import (
 	"github.com/jackc/pgx/v5/stdlib"
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/config"
+	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/metrics"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/persistence-worker/internal/consumer"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/persistence-worker/internal/decode"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/persistence-worker/internal/store"
@@ -30,6 +31,7 @@ func main() {
 	// own group so both see every message independently (that is the
 	// whole point of a consumer group per logical consumer).
 	groupID := config.String("KAFKA_CONSUMER_GROUP", "persistence-worker")
+	metricsPort := config.String("METRICS_PORT", "9090")
 
 	pool, err := pgxpool.New(ctx, postgresURL)
 	if err != nil {
@@ -64,6 +66,7 @@ func main() {
 	}()
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	go metrics.Serve(":"+metricsPort, logger)
 	handler := consumer.New(map[string]consumer.DecodeFunc{
 		"chat.events":       decode.DecodeChatEvent,
 		"matching.events":   decode.DecodeMatchingEvent,

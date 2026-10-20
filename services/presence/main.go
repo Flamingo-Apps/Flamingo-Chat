@@ -15,6 +15,7 @@ import (
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/config"
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/grpclog"
+	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/metrics"
 	presencev1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/presence/internal/broadcast"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/presence/internal/server"
@@ -23,6 +24,7 @@ import (
 
 func main() {
 	port := config.String("GRPC_PORT", "50054")
+	metricsPort := config.String("METRICS_PORT", "9090")
 	redisURL := config.String("REDIS_URL", "redis://redis:6379/0")
 
 	redisOpts, err := redis.ParseURL(redisURL)
@@ -40,6 +42,7 @@ func main() {
 	svc := server.New(presenceStore)
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	go metrics.Serve(":"+metricsPort, logger)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
