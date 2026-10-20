@@ -129,6 +129,17 @@ input, textarea {
   text-align: center;
 }
 
+.google-signin-link {
+  font: inherit;
+  padding: 0.5rem 0.75rem;
+  border-radius: 0.5rem;
+  border: 1px solid #444;
+  background: #222;
+  color: #eee;
+  text-decoration: none;
+  display: inline-block;
+}
+
 .preference-picker {
   display: flex;
   gap: 0.5rem;

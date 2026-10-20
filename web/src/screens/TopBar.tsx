@@ -1,25 +1,12 @@
 import { useState } from 'react'
 import * as api from '../api'
 import { useGateway } from '../gateway'
-import { GoogleSignInButton } from './GoogleSignInButton'
 
 export function TopBar() {
-  const { state, login, logout } = useGateway()
+  const { state, logout } = useGateway()
   const [verifying, setVerifying] = useState(false)
   const account = state.account
   if (!account) return null
-
-  async function onGoogleToken(idToken: string) {
-    try {
-      // The existing guest token upgrades the same account in place
-      // (docs/ARCHITECTURE.md §4.2's case B) rather than creating a
-      // second one.
-      const resp = await api.signInGoogle(idToken, state.token ?? undefined)
-      login(resp.account, resp.session_token)
-    } finally {
-      setVerifying(false)
-    }
-  }
 
   return (
     <header className="top-bar">
@@ -31,7 +18,9 @@ export function TopBar() {
       <button onClick={logout}>Sign out</button>
       {verifying && !account.google_linked && (
         <div className="top-bar__verify-popover">
-          <GoogleSignInButton onToken={onGoogleToken} />
+          <a className="google-signin-link" href={api.googleSignInURL(state.token ?? undefined)}>
+            Sign in with Google
+          </a>
         </div>
       )}
     </header>

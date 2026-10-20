@@ -1,6 +1,7 @@
 package httpapi
 
 import (
+	"context"
 	"encoding/json"
 	"net"
 	"net/http"
@@ -108,6 +109,12 @@ func (s *Server) handleAuthGuest(w http.ResponseWriter, r *http.Request) {
 	issueSessionAndRespond(w, s.sessions, resp.GetAccount())
 }
 
+// handleAuthGoogle takes an already-obtained Google ID token directly in
+// the request body. The browser UI no longer calls this (it uses the
+// server-side redirect flow, oauth_redirect.go, DEC-0092) - this stays
+// reachable because tests/e2e signs in as a verified user by POSTing a
+// DEV_FAKE_GOOGLE-shaped token here directly, which is far simpler than
+// driving a real browser through a redirect flow just for a test.
 func (s *Server) handleAuthGoogle(w http.ResponseWriter, r *http.Request) {
 	var req struct {
 		IDToken string `json:"id_token"`
@@ -117,38 +124,20 @@ func (s *Server) handleAuthGoogle(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	signInReq := &identityv1.SignInWithGoogleRequest{IdToken: req.IDToken}
+	var guestAccountID string
 	// An optional guest session upgrades that guest account in place
 	// (docs/ARCHITECTURE.md §4.2's case B). A missing or invalid
 	// Authorization header just means case C (create fresh) applies -
 	// not an error on this call.
 	if token, ok := bearerToken(r); ok {
 		if accountID, _, err := s.sessions.Verify(token); err == nil {
-			signInReq.GuestAccountId = &accountID
+			guestAccountID = accountID
 		}
 	}
 
-	resp, err := s.identity.SignInWithGoogle(r.Context(), signInReq)
+	token, resp, err := s.signInWithGoogle(r.Context(), req.IDToken, guestAccountID)
 	if err != nil {
 		writeError(w, err)
-		return
-	}
-	accountID := resp.GetAccount().GetId()
-	// A Google sign-in can resolve to an existing, possibly banned,
-	// account (DEC-0026: one verified account per Google account) -
-	// checked here, not just by withAuth on later requests, so a banned
-	// account never gets issued a fresh session in the first place
-	// (docs/ARCHITECTURE.md §3.5's "Gateways check banned on sign-in").
-	if bannedAccount, err := s.banned.IsBanned(r.Context(), accountID); err != nil {
-		writeError(w, status.Error(codes.Internal, "banned check failed"))
-		return
-	} else if bannedAccount {
-		writeError(w, status.Error(codes.PermissionDenied, "account is banned"))
-		return
-	}
-	token, err := s.sessions.Issue(accountID)
-	if err != nil {
-		writeError(w, status.Errorf(codes.Internal, "issue session: %v", err))
 		return
 	}
 	writeJSON(w, http.StatusOK, struct {
@@ -156,6 +145,40 @@ func (s *Server) handleAuthGoogle(w http.ResponseWriter, r *http.Request) {
 		Account      accountResponse `json:"account"`
 		NeedsGender  bool            `json:"needs_gender"`
 	}{token, toAccountResponse(resp.GetAccount()), resp.GetNeedsGender()})
+}
+
+// signInWithGoogle is handleAuthGoogle's logic, factored out so
+// handleGoogleCallback (the server-side redirect flow, DEC-0092) can
+// reach the exact same path from a raw ID token however it got one - in
+// handleAuthGoogle's case, straight from a JSON body; in
+// handleGoogleCallback's case, from exchanging an authorization code
+// first. guestAccountID is empty for "no guest session to upgrade."
+func (s *Server) signInWithGoogle(ctx context.Context, idToken, guestAccountID string) (sessionToken string, resp *identityv1.SignInWithGoogleResponse, err error) {
+	signInReq := &identityv1.SignInWithGoogleRequest{IdToken: idToken}
+	if guestAccountID != "" {
+		signInReq.GuestAccountId = &guestAccountID
+	}
+
+	resp, err = s.identity.SignInWithGoogle(ctx, signInReq)
+	if err != nil {
+		return "", nil, err
+	}
+	accountID := resp.GetAccount().GetId()
+	// A Google sign-in can resolve to an existing, possibly banned,
+	// account (DEC-0026: one verified account per Google account) -
+	// checked here, not just by withAuth on later requests, so a banned
+	// account never gets issued a fresh session in the first place
+	// (docs/ARCHITECTURE.md §3.5's "Gateways check banned on sign-in").
+	if bannedAccount, err := s.banned.IsBanned(ctx, accountID); err != nil {
+		return "", nil, status.Error(codes.Internal, "banned check failed")
+	} else if bannedAccount {
+		return "", nil, status.Error(codes.PermissionDenied, "account is banned")
+	}
+	token, err := s.sessions.Issue(accountID)
+	if err != nil {
+		return "", nil, status.Errorf(codes.Internal, "issue session: %v", err)
+	}
+	return token, resp, nil
 }
 
 // issueSessionAndRespond is the {session_token, account} response shape

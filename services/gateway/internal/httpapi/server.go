@@ -13,6 +13,7 @@ import (
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	moderationv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/moderation/v1"
 	presencev1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/googleauth"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/turnstile"
 )
 
@@ -51,6 +52,14 @@ type Server struct {
 	rateLimiter RateLimiter
 	banned      BannedChecker
 	turnstile   turnstile.Verifier
+
+	// exchanger, oauthState, oauthConfig and devFakeGoogle are only used
+	// by the server-side Google redirect flow (oauth_redirect.go,
+	// DEC-0092).
+	exchanger     googleauth.Exchanger
+	oauthState    OAuthStateStore
+	oauthConfig   GoogleOAuthConfig
+	devFakeGoogle bool
 }
 
 func NewServer(
@@ -62,16 +71,24 @@ func NewServer(
 	rateLimiter RateLimiter,
 	banned BannedChecker,
 	turnstileVerifier turnstile.Verifier,
+	exchanger googleauth.Exchanger,
+	oauthState OAuthStateStore,
+	oauthConfig GoogleOAuthConfig,
+	devFakeGoogle bool,
 ) *Server {
 	return &Server{
-		identity:    identity,
-		chat:        chat,
-		presence:    presence,
-		moderation:  moderation,
-		sessions:    sessions,
-		rateLimiter: rateLimiter,
-		banned:      banned,
-		turnstile:   turnstileVerifier,
+		identity:      identity,
+		chat:          chat,
+		presence:      presence,
+		moderation:    moderation,
+		sessions:      sessions,
+		rateLimiter:   rateLimiter,
+		banned:        banned,
+		turnstile:     turnstileVerifier,
+		exchanger:     exchanger,
+		oauthState:    oauthState,
+		oauthConfig:   oauthConfig,
+		devFakeGoogle: devFakeGoogle,
 	}
 }
 
@@ -82,6 +99,8 @@ func (s *Server) Routes(mux *http.ServeMux) {
 
 	mux.HandleFunc("POST /v1/auth/guest", s.handleAuthGuest)
 	mux.HandleFunc("POST /v1/auth/google", s.handleAuthGoogle)
+	mux.HandleFunc("GET /v1/auth/google/start", s.handleGoogleStart)
+	mux.HandleFunc("GET /v1/auth/google/callback", s.handleGoogleCallback)
 
 	mux.HandleFunc("GET /v1/me", s.withAuth(s.handleGetMe))
 	mux.HandleFunc("PATCH /v1/me", s.withAuth(s.handleUpdateMe))

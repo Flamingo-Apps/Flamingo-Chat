@@ -272,3 +272,42 @@ type fakeTurnstile struct {
 func (f *fakeTurnstile) Verify(context.Context, string, string) (bool, error) {
 	return f.ok, nil
 }
+
+// fakeExchanger implements googleauth.Exchanger. By default it returns
+// the code unchanged, matching googleauth.Fake's real behavior exactly -
+// so a test that also uses a fakeIdentity.signInWithGoogle wired for
+// "fake:<sub>:<email>"-shaped tokens can exercise the whole redirect
+// path without a real Google exchange.
+type fakeExchanger struct {
+	idToken string
+	err     error
+}
+
+func (f *fakeExchanger) Exchange(_ context.Context, code string) (string, error) {
+	if f.err != nil {
+		return "", f.err
+	}
+	if f.idToken != "" {
+		return f.idToken, nil
+	}
+	return code, nil
+}
+
+// fakeOAuthState implements OAuthStateStore in memory - no TTL
+// enforcement, since no test here needs to wait one out.
+type fakeOAuthState struct {
+	stored map[string]string
+}
+
+func newFakeOAuthState() *fakeOAuthState { return &fakeOAuthState{stored: map[string]string{}} }
+
+func (f *fakeOAuthState) Set(_ context.Context, state, guestAccountID string, _ time.Duration) error {
+	f.stored[state] = guestAccountID
+	return nil
+}
+
+func (f *fakeOAuthState) TakeAndDelete(_ context.Context, state string) (string, bool, error) {
+	v, ok := f.stored[state]
+	delete(f.stored, state)
+	return v, ok, nil
+}

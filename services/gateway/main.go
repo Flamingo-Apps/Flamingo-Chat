@@ -22,6 +22,7 @@ import (
 	moderationv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/moderation/v1"
 	presencev1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/presence/v1"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/banned"
+	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/googleauth"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/httpapi"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/presence"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/ratelimit"
@@ -53,6 +54,17 @@ func main() {
 	}
 	turnstileSecret := config.String("TURNSTILE_SECRET", "")
 	originPatterns := strings.Split(config.String("WS_ORIGIN_PATTERNS", ""), ",")
+
+	// The OAuth client id is the same registered Google client identity
+	// verifies ID token audiences against (COLLEGE_OAUTH_CLIENT_ID) -
+	// named the same here deliberately, since a mismatch between the two
+	// would make every server-side sign-in fail identity's audience
+	// check (DEC-0092).
+	googleClientID := config.String("COLLEGE_OAUTH_CLIENT_ID", "")
+	googleClientSecret := config.String("GOOGLE_CLIENT_SECRET", "")
+	googleRedirectURI := config.String("GOOGLE_REDIRECT_URI", "http://localhost:8080/v1/auth/google/callback")
+	frontendURL := config.String("FRONTEND_URL", "http://localhost:8000")
+	devFakeGoogle := config.String("DEV_FAKE_GOOGLE", "") != ""
 
 	identityConn := dialService(config.String("IDENTITY_ADDR", "identity:50051"))
 	defer func() { _ = identityConn.Close() }()
@@ -87,6 +99,20 @@ func main() {
 		log.Println("WARNING: TURNSTILE_SECRET is not set - guest signup will accept any (or no) Turnstile token")
 	}
 
+	// Mirrors identity's own DEV_FAKE_GOOGLE (DEC-0049): Fake turns a
+	// "fake:<sub>:<email>" authorization code straight into that same
+	// string as the id_token, which identity's verify.Fake already knows
+	// how to parse - letting the whole redirect flow be exercised in
+	// local development without a browser or real Google credentials
+	// (DEC-0092).
+	var exchanger googleauth.Exchanger = googleauth.NewGoogle(googleClientID, googleClientSecret, googleRedirectURI)
+	if devFakeGoogle {
+		log.Println("WARNING: DEV_FAKE_GOOGLE is set - the Google redirect flow accepts fabricated codes instead of exchanging real ones. Never set this outside local development.")
+		exchanger = googleauth.Fake{}
+	} else if googleClientSecret == "" {
+		log.Println("WARNING: GOOGLE_CLIENT_SECRET is not set - the Google redirect flow will fail every real exchange until it is configured")
+	}
+
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
@@ -97,7 +123,12 @@ func main() {
 
 	bannedChecker := banned.NewRedis(redisClient)
 
-	api := httpapi.NewServer(identityClient, chatClient, presenceClient, moderationClient, sessions, rateLimiter, bannedChecker, turnstileVerifier)
+	oauthConfig := httpapi.GoogleOAuthConfig{ClientID: googleClientID, RedirectURI: googleRedirectURI, FrontendURL: frontendURL}
+	api := httpapi.NewServer(
+		identityClient, chatClient, presenceClient, moderationClient,
+		sessions, rateLimiter, bannedChecker, turnstileVerifier,
+		exchanger, httpapi.NewRedisOAuthState(redisClient), oauthConfig, devFakeGoogle,
+	)
 	wsDeps := ws.Deps{
 		Identity: identityClient, Chat: chatClient, Matching: matchingClient, Presence: presenceClient,
 		Sessions: sessions, RateLimiter: rateLimiter, Banned: bannedChecker, Redis: redisClient, Logger: logger,
