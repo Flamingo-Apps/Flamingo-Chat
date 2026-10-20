@@ -41,10 +41,10 @@ k8s_resource('kafka-create-topics', resource_deps=['kafka'], labels=['dependenci
 # services below actually depend on: it installs the PodMonitor CRD
 # their own Helm release needs to exist first.
 #
-# Dashboards aren't port-forwarded here automatically (Tilt only tracks
-# k8s objects it applied itself via k8s_yaml, not ones a local_resource's
-# shell command created) - forward them manually when wanted:
-#   kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80
+# Their UIs get links through the grafana/prometheus/alloy-ui resources
+# further down: Tilt can't port-forward Services a local_resource's shell
+# command created (it only tracks objects it applied via k8s_yaml), so
+# those run `kubectl port-forward` themselves.
 # ---------------------------------------------------------------------------
 
 local_resource(
@@ -76,6 +76,55 @@ local_resource(
     cmd='helm upgrade --install alloy grafana/alloy --version 1.14.0 ' +
         '-f deploy/observability/alloy-values.yaml --wait --timeout 8m',
     resource_deps=['observability-repos', 'loki'],
+    labels=['observability'],
+)
+
+# A plain `kubectl port-forward` dies whenever its pod restarts and never
+# comes back, so each one runs in a retry loop.
+def port_forward(name, svc, ports, links, deps, preamble=''):
+    local_resource(
+        name,
+        serve_cmd=preamble + 'while true; do kubectl port-forward svc/%s %s; sleep 2; done' % (svc, ports),
+        links=links,
+        resource_deps=deps,
+        labels=['observability'],
+    )
+
+port_forward(
+    'grafana', 'kube-prometheus-stack-grafana', '3000:80',
+    [link('http://localhost:3000/d/flamingo-overview', 'Flamingo dashboard'),
+     link('http://localhost:3000/explore', 'Explore metrics and logs')],
+    ['kube-prometheus-stack'],
+    # The chart generates the admin password into a Secret; printed here
+    # so it shows in this resource's Tilt log instead of living in the repo.
+    preamble="echo \"Grafana login: admin / $(kubectl get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d)\"; ",
+)
+port_forward(
+    'prometheus', 'kube-prometheus-stack-prometheus', '9090:9090',
+    [link('http://localhost:9090/targets', 'Prometheus scrape targets')],
+    ['kube-prometheus-stack'],
+)
+# No resource_deps on 'alloy': the retry loop already waits for the Service,
+# and depending on it would hide this UI whenever that Helm step is red.
+port_forward(
+    'alloy-ui', 'alloy', '12345:12345',
+    [link('http://localhost:12345', 'Alloy pipeline graph')],
+    [],
+)
+
+# Dashboards as code: every JSON file in deploy/observability/dashboards/
+# becomes one ConfigMap, which Grafana's sidecar loads automatically because
+# of the grafana_dashboard=1 label (it watches every namespace for it).
+watch_file('deploy/observability/dashboards')
+k8s_yaml(local(
+    'kubectl create configmap grafana-dashboards-flamingo --from-file=deploy/observability/dashboards/ ' +
+    '--dry-run=client -o yaml | kubectl label --local -f - grafana_dashboard=1 -o yaml',
+    quiet=True,
+))
+k8s_resource(
+    new_name='grafana-dashboards',
+    objects=['grafana-dashboards-flamingo:configmap'],
+    resource_deps=['kube-prometheus-stack'],
     labels=['observability'],
 )
 
@@ -127,6 +176,9 @@ for svc in services:
         name,
         port_forwards='%d:%d' % (svc['port'], svc['port']) if svc['port'] else [],
         resource_deps=svc['deps'] + ['kube-prometheus-stack'],
+        # Without this Tilt files every PodMonitor under "uncategorized",
+        # since a PodMonitor has no pod of its own to group it by.
+        objects=['%s:podmonitor' % name],
         labels=['services'],
     )
 
@@ -145,5 +197,6 @@ local_resource(
     serve_dir='web',
     deps=['web/package.json'],
     resource_deps=['gateway'],
+    links=[link('http://localhost:8000', 'Flamingo web app')],
     labels=['web'],
 )

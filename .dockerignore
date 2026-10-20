@@ -8,6 +8,9 @@ docs/
 deploy/
 web/
 *.md
+# Tilt also uses this file to decide what triggers an image rebuild, so
+# without this every Tiltfile edit rebuilt all eight service images.
+Tiltfile
 
 # Stray `go build` output when run without -o - see .gitignore for the
 # matching list of binary names this excludes.

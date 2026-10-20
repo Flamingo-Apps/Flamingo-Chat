@@ -53,6 +53,14 @@ grpcurl -plaintext -d '{"pseudonym": "shadow_fox"}' \
   localhost:50051 identity.v1.IdentityService/CreateAccount
 ```
 
+It also runs the web app at [localhost:8000](http://localhost:8000) and a local monitoring stack (DEC-0095), each linked from its resource in the Tilt UI:
+
+- [localhost:3000/d/flamingo-overview](http://localhost:3000/d/flamingo-overview): Grafana's Flamingo dashboard (traffic, errors, latency, Kafka consumer lag, logs). The login is printed in the `grafana` resource's log in Tilt. Dashboards live as JSON in `deploy/observability/dashboards/` and load automatically.
+- [localhost:9090/targets](http://localhost:9090/targets): Prometheus, and whether it is scraping every service.
+- [localhost:12345](http://localhost:12345): Alloy's pipeline graph, the agent shipping every pod's logs to Loki.
+
+Request-rate panels stay empty until a service has had traffic on two separate scrapes: running `go test -tags e2e ./tests/e2e/...` twice is the quickest way to fill them.
+
 Each service is its own Go module, so build and test it directly, without Tilt, from inside its directory:
 
 ```sh
