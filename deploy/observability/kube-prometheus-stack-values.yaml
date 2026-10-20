@@ -1,0 +1,77 @@
+# Dev-only values for prometheus-community/kube-prometheus-stack
+# (chart 92.10.1), scoped down for a single-node kind cluster - see
+# DEC-0095. The chart's own defaults already assume one replica
+# everywhere and no persistent storage for Prometheus/Grafana, which is
+# right for a disposable dev cluster; this file only overrides what
+# would otherwise be wrong for that scope.
+#
+# Production hosting (self-hosted vs. a managed service, real retention,
+# real storage) is explicitly not decided here - this is dev-only, per
+# DEC-0095.
+
+prometheus:
+  prometheusSpec:
+    # The default (podMonitorSelectorNilUsesHelmValues: true) only picks
+    # up PodMonitors carrying this release's own Helm labels. Our
+    # services' PodMonitors (deploy/helm/service/templates/podmonitor.yaml)
+    # are each their own Helm release, so this has to be relaxed to "any
+    # PodMonitor in the cluster" instead.
+    podMonitorSelectorNilUsesHelmValues: false
+    serviceMonitorSelectorNilUsesHelmValues: false
+    # 10 days (the chart default) is more than a dev cluster that gets
+    # torn down between sessions needs, and there's no PVC backing this
+    # (emptyDir) - bound it so a long-running dev cluster can't slowly
+    # fill the node's disk.
+    retention: 2d
+    retentionSize: "1GB"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 256Mi
+      limits:
+        memory: 512Mi
+
+alertmanager:
+  alertmanagerSpec:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        memory: 64Mi
+
+grafana:
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+  # No admin password set here on purpose - the chart generates one into
+  # a Secret (kube-prometheus-stack-grafana), read with:
+  #   kubectl get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d
+  #
+  # Prometheus/Alertmanager are auto-provisioned by this chart; Loki is a
+  # separate release (deploy/observability/loki-values.yaml) so it needs
+  # its own datasource entry pointed at that release's Service.
+  additionalDataSources:
+    - name: Loki
+      type: loki
+      url: http://loki.default.svc.cluster.local:3100
+      access: proxy
+
+prometheus-node-exporter:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 16Mi
+    limits:
+      memory: 32Mi
+
+kube-state-metrics:
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 64Mi
