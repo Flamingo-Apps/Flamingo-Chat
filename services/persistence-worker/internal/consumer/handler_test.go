@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/IBM/sarama"
+	dto "github.com/prometheus/client_model/go"
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/persistence-worker/internal/decode"
 )
@@ -36,8 +37,9 @@ func (f *fakeSession) Context() context.Context { return f.ctx }
 // fakeClaim implements sarama.ConsumerGroupClaim over a fixed, in-memory
 // slice of messages for one topic.
 type fakeClaim struct {
-	topic    string
-	messages chan *sarama.ConsumerMessage
+	topic         string
+	messages      chan *sarama.ConsumerMessage
+	highWaterMark int64
 }
 
 func newFakeClaim(topic string, messages []*sarama.ConsumerMessage) *fakeClaim {
@@ -52,7 +54,7 @@ func newFakeClaim(topic string, messages []*sarama.ConsumerMessage) *fakeClaim {
 func (f *fakeClaim) Topic() string                            { return f.topic }
 func (f *fakeClaim) Partition() int32                         { return 0 }
 func (f *fakeClaim) InitialOffset() int64                     { return 0 }
-func (f *fakeClaim) HighWaterMarkOffset() int64               { return 0 }
+func (f *fakeClaim) HighWaterMarkOffset() int64               { return f.highWaterMark }
 func (f *fakeClaim) Messages() <-chan *sarama.ConsumerMessage { return f.messages }
 
 // fakeStore records every call, or returns a fixed error for the next
@@ -195,5 +197,53 @@ func TestConsumeClaimReturnsAnErrorForAnUnregisteredTopic(t *testing.T) {
 
 	if err := h.ConsumeClaim(session, claim); err == nil {
 		t.Fatalf("expected an error for a topic with no registered decoder")
+	}
+}
+
+// TestRecordLag proves the actual arithmetic (high water mark minus the
+// message's own offset, minus one for the message just consumed), not
+// just that the gauge exists - a topic name no other test in this file
+// uses, since consumerLag is package-level and shared across every test
+// in this process.
+func TestRecordLag(t *testing.T) {
+	claim := newFakeClaim("lag-test-topic", nil)
+	claim.highWaterMark = 110
+	m := &sarama.ConsumerMessage{Topic: "lag-test-topic", Partition: 0, Offset: 99}
+
+	recordLag(claim, m)
+
+	var out dto.Metric
+	gauge, err := consumerLag.GetMetricWithLabelValues("lag-test-topic", "0")
+	if err != nil {
+		t.Fatalf("GetMetricWithLabelValues: %v", err)
+	}
+	if err := gauge.Write(&out); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got, want := out.GetGauge().GetValue(), float64(10); got != want {
+		t.Fatalf("lag = %v, want %v (110 - 99 - 1)", got, want)
+	}
+}
+
+// TestRecordLagClampsNegativeLagToZero proves a message at or past the
+// high water mark (the consumer caught up, or a stale/zeroed high water
+// mark from a fake/misbehaving broker) never reports negative lag.
+func TestRecordLagClampsNegativeLagToZero(t *testing.T) {
+	claim := newFakeClaim("lag-test-topic-2", nil)
+	claim.highWaterMark = 5
+	m := &sarama.ConsumerMessage{Topic: "lag-test-topic-2", Partition: 0, Offset: 20}
+
+	recordLag(claim, m)
+
+	var out dto.Metric
+	gauge, err := consumerLag.GetMetricWithLabelValues("lag-test-topic-2", "0")
+	if err != nil {
+		t.Fatalf("GetMetricWithLabelValues: %v", err)
+	}
+	if err := gauge.Write(&out); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got := out.GetGauge().GetValue(); got != 0 {
+		t.Fatalf("lag = %v, want 0 (clamped)", got)
 	}
 }

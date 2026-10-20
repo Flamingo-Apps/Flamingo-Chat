@@ -6,11 +6,25 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"strconv"
 
 	"github.com/IBM/sarama"
+	"github.com/prometheus/client_golang/prometheus"
+	"github.com/prometheus/client_golang/prometheus/promauto"
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/delivery-worker/internal/router"
 )
+
+// consumerLag estimates how many messages are still unconsumed on a
+// partition: the claim's own high water mark (sarama's own words: "the
+// offset that will be used for the next message that will be produced")
+// minus the offset of the message just received (DEC-0094). Partition
+// count is small and fixed per topic (docs/ARCHITECTURE.md's Kafka
+// topics), so the label cardinality here is bounded.
+var consumerLag = promauto.NewGaugeVec(prometheus.GaugeOpts{
+	Name: "kafka_consumer_lag",
+	Help: "Approximate unconsumed messages on this partition: the partition's high water mark minus the last message this consumer group has seen.",
+}, []string{"topic", "partition"})
 
 // Publisher publishes a payload to a Redis channel. The real
 // implementation is a thin wrapper around *redis.Client.Publish; a fake
@@ -63,14 +77,16 @@ func (h *Handler) ConsumeClaim(session sarama.ConsumerGroupSession, claim sarama
 			if !ok {
 				return nil
 			}
-			h.handle(session, msg, route)
+			h.handle(session, claim, msg, route)
 		case <-session.Context().Done():
 			return nil
 		}
 	}
 }
 
-func (h *Handler) handle(session sarama.ConsumerGroupSession, msg *sarama.ConsumerMessage, route RouteFunc) {
+func (h *Handler) handle(session sarama.ConsumerGroupSession, claim sarama.ConsumerGroupClaim, msg *sarama.ConsumerMessage, route RouteFunc) {
+	recordLag(claim, msg)
+
 	targets, err := route(msg.Value)
 	if err != nil {
 		h.logger.Error("route", "topic", msg.Topic, "partition", msg.Partition, "offset", msg.Offset, "err", err)
@@ -93,4 +109,17 @@ func (h *Handler) handle(session sarama.ConsumerGroupSession, msg *sarama.Consum
 		}
 	}
 	session.MarkMessage(msg, "")
+}
+
+// recordLag updates consumerLag with how far behind this partition's
+// high water mark the message just received is. HighWaterMarkOffset is
+// the offset that will be used for the next message produced, so
+// subtracting the current message's offset (plus one, since that offset
+// is now consumed) gives the count still waiting.
+func recordLag(claim sarama.ConsumerGroupClaim, msg *sarama.ConsumerMessage) {
+	lag := claim.HighWaterMarkOffset() - msg.Offset - 1
+	if lag < 0 {
+		lag = 0
+	}
+	consumerLag.WithLabelValues(msg.Topic, strconv.Itoa(int(msg.Partition))).Set(float64(lag))
 }

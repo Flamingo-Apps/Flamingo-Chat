@@ -16,6 +16,7 @@ require (
 	github.com/jcmturner/rpc/v2 v2.0.3 // indirect
 	github.com/klauspost/compress v1.20.1 // indirect
 	github.com/pierrec/lz4/v4 v4.1.31 // indirect
+	github.com/prometheus/client_golang v1.25.0 // indirect
 	github.com/rcrowley/go-metrics v0.0.0-20250401214520-65e299d6c5c9 // indirect
 	github.com/redis/go-redis/v9 v9.23.0 // indirect
 	go.uber.org/atomic v1.12.0 // indirect
