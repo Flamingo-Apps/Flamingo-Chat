@@ -9,6 +9,8 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/prometheus/client_golang/prometheus"
+	dto "github.com/prometheus/client_model/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -111,6 +113,40 @@ func TestUnaryServerInterceptor_LogsFailureFields(t *testing.T) {
 	}
 	if fields["err"] == nil {
 		t.Errorf("expected an err field for a failed call, got fields: %v", fields)
+	}
+}
+
+// TestUnaryServerInterceptor_RecordsRequestDuration proves the
+// Prometheus histogram (DEC-0093) actually observes one sample per call,
+// labeled by the real method and code - not just that the metric exists.
+// Uses a method name no other test in this file reuses, since
+// requestDuration is package-level and shared across every test running
+// in this same process.
+func TestUnaryServerInterceptor_RecordsRequestDuration(t *testing.T) {
+	var buf bytes.Buffer
+	interceptor := UnaryServerInterceptor(newTestLogger(&buf))
+
+	handler := func(ctx context.Context, req any) (any, error) { return "ok", nil }
+	info := &grpc.UnaryServerInfo{FullMethod: "/test.v1.OnlyThisTestUsesMe/Call"}
+
+	if _, err := interceptor(context.Background(), "req", info, handler); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	var m dto.Metric
+	observer, err := requestDuration.GetMetricWithLabelValues(info.FullMethod, codes.OK.String())
+	if err != nil {
+		t.Fatalf("GetMetricWithLabelValues: %v", err)
+	}
+	histogram, ok := observer.(prometheus.Histogram)
+	if !ok {
+		t.Fatalf("expected a prometheus.Histogram, got %T", observer)
+	}
+	if err := histogram.Write(&m); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	if got := m.GetHistogram().GetSampleCount(); got != 1 {
+		t.Fatalf("expected exactly one observation for this method+code, got %d", got)
 	}
 }
 

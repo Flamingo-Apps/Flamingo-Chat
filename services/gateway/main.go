@@ -16,6 +16,7 @@ import (
 	"google.golang.org/grpc/credentials/insecure"
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/config"
+	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/metrics"
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	matchingv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1"
@@ -44,6 +45,7 @@ func dialService(addr string) *grpc.ClientConn {
 
 func main() {
 	port := config.String("HTTP_PORT", "8080")
+	metricsPort := config.String("METRICS_PORT", "9090")
 	signingKey := config.String("SESSION_SIGNING_KEY", "")
 	if signingKey == "" {
 		// Unlike Google sign-in (optional, degrades to rejecting that one
@@ -114,6 +116,7 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	go metrics.Serve(":"+metricsPort, logger)
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()

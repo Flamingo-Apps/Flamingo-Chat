@@ -18,11 +18,13 @@ spec:
         - name: {{ .Values.name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
           imagePullPolicy: {{ .Values.image.pullPolicy }}
-          {{- if ne .Values.protocol "worker" }}
           ports:
+            {{- if ne .Values.protocol "worker" }}
             - name: {{ .Values.protocol }}
               containerPort: {{ .Values.port }}
-          {{- end }}
+            {{- end }}
+            - name: metrics
+              containerPort: {{ .Values.metricsPort }}
           {{- if .Values.env }}
           env:
             {{- range $k, $v := .Values.env }}

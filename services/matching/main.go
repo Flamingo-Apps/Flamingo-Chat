@@ -17,6 +17,7 @@ import (
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/config"
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/grpclog"
+	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/metrics"
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
 	matchingv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/matching/internal/events"
@@ -27,6 +28,7 @@ import (
 
 func main() {
 	port := config.String("GRPC_PORT", "50052")
+	metricsPort := config.String("METRICS_PORT", "9090")
 	chatAddr := config.String("CHAT_ADDR", "chat:50053")
 	kafkaBrokers := strings.Split(config.String("KAFKA_BROKERS", "kafka:9092"), ",")
 	redisURL := config.String("REDIS_URL", "redis://redis:6379/0")
@@ -69,6 +71,7 @@ func main() {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	go metrics.Serve(":"+metricsPort, logger)
 	srv := grpc.NewServer(grpc.UnaryInterceptor(grpclog.UnaryServerInterceptor(logger)))
 
 	healthSrv := health.NewServer()

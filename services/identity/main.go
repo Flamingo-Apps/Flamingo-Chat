@@ -18,6 +18,7 @@ import (
 
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/config"
 	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/grpclog"
+	"github.com/Flamingo-Apps/Flamingo-Chat/pkg/metrics"
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/identity/internal/server"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/identity/internal/store"
@@ -79,6 +80,7 @@ func runServer() {
 	ctx := context.Background()
 
 	port := config.String("GRPC_PORT", "50051")
+	metricsPort := config.String("METRICS_PORT", "9090")
 	collegeDomain := config.String("COLLEGE_EMAIL_DOMAIN", "kiit.ac.in")
 	oauthClientID := config.String("COLLEGE_OAUTH_CLIENT_ID", "")
 	oauthIssuer := config.String("OAUTH_ISSUER_URL", "https://accounts.google.com")
@@ -116,6 +118,7 @@ func runServer() {
 	}
 
 	logger := slog.New(slog.NewJSONHandler(os.Stdout, nil))
+	go metrics.Serve(":"+metricsPort, logger)
 	srv := grpc.NewServer(grpc.UnaryInterceptor(grpclog.UnaryServerInterceptor(logger)))
 
 	healthSrv := health.NewServer()
