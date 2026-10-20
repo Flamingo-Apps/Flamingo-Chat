@@ -1,0 +1,23 @@
+# A PodMonitor (not ServiceMonitor) because it scrapes pods directly by
+# label, with no Service object required - delivery-worker and
+# persistence-worker have none (DEC-0066), but still expose the metrics
+# port on every pod (DEC-0093). Gated behind a flag, off by default: this
+# CRD only exists once the observability stack (deploy/observability,
+# DEC-0095) is installed, so an unconditional PodMonitor would break
+# `kubectl apply`/`tilt up` on any cluster that doesn't have it yet.
+{{- if .Values.podMonitor.enabled }}
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: {{ .Values.name }}
+  labels:
+    app: {{ .Values.name }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.name }}
+  podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 15s
+{{- end }}

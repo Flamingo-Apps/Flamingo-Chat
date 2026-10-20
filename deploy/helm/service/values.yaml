@@ -20,6 +20,11 @@ port: 50051
 # without each values/<name>.yaml repeating it.
 metricsPort: 9090
 
+# Off by default - see templates/podmonitor.yaml for why. Set via
+# --set/-f only where the PodMonitor CRD is actually installed.
+podMonitor:
+  enabled: false
+
 replicas: 1
 
 # Plain key: value environment variables.

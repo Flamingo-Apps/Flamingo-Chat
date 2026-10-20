@@ -1,0 +1,67 @@
+# Dev-only values for grafana/loki (chart 7.3.0) - see DEC-0095.
+#
+# The chart's default deploymentMode (SimpleScalable) runs separate
+# read/write/backend StatefulSets at 3 replicas each - built for real
+# production volume, not a single-node kind cluster. SingleBinary mode
+# runs the whole thing as one process/one replica, which is what the
+# chart's own docs call out as the right mode for exactly this case.
+deploymentMode: SingleBinary
+
+singleBinary:
+  replicas: 1
+  persistence:
+    enabled: true
+    size: 2Gi
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
+
+loki:
+  commonConfig:
+    replication_factor: 1
+  storage:
+    type: filesystem
+  # The chart's own escape hatch for "testing or playing around" instead
+  # of hand-writing a real schemaConfig meant for a durable object-store
+  # backed deployment.
+  useTestSchema: true
+  auth_enabled: false
+
+# Not needed - filesystem storage, no object store required.
+minio:
+  enabled: false
+
+# SimpleScalable-mode components (unused in SingleBinary mode, but the
+# chart still renders their resource blocks if left at chart defaults in
+# some sub-templates) - zeroed out explicitly rather than relying on
+# deploymentMode alone to suppress them.
+read:
+  replicas: 0
+write:
+  replicas: 0
+backend:
+  replicas: 0
+
+# Keep the self-monitoring sub-chart off; it brings in its own Grafana
+# Agent / Alloy instance, separate from the one deploy/observability
+# already installs standalone (DEC-0095).
+monitoring:
+  selfMonitoring:
+    enabled: false
+lokiCanary:
+  enabled: false
+test:
+  enabled: false
+
+gateway:
+  enabled: false
+
+# Memcached-backed caches - real value at production query volume, pure
+# overhead for a disposable dev cluster with no real traffic to cache.
+resultsCache:
+  enabled: false
+chunksCache:
+  enabled: false

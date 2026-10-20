@@ -33,6 +33,53 @@ k8s_resource('kafka', port_forwards='9092:9092', labels=['dependencies'])
 k8s_resource('kafka-create-topics', resource_deps=['kafka'], labels=['dependencies'])
 
 # ---------------------------------------------------------------------------
+# Observability: Prometheus + Grafana (metrics), Loki + Alloy (logs) -
+# dev-only, see DEC-0095 and deploy/observability/. Plain Helm releases
+# via local_resource, not Tilt's own helm() function - that one expects a
+# local chart directory (like deploy/helm/service below), not a
+# repo-hosted chart such as these. kube-prometheus-stack is what
+# services below actually depend on: it installs the PodMonitor CRD
+# their own Helm release needs to exist first.
+#
+# Dashboards aren't port-forwarded here automatically (Tilt only tracks
+# k8s objects it applied itself via k8s_yaml, not ones a local_resource's
+# shell command created) - forward them manually when wanted:
+#   kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80
+# ---------------------------------------------------------------------------
+
+local_resource(
+    'observability-repos',
+    cmd='helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1; ' +
+        'helm repo add grafana https://grafana.github.io/helm-charts >/dev/null 2>&1; ' +
+        'helm repo update prometheus-community grafana >/dev/null',
+    labels=['observability'],
+)
+
+local_resource(
+    'kube-prometheus-stack',
+    cmd='helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack ' +
+        '--version 92.10.1 -f deploy/observability/kube-prometheus-stack-values.yaml --wait --timeout 8m',
+    resource_deps=['observability-repos'],
+    labels=['observability'],
+)
+
+local_resource(
+    'loki',
+    cmd='helm upgrade --install loki grafana/loki --version 7.3.0 ' +
+        '-f deploy/observability/loki-values.yaml --wait --timeout 8m',
+    resource_deps=['observability-repos'],
+    labels=['observability'],
+)
+
+local_resource(
+    'alloy',
+    cmd='helm upgrade --install alloy grafana/alloy --version 1.14.0 ' +
+        '-f deploy/observability/alloy-values.yaml --wait --timeout 8m',
+    resource_deps=['observability-repos', 'loki'],
+    labels=['observability'],
+)
+
+# ---------------------------------------------------------------------------
 # The Go services, deployed through deploy/helm/service.
 # ---------------------------------------------------------------------------
 
@@ -70,11 +117,16 @@ for svc in services:
         'deploy/helm/service',
         name=name,
         values=['deploy/helm/service/values/%s.yaml' % name],
+        # Needs the PodMonitor CRD kube-prometheus-stack installs -
+        # unconditional in every other environment (deploy/helm/service's
+        # own default is off, see its values.yaml) since only the dev
+        # Tiltfile path has that CRD installed at all.
+        set=['podMonitor.enabled=true'],
     ))
     k8s_resource(
         name,
         port_forwards='%d:%d' % (svc['port'], svc['port']) if svc['port'] else [],
-        resource_deps=svc['deps'],
+        resource_deps=svc['deps'] + ['kube-prometheus-stack'],
         labels=['services'],
     )
 
