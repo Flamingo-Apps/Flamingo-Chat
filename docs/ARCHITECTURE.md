@@ -370,7 +370,7 @@ The monitoring stack (where metrics, traces and logs are stored and viewed) is d
 - **Frontend:** type checking, a production build, and unit tests for the connection and message state logic.
 - **Load tests** come with the deployment. Their results are committed with their method. (DEC-0025)
 
-## 12. Deployment (Proposed - DEC-0099, pending the maintainer)
+## 12. Deployment (Agreed - DEC-0099)
 
 Decided:
 
@@ -380,7 +380,7 @@ Decided:
 - A neutral project domain. (DEC-0033)
 - Monitoring runs before launch. (DEC-0024)
 
-Proposed for the closed beta (DEC-0099):
+Agreed for the closed beta (DEC-0099):
 
 ```
 student browser ──HTTPS──▶ Vercel (web app, <name>.vercel.app)
