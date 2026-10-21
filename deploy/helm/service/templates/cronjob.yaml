@@ -21,8 +21,18 @@ spec:
               {{- if .Values.env }}
               env:
                 {{- range $k, $v := .Values.env }}
+                {{- if not (kindIs "invalid" $v) }}
                 - name: {{ $k }}
                   value: {{ $v | quote }}
+                {{- end }}
+                {{- end }}
+              {{- end }}
+              {{- /* Same Secrets as the Deployment: in production POSTGRES_URL comes from one, and without this the job would silently fall back to a localhost database. */}}
+              {{- if .Values.envFromSecret }}
+              envFrom:
+                {{- range .Values.envFromSecret }}
+                - secretRef:
+                    name: {{ . }}
                 {{- end }}
               {{- end }}
 {{- end }}

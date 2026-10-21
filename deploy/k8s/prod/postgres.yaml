@@ -1,0 +1,82 @@
+# Production Postgres for the pilot (DEC-0023: in the cluster, no managed
+# database). Differs from deploy/k8s/dev/postgres.yaml in three ways:
+#
+# - A StatefulSet with a PersistentVolumeClaim instead of a Deployment with
+#   emptyDir, so accounts and kept chats survive the pod being restarted or
+#   rescheduled. No storageClassName: the cluster's default class is used
+#   (on GKE, a balanced persistent disk).
+# - PGDATA points at a subdirectory of the mount: a freshly formatted cloud
+#   disk contains lost+found, and Postgres refuses to initialise a data
+#   directory that isn't empty.
+# - Credentials come from the postgres-credentials Secret, which is created
+#   by hand on the cluster and never committed (AGENTS.md rule 9):
+#     kubectl create secret generic postgres-credentials \
+#       --from-literal=POSTGRES_USER=flamingo \
+#       --from-literal=POSTGRES_PASSWORD='<a long random password>' \
+#       --from-literal=POSTGRES_DB=flamingo
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+spec:
+  serviceName: postgres
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          ports:
+            - name: postgres
+              containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: postgres-credentials
+          env:
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+          livenessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U \"$POSTGRES_USER\" -d \"$POSTGRES_DB\""]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/postgresql/data
+          resources:
+            requests:
+              cpu: 50m
+              memory: 128Mi
+            limits:
+              memory: 512Mi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432

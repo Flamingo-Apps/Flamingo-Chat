@@ -56,12 +56,11 @@ func bearerToken(r *http.Request) (string, bool) {
 	return strings.TrimPrefix(h, prefix), true
 }
 
-// clientIP is used for rate limiting and Turnstile's remoteip field.
-// This reads RemoteAddr directly rather than trusting an X-Forwarded-For
-// header - which proxy, if any, sits in front of the gateway is
-// infrastructure that docs/ARCHITECTURE.md §12 says is still "to be
-// designed", and trusting a client-settable header for this would be a
-// spoofing vector until that's settled.
+// clientIP is used for rate limiting and Turnstile's remoteip field. It
+// reads RemoteAddr, never a header itself: behind a trusted proxy, RealIP
+// has already rewritten RemoteAddr to the real client's address, and
+// without one, trusting a client-settable header here would let anyone
+// pick their own rate-limit identity.
 func clientIP(r *http.Request) string {
 	host, _, err := net.SplitHostPort(r.RemoteAddr)
 	if err != nil {

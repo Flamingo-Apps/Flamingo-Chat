@@ -1,0 +1,4 @@
+image:
+  repository: ghcr.io/flamingo-apps/flamingo-delivery-worker
+podMonitor:
+  enabled: true

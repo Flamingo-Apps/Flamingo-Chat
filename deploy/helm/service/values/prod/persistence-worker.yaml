@@ -1,0 +1,9 @@
+image:
+  repository: ghcr.io/flamingo-apps/flamingo-persistence-worker
+podMonitor:
+  enabled: true
+# POSTGRES_URL comes from the flamingo-postgres Secret (deploy/prod/create-secrets.sh).
+envFromSecret:
+  - flamingo-postgres
+env:
+  POSTGRES_URL: null

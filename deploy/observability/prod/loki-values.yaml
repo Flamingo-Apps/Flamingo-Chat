@@ -1,0 +1,6 @@
+# Production overlay, applied after deploy/observability/loki-values.yaml
+# (DEC-0099): a bigger disk than the dev 2Gi, since production logs build up
+# over the pilot's two months instead of being thrown away with the cluster.
+singleBinary:
+  persistence:
+    size: 5Gi

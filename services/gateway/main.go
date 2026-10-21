@@ -56,6 +56,9 @@ func main() {
 	}
 	turnstileSecret := config.String("TURNSTILE_SECRET", "")
 	originPatterns := strings.Split(config.String("WS_ORIGIN_PATTERNS", ""), ",")
+	// Empty unless gateway is only reachable through a proxy that sets
+	// this header (CF-Connecting-IP behind Cloudflare) - see httpapi.RealIP.
+	clientIPHeader := config.String("CLIENT_IP_HEADER", "")
 
 	// The OAuth client id is the same registered Google client identity
 	// verifies ID token audiences against (COLLEGE_OAUTH_CLIENT_ID) -
@@ -66,7 +69,10 @@ func main() {
 	googleClientSecret := config.String("GOOGLE_CLIENT_SECRET", "")
 	googleRedirectURI := config.String("GOOGLE_REDIRECT_URI", "http://localhost:8080/v1/auth/google/callback")
 	frontendURL := config.String("FRONTEND_URL", "http://localhost:8000")
-	devFakeGoogle := config.String("DEV_FAKE_GOOGLE", "") != ""
+	// Exactly "1", not merely non-empty: with "any value enables it", a
+	// DEV_FAKE_GOOGLE of "0" or "false" - which reads as off - would turn
+	// fabricated sign-ins on.
+	devFakeGoogle := config.String("DEV_FAKE_GOOGLE", "") == "1"
 
 	identityConn := dialService(config.String("IDENTITY_ADDR", "identity:50051"))
 	defer func() { _ = identityConn.Close() }()
@@ -151,7 +157,7 @@ func main() {
 	// WebSocket connection once it's upgraded.
 	srv := &http.Server{
 		Addr:              ":" + port,
-		Handler:           httpapi.CORS(originPatterns, httpapi.Metrics(mux)),
+		Handler:           httpapi.CORS(originPatterns, httpapi.RealIP(clientIPHeader, httpapi.Metrics(mux))),
 		ReadHeaderTimeout: 5 * time.Second,
 	}
 
