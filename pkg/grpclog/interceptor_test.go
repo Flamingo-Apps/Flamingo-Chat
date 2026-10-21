@@ -13,6 +13,8 @@ import (
 	dto "github.com/prometheus/client_model/go"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/health"
+	healthpb "google.golang.org/grpc/health/grpc_health_v1"
 	"google.golang.org/grpc/status"
 )
 
@@ -147,6 +149,55 @@ func TestUnaryServerInterceptor_RecordsRequestDuration(t *testing.T) {
 	}
 	if got := m.GetHistogram().GetSampleCount(); got != 1 {
 		t.Fatalf("expected exactly one observation for this method+code, got %d", got)
+	}
+}
+
+// requestDurationCounts reads every grpc_server_request_duration_seconds
+// series from the default registry, keyed "method|code" -> sample count.
+// It gathers instead of calling GetMetricWithLabelValues, because that
+// creates a series when it's missing, which would make any "exists" check
+// pass trivially.
+func requestDurationCounts(t *testing.T) map[string]uint64 {
+	t.Helper()
+	families, err := prometheus.DefaultGatherer.Gather()
+	if err != nil {
+		t.Fatalf("Gather: %v", err)
+	}
+	counts := map[string]uint64{}
+	for _, f := range families {
+		if f.GetName() != "grpc_server_request_duration_seconds" {
+			continue
+		}
+		for _, m := range f.GetMetric() {
+			labels := map[string]string{}
+			for _, l := range m.GetLabel() {
+				labels[l.GetName()] = l.GetValue()
+			}
+			counts[labels["method"]+"|"+labels["code"]] = m.GetHistogram().GetSampleCount()
+		}
+	}
+	return counts
+}
+
+// The health service is used because it has both a unary method (Check)
+// and a server-streaming one (Watch), and no other test in this package
+// records either.
+func TestInitializeMetrics_CreatesZeroSeriesForUnaryMethodsOnly(t *testing.T) {
+	s := grpc.NewServer()
+	healthpb.RegisterHealthServer(s, health.NewServer())
+
+	InitializeMetrics(s)
+
+	counts := requestDurationCounts(t)
+	got, ok := counts["/grpc.health.v1.Health/Check|OK"]
+	if !ok {
+		t.Fatalf("expected a series for the unary Check method before any request, got %v", counts)
+	}
+	if got != 0 {
+		t.Fatalf("expected the Check series to start at 0 observations, got %d", got)
+	}
+	if _, ok := counts["/grpc.health.v1.Health/Watch|OK"]; ok {
+		t.Fatalf("streaming method Watch got a series, but the unary interceptor can never record it")
 	}
 }
 

@@ -99,6 +99,7 @@ func main() {
 	healthpb.RegisterHealthServer(srv, healthSrv)
 	reflection.Register(srv)
 	moderationv1.RegisterModerationServiceServer(srv, svc)
+	grpclog.InitializeMetrics(srv)
 
 	log.Printf("moderation listening on :%s", port)
 	if err := srv.Serve(lis); err != nil {

@@ -93,6 +93,7 @@ func main() {
 	healthpb.RegisterHealthServer(srv, healthSrv)
 	reflection.Register(srv)
 	chatv1.RegisterChatServiceServer(srv, svc)
+	grpclog.InitializeMetrics(srv)
 
 	log.Printf("chat listening on :%s", port)
 	if err := srv.Serve(lis); err != nil {

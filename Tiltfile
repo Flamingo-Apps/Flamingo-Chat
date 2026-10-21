@@ -47,37 +47,35 @@ k8s_resource('kafka-create-topics', resource_deps=['kafka'], labels=['dependenci
 # those run `kubectl port-forward` themselves.
 # ---------------------------------------------------------------------------
 
+# A failed repo refresh (offline, slow network) is only a warning:
+# ensure-release.sh needs the network only when a chart version isn't in
+# Helm's local cache yet.
 local_resource(
     'observability-repos',
     cmd='helm repo add prometheus-community https://prometheus-community.github.io/helm-charts >/dev/null 2>&1; ' +
         'helm repo add grafana https://grafana.github.io/helm-charts >/dev/null 2>&1; ' +
-        'helm repo update prometheus-community grafana >/dev/null',
+        '(helm repo update prometheus-community grafana >/dev/null 2>&1 && echo "chart repos refreshed") ' +
+        '|| echo "warning: could not refresh chart repos - using Helm\'s cached index"',
     labels=['observability'],
 )
 
-local_resource(
-    'kube-prometheus-stack',
-    cmd='helm upgrade --install kube-prometheus-stack prometheus-community/kube-prometheus-stack ' +
-        '--version 92.10.1 -f deploy/observability/kube-prometheus-stack-values.yaml --wait --timeout 8m',
-    resource_deps=['observability-repos'],
-    labels=['observability'],
-)
+# Each release is (re)installed only when its chart version or values file
+# changed since the last install - otherwise it's a few seconds of "nothing
+# to do" (DEC-0097). deps makes an edit to a values file re-apply it while
+# tilt up is running.
+def helm_release(release, chart, version, values, deps=[]):
+    local_resource(
+        release,
+        cmd='deploy/observability/ensure-release.sh %s %s %s %s' % (release, chart, version, values),
+        deps=[values, 'deploy/observability/ensure-release.sh'],
+        resource_deps=['observability-repos'] + deps,
+        labels=['observability'],
+    )
 
-local_resource(
-    'loki',
-    cmd='helm upgrade --install loki grafana/loki --version 7.3.0 ' +
-        '-f deploy/observability/loki-values.yaml --wait --timeout 8m',
-    resource_deps=['observability-repos'],
-    labels=['observability'],
-)
-
-local_resource(
-    'alloy',
-    cmd='helm upgrade --install alloy grafana/alloy --version 1.14.0 ' +
-        '-f deploy/observability/alloy-values.yaml --wait --timeout 8m',
-    resource_deps=['observability-repos', 'loki'],
-    labels=['observability'],
-)
+helm_release('kube-prometheus-stack', 'prometheus-community/kube-prometheus-stack', '92.10.1',
+             'deploy/observability/kube-prometheus-stack-values.yaml')
+helm_release('loki', 'grafana/loki', '7.3.0', 'deploy/observability/loki-values.yaml')
+helm_release('alloy', 'grafana/alloy', '1.14.0', 'deploy/observability/alloy-values.yaml', deps=['loki'])
 
 # A plain `kubectl port-forward` dies whenever its pod restarts and never
 # comes back, so each one runs in a retry loop.

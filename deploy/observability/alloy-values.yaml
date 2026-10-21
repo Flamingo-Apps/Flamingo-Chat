@@ -12,6 +12,15 @@
 # after installing that release - it's set here to the expected default
 # for a release named "loki").
 alloy:
+  # Under alloy:, not at the top level: the chart ignores a top-level
+  # resources key, which left Alloy with no limit at all (INC-0017).
+  # Measured peak 121Mi.
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
   configMap:
     content: |-
       loki.write "default" {
@@ -97,10 +106,3 @@ alloy:
 
         forward_to = [loki.write.default.receiver]
       }
-
-resources:
-  requests:
-    cpu: 50m
-    memory: 64Mi
-  limits:
-    memory: 128Mi

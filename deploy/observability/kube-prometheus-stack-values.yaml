@@ -24,12 +24,14 @@ prometheus:
     # fill the node's disk.
     retention: 2d
     retentionSize: "1GB"
+    # Sized from measurement, not guessed: peaked at 385Mi in a day of dev
+    # use, 75% of the original 512Mi limit (INC-0017).
     resources:
       requests:
         cpu: 100m
-        memory: 256Mi
+        memory: 384Mi
       limits:
-        memory: 512Mi
+        memory: 1Gi
 
 alertmanager:
   alertmanagerSpec:
@@ -41,12 +43,17 @@ alertmanager:
         memory: 64Mi
 
 grafana:
+  # The original 256Mi limit was a guess that turned out exactly at
+  # Grafana's working set: it was OOM-killed repeatedly, which shows up in
+  # the browser as "Grafana has failed to load its application files"
+  # (INC-0017). Pinned at 255Mi under the old limit; uncapped, it sits at
+  # about 380Mi right after starting, so the limit is roughly double that.
   resources:
     requests:
       cpu: 50m
-      memory: 128Mi
+      memory: 384Mi
     limits:
-      memory: 256Mi
+      memory: 768Mi
   # No admin password set here on purpose - the chart generates one into
   # a Secret (kube-prometheus-stack-grafana), read with:
   #   kubectl get secret kube-prometheus-stack-grafana -o jsonpath='{.data.admin-password}' | base64 -d
@@ -75,3 +82,17 @@ kube-state-metrics:
       memory: 32Mi
     limits:
       memory: 64Mi
+
+# kind's control-plane components (and kube-proxy) only expose metrics on
+# the node's own 127.0.0.1, so Prometheus can never reach them here: on by
+# default they are four permanently-down targets plus false TargetDown and
+# etcdInsufficientMembers alerts. A managed cluster (GKE) doesn't expose
+# its control plane for scraping either, so they wouldn't apply there.
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeEtcd:
+  enabled: false
+kubeProxy:
+  enabled: false

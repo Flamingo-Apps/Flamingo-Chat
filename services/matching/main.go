@@ -78,6 +78,7 @@ func main() {
 	healthpb.RegisterHealthServer(srv, healthSrv)
 	reflection.Register(srv)
 	matchingv1.RegisterMatchingServiceServer(srv, svc)
+	grpclog.InitializeMetrics(srv)
 
 	log.Printf("matching listening on :%s", port)
 	if err := srv.Serve(lis); err != nil {
