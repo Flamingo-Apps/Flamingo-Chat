@@ -1,0 +1,109 @@
+# Production Kafka for the pilot: the same single combined broker+controller
+# as deploy/k8s/dev/kafka.yaml (one broker, no replication - an accepted
+# pilot-budget tradeoff, DEC-0020), with two differences:
+#
+# - A StatefulSet with a PersistentVolumeClaim instead of emptyDir, so
+#   events not yet consumed by delivery-worker/persistence-worker survive a
+#   restart.
+# - The volume is mounted at exactly /var/lib/kafka/data and KAFKA_LOG_DIRS
+#   points inside it. Kafka's Dockerfile declares
+#   VOLUME ["/etc/kafka/secrets", "/var/lib/kafka/data", "/mnt/shared/config"],
+#   so the container runtime gives every new container a fresh, empty mount
+#   at that path. A disk mounted at /var/lib/kafka (one level up) is hidden
+#   beneath it: Kafka formats the empty mount on every start and all topics
+#   and unconsumed events are lost on each restart (INC-0020, found by
+#   restarting the pod in a test namespace). Mounting the disk at the image's
+#   own volume path replaces that throwaway mount. Without KAFKA_LOG_DIRS at
+#   all, this image writes to /tmp/kafka-logs instead.
+# - Data goes in a logs/ subdirectory, not the mount root: a freshly
+#   formatted cloud disk contains lost+found, which Kafka would try to read
+#   as a topic partition.
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: kafka
+spec:
+  serviceName: kafka
+  replicas: 1
+  selector:
+    matchLabels:
+      app: kafka
+  template:
+    metadata:
+      labels:
+        app: kafka
+    spec:
+      containers:
+        - name: kafka
+          image: apache/kafka:4.3.1
+          ports:
+            - name: kafka
+              containerPort: 9092
+            - name: controller
+              containerPort: 9093
+          env:
+            - name: KAFKA_NODE_ID
+              value: "1"
+            - name: KAFKA_PROCESS_ROLES
+              value: "broker,controller"
+            - name: KAFKA_LISTENERS
+              value: "PLAINTEXT://:9092,CONTROLLER://:9093"
+            - name: KAFKA_ADVERTISED_LISTENERS
+              value: "PLAINTEXT://kafka:9092"
+            - name: KAFKA_CONTROLLER_LISTENER_NAMES
+              value: "CONTROLLER"
+            - name: KAFKA_LISTENER_SECURITY_PROTOCOL_MAP
+              value: "CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT"
+            - name: KAFKA_CONTROLLER_QUORUM_VOTERS
+              value: "1@localhost:9093"
+            - name: KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR
+              value: "1"
+            - name: KAFKA_TRANSACTION_STATE_LOG_MIN_ISR
+              value: "1"
+            - name: KAFKA_GROUP_INITIAL_REBALANCE_DELAY_MS
+              value: "0"
+            - name: KAFKA_HEAP_OPTS
+              value: "-Xmx512M -Xms512M"
+            - name: KAFKA_LOG_DIRS
+              value: "/var/lib/kafka/data/logs"
+          readinessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 10
+            periodSeconds: 5
+          livenessProbe:
+            tcpSocket:
+              port: 9092
+            initialDelaySeconds: 20
+            periodSeconds: 15
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/kafka/data
+          resources:
+            requests:
+              cpu: 100m
+              memory: 640Mi
+            limits:
+              memory: 1Gi
+  volumeClaimTemplates:
+    - metadata:
+        name: data
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 10Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+spec:
+  selector:
+    app: kafka
+  ports:
+    - name: kafka
+      port: 9092
+      targetPort: 9092

@@ -1,0 +1,26 @@
+# Production overlay, applied after values/gateway.yaml (DEC-0099). A null
+# deletes the key from the merged values, which is how every dev-only
+# setting is removed rather than overridden - in particular
+# DEV_FAKE_GOOGLE, which must not be present at all in production.
+#
+# Secrets come from the gateway-secrets Secret (deploy/prod/create-secrets.sh),
+# never from this file: SESSION_SIGNING_KEY and GOOGLE_CLIENT_SECRET.
+# TURNSTILE_SECRET is deliberately not in it yet: the web app has no
+# Turnstile widget, so setting it would reject every guest signup.
+image:
+  repository: ghcr.io/flamingo-apps/flamingo-gateway
+podMonitor:
+  enabled: true
+envFromSecret:
+  - gateway-secrets
+env:
+  SESSION_SIGNING_KEY: null
+  GOOGLE_CLIENT_SECRET: null
+  TURNSTILE_SECRET: null
+  DEV_FAKE_GOOGLE: null
+  # Cloudflare Tunnel is the only way in (gateway's Service is ClusterIP),
+  # so Cloudflare's header can be trusted for the client's real IP.
+  CLIENT_IP_HEADER: "CF-Connecting-IP"
+  WS_ORIGIN_PATTERNS: "CHANGE-ME.vercel.app"
+  FRONTEND_URL: "https://CHANGE-ME.vercel.app"
+  GOOGLE_REDIRECT_URI: "https://auth.aranyadutta.dev/v1/auth/google/callback"

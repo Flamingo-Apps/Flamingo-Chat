@@ -84,7 +84,10 @@ func runServer() {
 	collegeDomain := config.String("COLLEGE_EMAIL_DOMAIN", "kiit.ac.in")
 	oauthClientID := config.String("COLLEGE_OAUTH_CLIENT_ID", "")
 	oauthIssuer := config.String("OAUTH_ISSUER_URL", "https://accounts.google.com")
-	devFakeGoogle := config.String("DEV_FAKE_GOOGLE", "") != ""
+	// Exactly "1", not merely non-empty: with "any value enables it", a
+	// DEV_FAKE_GOOGLE of "0" or "false" - which reads as off - would accept
+	// fabricated ID tokens.
+	devFakeGoogle := config.String("DEV_FAKE_GOOGLE", "") == "1"
 
 	pool := connectAndMigrate(ctx)
 	defer pool.Close()
