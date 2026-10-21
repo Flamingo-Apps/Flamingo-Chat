@@ -1,0 +1,17 @@
+# Production overlay, applied after deploy/observability/kube-prometheus-stack-values.yaml
+# (DEC-0099). Prometheus keeps its data on a disk instead of emptyDir: the
+# pilot's dashboards and any exported query results are evidence (DEC-0025),
+# so a pod restart must not erase them. Retention is sized to the disk.
+# Grafana stays without a public address - reach it with
+#   kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80
+prometheus:
+  prometheusSpec:
+    retention: 15d
+    retentionSize: "8GB"
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          accessModes: ["ReadWriteOnce"]
+          resources:
+            requests:
+              storage: 10Gi
