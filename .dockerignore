@@ -7,6 +7,7 @@
 docs/
 deploy/
 web/
+site/
 *.md
 # Tilt also uses this file to decide what triggers an image rebuild, so
 # without this every Tiltfile edit rebuilt all eight service images.
