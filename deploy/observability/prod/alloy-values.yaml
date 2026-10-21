@@ -1,0 +1,6 @@
+# Production overlay, applied after deploy/observability/alloy-values.yaml
+# (DEC-0099): only the cluster label on every log line differs.
+alloy:
+  extraEnv:
+    - name: CLUSTER_NAME
+      value: flamingo-pilot

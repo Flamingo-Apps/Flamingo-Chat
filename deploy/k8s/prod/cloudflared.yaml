@@ -1,0 +1,70 @@
+# Cloudflare Tunnel connector: the only way into the production cluster
+# (DEC-0099). cloudflared makes an outbound connection to Cloudflare, so
+# nothing in the cluster has a public IP or an open port, and Cloudflare
+# terminates TLS. gateway's Service stays ClusterIP; that is what makes its
+# CLIENT_IP_HEADER=CF-Connecting-IP trustworthy.
+#
+# Follows Cloudflare's Kubernetes deployment guide, except: the image is
+# pinned instead of :latest so an upgrade is a deliberate change, and the
+# ping_group_range sysctl is left out (it only enables ICMP to private
+# resources, which nothing here uses).
+#
+# Routing is configured on Cloudflare's side, not here: in the dashboard,
+# Networking > Tunnels > (this tunnel) > Routes > Published application,
+# hostname auth.aranyadutta.dev -> service http://gateway:8080.
+# The tunnel's token goes into a Secret by hand, never into the repository:
+#   kubectl create secret generic tunnel-token --from-literal=token='<token from the dashboard>'
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cloudflared
+spec:
+  # Two replicas, as Cloudflare's guide recommends, so a restart of one
+  # doesn't drop every WebSocket at once.
+  replicas: 2
+  selector:
+    matchLabels:
+      app: cloudflared
+  template:
+    metadata:
+      labels:
+        app: cloudflared
+    spec:
+      containers:
+        - name: cloudflared
+          image: cloudflare/cloudflared:2026.10.2
+          command:
+            - cloudflared
+            - tunnel
+            - --no-autoupdate
+            - --loglevel
+            - info
+            - --output
+            - json
+            - --metrics
+            - 0.0.0.0:2000
+            - run
+          env:
+            - name: TUNNEL_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: tunnel-token
+                  key: token
+          ports:
+            - name: metrics
+              containerPort: 2000
+          # /ready answers 200 only while cloudflared has a live connection
+          # to Cloudflare's network.
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: 2000
+            failureThreshold: 1
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              memory: 128Mi

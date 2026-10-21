@@ -370,7 +370,7 @@ The monitoring stack (where metrics, traces and logs are stored and viewed) is d
 - **Frontend:** type checking, a production build, and unit tests for the connection and message state logic.
 - **Load tests** come with the deployment. Their results are committed with their method. (DEC-0025)
 
-## 12. Deployment (summary; to be designed)
+## 12. Deployment (Agreed - DEC-0099)
 
 Decided:
 
@@ -380,7 +380,28 @@ Decided:
 - A neutral project domain. (DEC-0033)
 - Monitoring runs before launch. (DEC-0024)
 
-Still to design: cluster mode and region, node sizes and their verified cost, Postgres and Kafka on the cluster, the monitoring stack, the deploy pipeline, and where Cloudflare sits.
+Agreed for the closed beta (DEC-0099):
+
+```
+student browser ──HTTPS──▶ Vercel (web app, <name>.vercel.app)
+       │
+       └──HTTPS / WSS──▶ Cloudflare (auth.aranyadutta.dev, TLS)
+                            │  Cloudflare Tunnel (outbound from the cluster; no public IP, no open port)
+                            ▼
+              GKE Standard, zonal asia-south1-a, one e2-standard-2 node
+                cloudflared ─▶ gateway ─▶ identity / chat / matching / presence / moderation
+                                 Postgres + Kafka (StatefulSets on persistent disks), Redis (in memory)
+                                 delivery-worker, persistence-worker
+                                 Prometheus + Grafana + Loki + Alloy (Grafana not public)
+```
+
+- **Cluster:** `deploy/gke/create-cluster.sh`. One 8 GiB node: the whole dev stack measured 2.83 GiB and peaked at 5.16 GiB over a day that included rollouts and an extra test database (DEC-0099 has the query). Google's managed Prometheus and workload logging are off since the cluster runs its own (DEC-0095). About $70 a month at catalog prices (DEC-0099 has the breakdown).
+- **Data stores:** `deploy/k8s/prod/`. Postgres and Kafka keep their data on persistent disks (INC-0020: Kafka's image would otherwise lose it on every restart); Redis holds only caches, queues and pub/sub, so it stays in memory.
+- **Entry point:** a Cloudflare Tunnel is the only way in, so gateway trusts Cloudflare's `CF-Connecting-IP` for the client's address (`CLIENT_IP_HEADER`); otherwise every student would share one rate limit.
+- **Configuration:** each service's `values/prod/<name>.yaml` overlays its dev values and removes every dev-only setting; secrets are Kubernetes Secrets made by `deploy/prod/create-secrets.sh`. `deploy/prod/check-render.py` refuses a render that still carries dev settings (INC-0021).
+- **Pipeline:** `.github/workflows/images.yml` builds every image on merge to `main` and pushes it to GitHub Container Registry, tagged with the commit SHA. Deploying is a deliberate `deploy/prod/deploy.sh <sha>`, never automatic.
+
+Not covered yet: alert routing, Postgres backups, and the move off Google Cloud.
 
 ## 13. Open questions
 

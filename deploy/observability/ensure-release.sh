@@ -6,18 +6,24 @@
 # whenever that download was slow, even with the release installed and
 # healthy (INC-0017).
 #
-# Usage: ensure-release.sh <release> <repo/chart> <version> <values-file>
+# Usage: ensure-release.sh <release> <repo/chart> <version> <values-file> [<values-file>...]
+# Later values files override earlier ones, as with helm -f (production
+# passes the dev values plus deploy/observability/prod/ overlays).
 set -euo pipefail
 
 release=$1
 chart_ref=$2
 version=$3
-values=$4
+shift 3
+values=("$@")
+[ ${#values[@]} -gt 0 ] || { echo "usage: $0 <release> <repo/chart> <version> <values-file>..." >&2; exit 1; }
 chart_name=${chart_ref#*/}
+value_flags=()
+for v in "${values[@]}"; do value_flags+=(-f "$v"); done
 
 # Fingerprint of everything that decides what gets installed. Stored per
 # release in a ConfigMap after a successful install, and compared next time.
-want=$({ echo "$chart_ref@$version"; cat "$values"; } | sha256sum | cut -c1-16)
+want=$({ echo "$chart_ref@$version"; cat "${values[@]}"; } | sha256sum | cut -c1-16)
 key=${release//-/_}
 have=$(kubectl get configmap tilt-helm-releases -o "jsonpath={.data.$key}" 2>/dev/null || true)
 
@@ -36,7 +42,7 @@ if [ ! -f "$tgz" ]; then
 fi
 
 echo "$release: installing ${chart_name}-${version} (chart or values changed since the last install)..."
-helm upgrade --install "$release" "$tgz" -f "$values" --wait --timeout 8m
+helm upgrade --install "$release" "$tgz" "${value_flags[@]}" --wait --timeout 8m
 
 kubectl create configmap tilt-helm-releases >/dev/null 2>&1 || true
 kubectl patch configmap tilt-helm-releases --type merge -p "{\"data\":{\"$key\":\"$want\"}}" >/dev/null

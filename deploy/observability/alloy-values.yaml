@@ -21,6 +21,13 @@ alloy:
       memory: 128Mi
     limits:
       memory: 256Mi
+  # The chart's default sends anonymous usage statistics to Grafana Labs;
+  # nothing about this deployment needs to leave it.
+  enableReporting: false
+  # Read by the cluster label below; prod/alloy-values.yaml overrides it.
+  extraEnv:
+    - name: CLUSTER_NAME
+      value: flamingo-dev
   configMap:
     content: |-
       loki.write "default" {
@@ -100,7 +107,7 @@ alloy:
       loki.process "pod_logs" {
         stage.static_labels {
           values = {
-            cluster = "flamingo-dev",
+            cluster = sys.env("CLUSTER_NAME"),
           }
         }
 

@@ -27,9 +27,12 @@ spec:
               containerPort: {{ .Values.metricsPort }}
           {{- if .Values.env }}
           env:
+            {{- /* A null removes the variable (a production overlay deleting a dev-only setting). Helm itself only drops nulls against the chart's own defaults, not between values files, and an empty explicit env var would override the same name coming from envFromSecret. */}}
             {{- range $k, $v := .Values.env }}
+            {{- if not (kindIs "invalid" $v) }}
             - name: {{ $k }}
               value: {{ $v | quote }}
+            {{- end }}
             {{- end }}
           {{- end }}
           {{- if .Values.envFromSecret }}
