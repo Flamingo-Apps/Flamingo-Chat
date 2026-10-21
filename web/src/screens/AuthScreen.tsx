@@ -2,6 +2,7 @@ import { useState } from 'react'
 import * as api from '../api'
 import { useGateway } from '../gateway'
 import { generatePseudonym } from '../pseudonym'
+import { GoogleSignInLink } from './GoogleSignInLink'
 
 export function AuthScreen() {
   const { login } = useGateway()
@@ -29,9 +30,7 @@ export function AuthScreen() {
         Continue as guest
       </button>
       <div className="auth-screen__divider">or</div>
-      <a className="google-signin-link" href={api.googleSignInURL()}>
-        Sign in with Google
-      </a>
+      <GoogleSignInLink href={api.googleSignInURL()} />
       {error && <p className="error-text">{error}</p>}
     </div>
   )

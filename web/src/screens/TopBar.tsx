@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import * as api from '../api'
 import { useGateway } from '../gateway'
+import { GoogleSignInLink } from './GoogleSignInLink'
 
 export function TopBar() {
   const { state, logout } = useGateway()
@@ -18,9 +19,7 @@ export function TopBar() {
       <button onClick={logout}>Sign out</button>
       {verifying && !account.google_linked && (
         <div className="top-bar__verify-popover">
-          <a className="google-signin-link" href={api.googleSignInURL(state.token ?? undefined)}>
-            Sign in with Google
-          </a>
+          <GoogleSignInLink href={api.googleSignInURL(state.token ?? undefined)} />
         </div>
       )}
     </header>

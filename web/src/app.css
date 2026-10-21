@@ -129,15 +129,17 @@ input, textarea {
   text-align: center;
 }
 
-.google-signin-link {
-  font: inherit;
-  padding: 0.5rem 0.75rem;
-  border-radius: 0.5rem;
-  border: 1px solid #444;
-  background: #222;
-  color: #eee;
-  text-decoration: none;
+/* Wraps Google's own button image (GoogleSignInLink.tsx); no styling of its
+   own beyond a visible keyboard focus, so the image stays as Google drew it. */
+.google-signin {
   display: inline-block;
+  line-height: 0;
+  border-radius: 20px;
+}
+
+.google-signin:focus-visible {
+  outline: 2px solid #e91e8c;
+  outline-offset: 2px;
 }
 
 .preference-picker {
