@@ -125,6 +125,7 @@ func runServer() {
 	healthpb.RegisterHealthServer(srv, healthSrv)
 	reflection.Register(srv)
 	identityv1.RegisterIdentityServiceServer(srv, svc)
+	grpclog.InitializeMetrics(srv)
 
 	log.Printf("identity listening on :%s", port)
 	if err := srv.Serve(lis); err != nil {

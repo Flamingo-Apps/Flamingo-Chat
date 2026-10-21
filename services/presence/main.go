@@ -59,6 +59,7 @@ func main() {
 	healthpb.RegisterHealthServer(srv, healthSrv)
 	reflection.Register(srv)
 	presencev1.RegisterPresenceServiceServer(srv, svc)
+	grpclog.InitializeMetrics(srv)
 
 	log.Printf("presence listening on :%s", port)
 	if err := srv.Serve(lis); err != nil {

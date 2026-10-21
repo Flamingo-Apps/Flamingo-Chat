@@ -2,7 +2,7 @@
 
 # Build context is the repository root, not this directory - see
 # services/identity/Dockerfile for why, and docs/ARCHITECTURE.md §9.
-FROM golang:1.27.2-bookworm AS build
+FROM golang:1.27.3-bookworm AS build
 WORKDIR /src
 COPY . .
 WORKDIR /src/services/gateway

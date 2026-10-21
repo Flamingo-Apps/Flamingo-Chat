@@ -17,7 +17,10 @@ env:
   # Use exactly the Go version setup-go installs below - never auto-download
   # a newer toolchain mid-run. See INC-0001 in docs/decisions.jsonl.
   GOTOOLCHAIN: local
-  GO_VERSION: "1.27.2"
+  # Ahead of go.work's `go 1.27.2` on purpose: that line is the minimum
+  # version, this is the patch release CI and the images build with
+  # (INC-0019).
+  GO_VERSION: "1.27.3"
   GOLANGCI_LINT_VERSION: "v2.14.0"
 
 jobs:

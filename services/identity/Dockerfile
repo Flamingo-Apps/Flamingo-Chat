@@ -5,7 +5,7 @@
 # either a trimmed go.work or replace directives duplicating what go.work
 # already provides, so the whole source tree is copied in instead. See
 # docs/ARCHITECTURE.md §9.
-FROM golang:1.27.2-bookworm AS build
+FROM golang:1.27.3-bookworm AS build
 WORKDIR /src
 COPY . .
 WORKDIR /src/services/identity

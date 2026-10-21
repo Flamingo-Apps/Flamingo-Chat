@@ -56,10 +56,10 @@ grpcurl -plaintext -d '{"pseudonym": "shadow_fox"}' \
 It also runs the web app at [localhost:8000](http://localhost:8000) and a local monitoring stack (DEC-0095), each linked from its resource in the Tilt UI:
 
 - [localhost:3000/d/flamingo-overview](http://localhost:3000/d/flamingo-overview): Grafana's Flamingo dashboard (traffic, errors, latency, Kafka consumer lag, logs). The login is printed in the `grafana` resource's log in Tilt. Dashboards live as JSON in `deploy/observability/dashboards/` and load automatically.
-- [localhost:9090/targets](http://localhost:9090/targets): Prometheus, and whether it is scraping every service.
+- [localhost:9090/targets](http://localhost:9090/targets): Prometheus, and whether it is scraping every service. With more than 20 scrape pools its UI shows only the first one, under a "Found many pools, showing only one" banner; pick others from the dropdown, or run the query `up` to see every target at once (1 = being scraped).
 - [localhost:12345](http://localhost:12345): Alloy's pipeline graph, the agent shipping every pod's logs to Loki.
 
-Request-rate panels stay empty until a service has had traffic on two separate scrapes: running `go test -tags e2e ./tests/e2e/...` twice is the quickest way to fill them.
+`go test -tags e2e ./tests/e2e/...` is the quickest way to put real traffic on the dashboard. The gRPC services start every request counter at zero, so even one run shows up; gateway's HTTP counters only appear on their first request, so its panels need a second run.
 
 Each service is its own Go module, so build and test it directly, without Tilt, from inside its directory:
 

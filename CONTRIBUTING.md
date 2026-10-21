@@ -14,7 +14,7 @@ This guide covers how to set up the project, how changes get merged, and the few
 
 You need:
 
-- Go 1.27.2 or newer. CI builds with 1.27.2, so do not add a dependency that requires a newer version.
+- Go 1.27.2 or newer (1.27.3 recommended: CI and the service images build with it). Do not add a dependency that requires a newer version than 1.27.2.
 - Docker, [kind](https://kind.sigs.k8s.io) and [Tilt](https://docs.tilt.dev/install.html), for running the full system locally - see the README's "Run it locally" section.
 - [buf](https://buf.build), only if you change `.proto` files.
 

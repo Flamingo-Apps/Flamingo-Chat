@@ -1,14 +1,19 @@
 {
   "title": "Flamingo overview",
   "uid": "flamingo-overview",
-  "description": "Flamingo's own services: gRPC traffic, errors and latency (pkg/grpclog, DEC-0093), Kafka consumer lag (DEC-0094), Go runtime health, and logs from Loki (DEC-0095). Gateway is HTTP, so it has no gRPC request metrics of its own - its calls show up on the services it calls.",
-  "tags": ["flamingo"],
+  "description": "Flamingo's own services: gateway's HTTP traffic (DEC-0098) and the gRPC services' traffic, errors and latency (pkg/grpclog, DEC-0093), Kafka consumer lag (DEC-0094), Go runtime health, and logs from Loki (DEC-0095).",
+  "tags": [
+    "flamingo"
+  ],
   "timezone": "browser",
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "refresh": "10s",
-  "time": { "from": "now-30m", "to": "now" },
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
   "templating": {
     "list": [
       {
@@ -16,7 +21,11 @@
         "label": "Metrics",
         "type": "datasource",
         "query": "prometheus",
-        "current": { "selected": true, "text": "Prometheus", "value": "prometheus" },
+        "current": {
+          "selected": true,
+          "text": "Prometheus",
+          "value": "prometheus"
+        },
         "hide": 0
       },
       {
@@ -30,13 +39,27 @@
         "name": "service",
         "label": "Service",
         "type": "query",
-        "datasource": { "type": "prometheus", "uid": "${datasource}" },
-        "query": { "query": "label_values(up{job=~\"default/.+\"}, container)", "refId": "service" },
+        "datasource": {
+          "type": "prometheus",
+          "uid": "${datasource}"
+        },
+        "query": {
+          "query": "label_values(up{job=~\"default/.+\"}, container)",
+          "refId": "service"
+        },
         "definition": "label_values(up{job=~\"default/.+\"}, container)",
         "refresh": 2,
         "multi": true,
         "includeAll": true,
-        "current": { "selected": true, "text": ["All"], "value": ["$__all"] },
+        "current": {
+          "selected": true,
+          "text": [
+            "All"
+          ],
+          "value": [
+            "$__all"
+          ]
+        },
         "sort": 1,
         "hide": 0
       }
@@ -44,110 +67,445 @@
   },
   "panels": [
     {
-      "type": "row", "title": "Health", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 0 }, "id": 1, "panels": []
+      "type": "row",
+      "title": "Health",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 0
+      },
+      "id": 1,
+      "panels": []
     },
     {
-      "type": "stat", "title": "Service up", "id": 2,
+      "type": "stat",
+      "title": "Service up",
+      "id": 2,
       "description": "1 = Prometheus can scrape the service's /metrics endpoint (its PodMonitor target is healthy).",
-      "gridPos": { "h": 4, "w": 24, "x": 0, "y": 1 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 4,
+        "w": 24,
+        "x": 0,
+        "y": 1
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
-        { "refId": "A", "expr": "max by (container) (up{job=~\"default/.+\", container=~\"$service\"})", "legendFormat": "{{container}}", "instant": true }
+        {
+          "refId": "A",
+          "expr": "max by (container) (up{job=~\"default/.+\", container=~\"$service\"})",
+          "legendFormat": "{{container}}",
+          "instant": true
+        }
       ],
-      "options": { "colorMode": "background", "graphMode": "none", "textMode": "value_and_name", "reduceOptions": { "calcs": ["lastNotNull"], "fields": "", "values": false } },
+      "options": {
+        "colorMode": "background",
+        "graphMode": "none",
+        "textMode": "value_and_name",
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ],
+          "fields": "",
+          "values": false
+        }
+      },
       "fieldConfig": {
         "defaults": {
-          "mappings": [ { "type": "value", "options": { "0": { "text": "DOWN", "color": "red" }, "1": { "text": "UP", "color": "green" } } } ],
-          "thresholds": { "mode": "absolute", "steps": [ { "color": "red", "value": null }, { "color": "green", "value": 1 } ] }
+          "mappings": [
+            {
+              "type": "value",
+              "options": {
+                "0": {
+                  "text": "DOWN",
+                  "color": "red"
+                },
+                "1": {
+                  "text": "UP",
+                  "color": "green"
+                }
+              }
+            }
+          ],
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "red",
+                "value": null
+              },
+              {
+                "color": "green",
+                "value": 1
+              }
+            ]
+          }
         },
         "overrides": []
       }
     },
     {
-      "type": "row", "title": "gRPC traffic (health checks excluded)", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 5 }, "id": 3, "panels": []
+      "type": "row",
+      "title": "Gateway (HTTP, probes excluded)",
+      "collapsed": false,
+      "id": 20,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 5
+      },
+      "panels": []
     },
     {
-      "type": "timeseries", "title": "Requests per second, by service", "id": 4,
-      "gridPos": { "h": 8, "w": 8, "x": 0, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "type": "timeseries",
+      "title": "Requests per second, by route",
+      "id": 21,
+      "description": "Every HTTP request the gateway served, labelled by its route pattern (so /v1/rooms/{id}/messages is one line, whatever the room). Unknown paths are grouped as 'unmatched'. WebSocket sessions are not counted here.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (container) (rate(grpc_server_request_duration_seconds_count{container=~\"$service\", method!~\"/grpc.health.v1.Health/.*\"}[$__rate_interval]))", "legendFormat": "{{container}}" }
+        {
+          "refId": "A",
+          "legendFormat": "{{route}}",
+          "expr": "sum by (route) (rate(http_server_request_duration_seconds_count{route!~\"GET /(healthz|readyz)\"}[$__rate_interval]))"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
     },
     {
-      "type": "timeseries", "title": "Errors per second, by service and code", "id": 5,
+      "type": "timeseries",
+      "title": "Error responses per second, by route and code",
+      "id": 22,
+      "description": "4xx is usually the client (bad input, not signed in, rate-limited); 5xx is the gateway or a service behind it failing.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{route}} {{code}}",
+          "expr": "sum by (route, code) (rate(http_server_request_duration_seconds_count{route!~\"GET /(healthz|readyz)\", code=~\"4..|5..\"}[$__rate_interval]))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "p95 latency, by route",
+      "id": 23,
+      "description": "Includes the time spent waiting on the gRPC services behind the gateway, so this is the latency a client actually sees.",
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 6
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "legendFormat": "{{route}}",
+          "expr": "histogram_quantile(0.95, sum by (le, route) (rate(http_server_request_duration_seconds_bucket{route!~\"GET /(healthz|readyz)\"}[$__rate_interval])))"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "row",
+      "title": "gRPC traffic (health checks excluded)",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 14
+      },
+      "id": 3,
+      "panels": []
+    },
+    {
+      "type": "timeseries",
+      "title": "Requests per second, by service",
+      "id": 4,
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 0,
+        "y": 15
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by (container) (rate(grpc_server_request_duration_seconds_count{container=~\"$service\", method!~\"/grpc.health.v1.Health/.*\"}[$__rate_interval]))",
+          "legendFormat": "{{container}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Errors per second, by service and code",
+      "id": 5,
       "description": "Any gRPC status other than OK. NotFound/PermissionDenied are often expected business outcomes, not bugs - check the code before panicking.",
-      "gridPos": { "h": 8, "w": 8, "x": 8, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 8,
+        "y": 15
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
-        { "refId": "A", "expr": "sum by (container, code) (rate(grpc_server_request_duration_seconds_count{container=~\"$service\", code!=\"OK\", method!~\"/grpc.health.v1.Health/.*\"}[$__rate_interval]))", "legendFormat": "{{container}} {{code}}" }
+        {
+          "refId": "A",
+          "expr": "sum by (container, code) (rate(grpc_server_request_duration_seconds_count{container=~\"$service\", code!=\"OK\", method!~\"/grpc.health.v1.Health/.*\"}[$__rate_interval]))",
+          "legendFormat": "{{container}} {{code}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "reqps" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps"
+        },
+        "overrides": []
+      }
     },
     {
-      "type": "timeseries", "title": "p95 latency, by method", "id": 6,
+      "type": "timeseries",
+      "title": "p95 latency, by method",
+      "id": 6,
       "description": "95th percentile from the request-duration histogram. With very little traffic this is an estimate from a handful of samples.",
-      "gridPos": { "h": 8, "w": 8, "x": 16, "y": 6 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 8,
+        "w": 8,
+        "x": 16,
+        "y": 15
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
-        { "refId": "A", "expr": "histogram_quantile(0.95, sum by (le, method) (rate(grpc_server_request_duration_seconds_bucket{container=~\"$service\", method!~\"/grpc.health.v1.Health/.*\"}[$__rate_interval])))", "legendFormat": "{{method}}" }
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95, sum by (le, method) (rate(grpc_server_request_duration_seconds_bucket{container=~\"$service\", method!~\"/grpc.health.v1.Health/.*\"}[$__rate_interval])))",
+          "legendFormat": "{{method}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "s" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s"
+        },
+        "overrides": []
+      }
     },
     {
-      "type": "row", "title": "Kafka workers", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 14 }, "id": 7, "panels": []
+      "type": "row",
+      "title": "Kafka workers",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 23
+      },
+      "id": 7,
+      "panels": []
     },
     {
-      "type": "timeseries", "title": "Consumer lag, by worker / topic / partition", "id": 8,
+      "type": "timeseries",
+      "title": "Consumer lag, by worker / topic / partition",
+      "id": 8,
       "description": "Messages still waiting on each partition. Only updates when a message is consumed (DEC-0094), so a series appears after a worker's first message and an idle partition keeps its last value.",
-      "gridPos": { "h": 8, "w": 24, "x": 0, "y": 15 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 8,
+        "w": 24,
+        "x": 0,
+        "y": 24
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
-        { "refId": "A", "expr": "max by (container, topic, partition) (kafka_consumer_lag{container=~\"$service\"})", "legendFormat": "{{container}} {{topic}}/{{partition}}" }
+        {
+          "refId": "A",
+          "expr": "max by (container, topic, partition) (kafka_consumer_lag{container=~\"$service\"})",
+          "legendFormat": "{{container}} {{topic}}/{{partition}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short", "min": 0 }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "min": 0
+        },
+        "overrides": []
+      }
     },
     {
-      "type": "row", "title": "Go runtime", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 23 }, "id": 9, "panels": []
+      "type": "row",
+      "title": "Go runtime",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 32
+      },
+      "id": 9,
+      "panels": []
     },
     {
-      "type": "timeseries", "title": "Goroutines", "id": 10,
+      "type": "timeseries",
+      "title": "Goroutines",
+      "id": 10,
       "description": "A count that only ever climbs is the classic sign of a goroutine leak.",
-      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 33
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
-        { "refId": "A", "expr": "max by (container) (go_goroutines{job=~\"default/.+\", container=~\"$service\"})", "legendFormat": "{{container}}" }
+        {
+          "refId": "A",
+          "expr": "max by (container) (go_goroutines{job=~\"default/.+\", container=~\"$service\"})",
+          "legendFormat": "{{container}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "short" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short"
+        },
+        "overrides": []
+      }
     },
     {
-      "type": "timeseries", "title": "Memory (resident)", "id": 11,
+      "type": "timeseries",
+      "title": "Memory (resident)",
+      "id": 11,
       "description": "Compare against each service's 128Mi memory limit in deploy/helm/service/values.yaml.",
-      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 24 },
-      "datasource": { "type": "prometheus", "uid": "${datasource}" },
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 33
+      },
+      "datasource": {
+        "type": "prometheus",
+        "uid": "${datasource}"
+      },
       "targets": [
-        { "refId": "A", "expr": "max by (container) (process_resident_memory_bytes{job=~\"default/.+\", container=~\"$service\"})", "legendFormat": "{{container}}" }
+        {
+          "refId": "A",
+          "expr": "max by (container) (process_resident_memory_bytes{job=~\"default/.+\", container=~\"$service\"})",
+          "legendFormat": "{{container}}"
+        }
       ],
-      "fieldConfig": { "defaults": { "unit": "bytes" }, "overrides": [] }
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes"
+        },
+        "overrides": []
+      }
     },
     {
-      "type": "row", "title": "Logs", "collapsed": false,
-      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 32 }, "id": 12, "panels": []
+      "type": "row",
+      "title": "Logs",
+      "collapsed": false,
+      "gridPos": {
+        "h": 1,
+        "w": 24,
+        "x": 0,
+        "y": 41
+      },
+      "id": 12,
+      "panels": []
     },
     {
-      "type": "logs", "title": "Service logs", "id": 13,
+      "type": "logs",
+      "title": "Service logs",
+      "id": 13,
       "description": "Every line the selected services wrote to stdout, shipped by Alloy into Loki - minus Kubernetes' health-check calls, which pkg/grpclog logs every few seconds per service and would otherwise bury everything else.",
-      "gridPos": { "h": 14, "w": 24, "x": 0, "y": 33 },
-      "datasource": { "type": "loki", "uid": "${loki}" },
+      "gridPos": {
+        "h": 14,
+        "w": 24,
+        "x": 0,
+        "y": 42
+      },
+      "datasource": {
+        "type": "loki",
+        "uid": "${loki}"
+      },
       "targets": [
-        { "refId": "A", "expr": "{namespace=\"default\", app=~\"$service\"} != \"/grpc.health.v1.Health/Check\"", "datasource": { "type": "loki", "uid": "${loki}" } }
+        {
+          "refId": "A",
+          "expr": "{namespace=\"default\", app=~\"$service\"} != \"/grpc.health.v1.Health/Check\"",
+          "datasource": {
+            "type": "loki",
+            "uid": "${loki}"
+          }
+        }
       ],
-      "options": { "showTime": true, "wrapLogMessage": true, "sortOrder": "Descending", "enableLogDetails": true, "dedupStrategy": "none" }
+      "options": {
+        "showTime": true,
+        "wrapLogMessage": true,
+        "sortOrder": "Descending",
+        "enableLogDetails": true,
+        "dedupStrategy": "none"
+      }
     }
   ]
 }
