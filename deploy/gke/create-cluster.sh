@@ -34,7 +34,14 @@ if gcloud projects describe "$project" >/dev/null 2>&1; then
 else
 	gcloud projects create "$project" --name="Flamingo pilot"
 fi
-gcloud billing projects link "$project" --billing-account="$billing" >/dev/null
+# Re-linking a project that is already on this account is not a no-op: it
+# failed with "Cloud billing quota exceeded" for a project that was already
+# linked (INC-0022).
+if [ "$(gcloud billing projects describe "$project" --format='value(billingAccountName)')" = "billingAccounts/$billing" ]; then
+	echo "project $project: billed to $billing"
+else
+	gcloud billing projects link "$project" --billing-account="$billing" >/dev/null
+fi
 gcloud services enable container.googleapis.com --project="$project"
 
 if gcloud container clusters describe "$cluster" --project="$project" --zone="$zone" >/dev/null 2>&1; then

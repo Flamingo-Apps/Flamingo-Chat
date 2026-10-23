@@ -6,10 +6,10 @@ name: Images
 # Building here rather than on a laptop also keeps release images off the
 # local Docker Desktop that INC-0018 found unreliable.
 #
-# New packages on ghcr.io start out private; each one is made public once,
-# by hand (package settings > Change visibility), so the cluster can pull
-# them without a registry credential. They contain nothing but this public
-# repository's code.
+# The packages stay private, as new packages on ghcr.io start out; the
+# cluster pulls them with the ghcr-pull Secret (DEC-0101). The source label
+# links each package to this repository, so it inherits the repository's
+# access.
 
 on:
   push:

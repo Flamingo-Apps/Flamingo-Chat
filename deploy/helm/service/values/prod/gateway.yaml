@@ -9,6 +9,8 @@
 # Turnstile widget, so setting it would reject every guest signup.
 image:
   repository: ghcr.io/flamingo-apps/flamingo-gateway
+imagePullSecrets:
+  - ghcr-pull
 podMonitor:
   enabled: true
 envFromSecret:
