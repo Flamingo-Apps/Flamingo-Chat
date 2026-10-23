@@ -24,6 +24,13 @@
 #     deploy/gke/create-cluster.sh
 set -euo pipefail
 
+# kubectl reaches GKE only through Google's credential plugin; without it
+# the cluster gets created and then nothing can talk to it (INC-0022).
+command -v gke-gcloud-auth-plugin >/dev/null || {
+	echo "gke-gcloud-auth-plugin is not installed - see https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl" >&2
+	exit 1
+}
+
 project=${PROJECT_ID:?set PROJECT_ID}
 billing=${BILLING_ACCOUNT:?set BILLING_ACCOUNT}
 zone=asia-south1-a
