@@ -89,6 +89,13 @@ function applyFrame(state: AppState, frame: ServerFrame): AppState {
     case 'match_queued':
       return { ...state, matching: true, currentMatch: null }
 
+    // The server's confirmation that we are no longer searching
+    // (DEC-0103). Only the searching flag changes: a match_found that
+    // raced ahead of the cancel has already set currentMatch, and that
+    // chat should stay.
+    case 'match_cancelled':
+      return { ...state, matching: false }
+
     case 'match_found':
       return {
         ...state,
