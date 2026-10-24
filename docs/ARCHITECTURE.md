@@ -400,7 +400,7 @@ student browser ──HTTPS──▶ Vercel (web app, <name>.vercel.app)
 - **Hostnames (DEC-0102):** `flamingo-api.aranyadutta.dev` is gateway, so every API call, the WebSocket and Google's sign-in callback; `flamingo.aranyadutta.dev` is the static homepage, privacy notice and terms on Cloudflare Pages that Google's brand verification checks (DEC-0100). The web app itself stays on Vercel's own subdomain.
 - **Entry point:** a Cloudflare Tunnel is the only way in, so gateway trusts Cloudflare's `CF-Connecting-IP` for the client's address (`CLIENT_IP_HEADER`); otherwise every student would share one rate limit.
 - **Configuration:** each service's `values/prod/<name>.yaml` overlays its dev values and removes every dev-only setting; secrets are Kubernetes Secrets made by `deploy/prod/create-secrets.sh`. `deploy/prod/check-render.py` refuses a render that still carries dev settings (INC-0021).
-- **Pipeline:** `.github/workflows/images.yml` builds every image on merge to `main` and pushes it to GitHub Container Registry, tagged with the commit SHA. The packages stay private and the cluster pulls them with the `ghcr-pull` Secret (DEC-0101, proposed). Deploying is a deliberate `deploy/prod/deploy.sh <sha>`, never automatic.
+- **Pipeline:** `.github/workflows/images.yml` builds every image on merge to `main` and pushes it to GitHub Container Registry, tagged with the commit SHA. The packages stay private and the cluster pulls them with the `ghcr-pull` Secret (DEC-0101). Deploying is a deliberate `deploy/prod/deploy.sh <sha>`, never automatic.
 
 Not covered yet: alert routing, Postgres backups, and the move off Google Cloud.
 
