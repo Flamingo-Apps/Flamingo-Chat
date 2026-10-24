@@ -1,4 +1,6 @@
 image:
   repository: ghcr.io/flamingo-apps/flamingo-presence
+imagePullSecrets:
+  - ghcr-pull
 podMonitor:
   enabled: true

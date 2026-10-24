@@ -5,6 +5,10 @@ image:
   repository: ""
   tag: dev
   pullPolicy: IfNotPresent
+# Names of registry Secrets the kubelet pulls the image with. None in dev,
+# where the images are built locally; production pulls its private GHCR
+# images with ghcr-pull (deploy/prod/create-secrets.sh, DEC-0101).
+imagePullSecrets: []
 
 # "grpc" services are checked with Kubernetes' native gRPC probe (stable
 # since Kubernetes 1.27), which calls the standard grpc.health.v1.Health

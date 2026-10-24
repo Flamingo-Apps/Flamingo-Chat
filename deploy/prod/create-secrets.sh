@@ -9,7 +9,8 @@
 # existing database. To rotate a value on purpose, delete that Secret first.
 #
 # Usage (against the production cluster's kubectl context):
-#   GOOGLE_CLIENT_SECRET='...' deploy/prod/create-secrets.sh
+#   GOOGLE_CLIENT_SECRET='...' GHCR_USERNAME='...' GHCR_TOKEN='...' deploy/prod/create-secrets.sh
+# Any of the three that is not set is asked for, with the secret ones hidden.
 set -euo pipefail
 
 # Twice the requested length of random bytes, so enough letters and digits
@@ -52,4 +53,26 @@ else
 		--from-literal=SESSION_SIGNING_KEY="$(random 64)" \
 		--from-literal=GOOGLE_CLIENT_SECRET="$GOOGLE_CLIENT_SECRET" >/dev/null
 	echo "gateway-secrets: created (random session signing key)."
+fi
+
+# The images on ghcr.io are private (DEC-0101), so the kubelet needs a
+# credential to pull them: a classic personal access token with only the
+# read:packages scope, from a GitHub account that can read this repository
+# (each package is linked to it and inherits its access).
+if exists ghcr-pull; then
+	echo "ghcr-pull: already exists - kept."
+else
+	if [ -z "${GHCR_USERNAME:-}" ]; then
+		read -rp "GitHub username that owns the read:packages token: " GHCR_USERNAME
+	fi
+	if [ -z "${GHCR_TOKEN:-}" ]; then
+		read -rsp "GitHub personal access token (classic, read:packages only): " GHCR_TOKEN
+		echo
+	fi
+	[ -n "$GHCR_USERNAME" ] && [ -n "$GHCR_TOKEN" ] || { echo "GHCR_USERNAME and GHCR_TOKEN are required" >&2; exit 1; }
+	kubectl create secret docker-registry ghcr-pull \
+		--docker-server=ghcr.io \
+		--docker-username="$GHCR_USERNAME" \
+		--docker-password="$GHCR_TOKEN" >/dev/null
+	echo "ghcr-pull: created."
 fi

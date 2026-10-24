@@ -24,6 +24,13 @@
 #     deploy/gke/create-cluster.sh
 set -euo pipefail
 
+# kubectl reaches GKE only through Google's credential plugin; without it
+# the cluster gets created and then nothing can talk to it (INC-0022).
+command -v gke-gcloud-auth-plugin >/dev/null || {
+	echo "gke-gcloud-auth-plugin is not installed - see https://docs.cloud.google.com/kubernetes-engine/docs/how-to/cluster-access-for-kubectl" >&2
+	exit 1
+}
+
 project=${PROJECT_ID:?set PROJECT_ID}
 billing=${BILLING_ACCOUNT:?set BILLING_ACCOUNT}
 zone=asia-south1-a
@@ -34,7 +41,14 @@ if gcloud projects describe "$project" >/dev/null 2>&1; then
 else
 	gcloud projects create "$project" --name="Flamingo pilot"
 fi
-gcloud billing projects link "$project" --billing-account="$billing" >/dev/null
+# Re-linking a project that is already on this account is not a no-op: it
+# failed with "Cloud billing quota exceeded" for a project that was already
+# linked (INC-0022).
+if [ "$(gcloud billing projects describe "$project" --format='value(billingAccountName)')" = "billingAccounts/$billing" ]; then
+	echo "project $project: billed to $billing"
+else
+	gcloud billing projects link "$project" --billing-account="$billing" >/dev/null
+fi
 gcloud services enable container.googleapis.com --project="$project"
 
 if gcloud container clusters describe "$cluster" --project="$project" --zone="$zone" >/dev/null 2>&1; then

@@ -16,7 +16,7 @@ case "$ctx" in
 esac
 echo "Deploying image tag $tag to $ctx"
 
-for s in postgres-credentials flamingo-postgres gateway-secrets tunnel-token; do
+for s in postgres-credentials flamingo-postgres gateway-secrets ghcr-pull tunnel-token; do
 	kubectl get secret "$s" >/dev/null 2>&1 || { echo "Missing Secret $s - see deploy/prod/create-secrets.sh and deploy/k8s/prod/cloudflared.yaml" >&2; exit 1; }
 done
 
