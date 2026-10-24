@@ -65,6 +65,7 @@ export type ServerFrame =
     }
   | { type: 'message_ack'; client_msg_id: string; message_id: string; sent_at: number }
   | { type: 'match_queued' }
+  | { type: 'match_cancelled' }
   | { type: 'match_found'; room_id: string; partner_pseudonym: string; partner_account_id: string }
   | { type: 'match_ended'; room_id: string; reason: 'you_left' | 'partner_left' }
   | { type: 'keep_status'; room_id: string; you: boolean; partner: boolean; kept: boolean }

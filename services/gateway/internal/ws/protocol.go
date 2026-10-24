@@ -74,6 +74,8 @@ type messageAckFrame struct {
 
 type matchQueuedFrame struct{}
 
+type matchCancelledFrame struct{}
+
 type matchFoundFrame struct {
 	RoomID           string `json:"room_id"`
 	PartnerPseudonym string `json:"partner_pseudonym"`

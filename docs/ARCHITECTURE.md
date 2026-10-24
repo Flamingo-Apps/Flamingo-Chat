@@ -242,6 +242,7 @@ Server to client:
 | `message` | `message_id`, `room_id`, `sender_account_id`, `sender_pseudonym`, `body`, `sent_at`, `client_msg_id` |
 | `message_ack` | `client_msg_id`, `message_id`, `sent_at` |
 | `match_queued` | none |
+| `match_cancelled` | none (sent after every successful `match_cancel`, DEC-0103) |
 | `match_found` | `room_id`, `partner_pseudonym`, `partner_account_id` |
 | `match_ended` | `room_id`, `reason` |
 | `keep_status` | `room_id`, `you`, `partner`, `kept` |

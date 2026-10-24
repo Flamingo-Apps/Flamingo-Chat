@@ -82,6 +82,26 @@ describe('reducer', () => {
     expect(state.currentMatch).toBeNull()
   })
 
+  it('stops showing "looking for a match" once the server confirms a cancel (DEC-0103)', () => {
+    let state = reducer(initialState, { type: 'frame', frame: { type: 'match_queued' } })
+    expect(state.matching).toBe(true)
+
+    state = reducer(state, { type: 'frame', frame: { type: 'match_cancelled' } })
+    expect(state.matching).toBe(false)
+  })
+
+  it('keeps a match that was found before a late match_cancelled arrives', () => {
+    let state = reducer(initialState, { type: 'frame', frame: { type: 'match_queued' } })
+    state = reducer(state, {
+      type: 'frame',
+      frame: { type: 'match_found', room_id: 'room-1', partner_pseudonym: 'Hound', partner_account_id: 'acc-2' },
+    })
+
+    state = reducer(state, { type: 'frame', frame: { type: 'match_cancelled' } })
+    expect(state.matching).toBe(false)
+    expect(state.currentMatch?.roomId).toBe('room-1')
+  })
+
   it('ignores keep_status and match_ended for a room that is not the current match', () => {
     const state = reducer(initialState, { type: 'frame', frame: { type: 'match_ended', room_id: 'some-other-room', reason: 'partner_left' } })
     expect(state).toEqual(initialState)

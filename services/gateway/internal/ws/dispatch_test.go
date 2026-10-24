@@ -9,6 +9,8 @@ import (
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 	matchingv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 // newTestConn builds a conn with fakes, bypassing Serve/authenticate -
@@ -162,6 +164,9 @@ func TestHandleMatchCancelAndNextAndEnd(t *testing.T) {
 	if !gotCancel {
 		t.Fatalf("expected CancelMatch to be called")
 	}
+	if frame := c.nextFrame(t); frame["type"] != "match_cancelled" {
+		t.Fatalf("expected a match_cancelled frame after a successful cancel, got %+v", frame)
+	}
 
 	c.setCurrentMatchRoom("room-current")
 	c.dispatch(context.Background(), []byte(`{"type":"match_next"}`))
@@ -171,6 +176,46 @@ func TestHandleMatchCancelAndNextAndEnd(t *testing.T) {
 	frame := c.nextFrame(t)
 	if frame["type"] != "match_queued" {
 		t.Fatalf("expected a match_queued frame after a successful Next, got %+v", frame)
+	}
+}
+
+// TestHandleMatchCancelSendsMatchCancelledEitherWay covers DEC-0103:
+// Cancelled is false when the caller wasn't in any queue (already
+// matched, or never queued), which still means they are not searching
+// any more - the client needs to hear that just as much, or its
+// "Looking for a match" screen never clears.
+func TestHandleMatchCancelSendsMatchCancelledEitherWay(t *testing.T) {
+	for _, cancelled := range []bool{true, false} {
+		matching := &fakeMatching{
+			cancelMatch: func(context.Context, *matchingv1.CancelMatchRequest) (*matchingv1.CancelMatchResponse, error) {
+				return &matchingv1.CancelMatchResponse{Cancelled: cancelled}, nil
+			},
+		}
+		c := newTestConn(&fakeIdentity{}, &fakeChat{}, matching)
+
+		c.dispatch(context.Background(), []byte(`{"type":"match_cancel"}`))
+		if frame := c.nextFrame(t); frame["type"] != "match_cancelled" {
+			t.Fatalf("Cancelled=%v: expected a match_cancelled frame, got %+v", cancelled, frame)
+		}
+	}
+}
+
+func TestHandleMatchCancelErrorSendsOnlyTheError(t *testing.T) {
+	matching := &fakeMatching{
+		cancelMatch: func(context.Context, *matchingv1.CancelMatchRequest) (*matchingv1.CancelMatchResponse, error) {
+			return nil, status.Error(codes.Internal, "redis down")
+		},
+	}
+	c := newTestConn(&fakeIdentity{}, &fakeChat{}, matching)
+
+	c.dispatch(context.Background(), []byte(`{"type":"match_cancel"}`))
+	if frame := c.nextFrame(t); frame["type"] != "error" {
+		t.Fatalf("expected an error frame, got %+v", frame)
+	}
+	select {
+	case b := <-c.send:
+		t.Fatalf("expected nothing after the error frame, got %q", b)
+	default:
 	}
 }
 

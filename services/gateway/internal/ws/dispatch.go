@@ -266,10 +266,19 @@ func (c *conn) handleMatchRequest(ctx context.Context, data []byte) {
 	c.enqueue(b)
 }
 
+// handleMatchCancel acknowledges a successful cancel with match_cancelled
+// (DEC-0103), the counterpart of match_queued: the client shows "looking
+// for a match" from match_queued until something tells it otherwise, and
+// without this nothing ever did. It is sent whether or not Cancelled is
+// true - false only means the caller wasn't in any queue (already
+// matched, or never queued), so either way they are no longer searching.
 func (c *conn) handleMatchCancel(ctx context.Context) {
 	if _, err := c.deps.Matching.CancelMatch(ctx, &matchingv1.CancelMatchRequest{AccountId: c.accountID}); err != nil {
 		c.sendErrorFromStatus(err, "")
+		return
 	}
+	b, _ := withType("match_cancelled", matchCancelledFrame{})
+	c.enqueue(b)
 }
 
 // handleMatchNext mirrors handleMatchRequest's match_queued
