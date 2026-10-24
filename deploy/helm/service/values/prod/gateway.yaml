@@ -23,6 +23,6 @@ env:
   # Cloudflare Tunnel is the only way in (gateway's Service is ClusterIP),
   # so Cloudflare's header can be trusted for the client's real IP.
   CLIENT_IP_HEADER: "CF-Connecting-IP"
-  WS_ORIGIN_PATTERNS: "CHANGE-ME.vercel.app"
-  FRONTEND_URL: "https://CHANGE-ME.vercel.app"
+  WS_ORIGIN_PATTERNS: "flamingo-chat-seven.vercel.app"
+  FRONTEND_URL: "https://flamingo-chat-seven.vercel.app"
   GOOGLE_REDIRECT_URI: "https://flamingo-api.aranyadutta.dev/v1/auth/google/callback"
