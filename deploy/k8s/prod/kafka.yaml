@@ -33,6 +33,17 @@ spec:
       labels:
         app: kafka
     spec:
+      # The image runs Kafka as appuser (uid and gid 1000), but a new Google
+      # persistent disk's top directory is root-owned with mode 755, so Kafka
+      # could not create its log directory and crash-looped (INC-0023). kind's
+      # local disks are writable by everyone, which hid this in testing.
+      # fsGroup makes Kubernetes give the mounted disk to group 1000 (group
+      # writable, setgid) before Kafka starts; OnRootMismatch skips the
+      # recursive ownership walk on later mounts once the top directory is
+      # already right.
+      securityContext:
+        fsGroup: 1000
+        fsGroupChangePolicy: OnRootMismatch
       containers:
         - name: kafka
           image: apache/kafka:4.3.1
