@@ -11,7 +11,7 @@
 #
 # Routing is configured on Cloudflare's side, not here: in the dashboard,
 # Networking > Tunnels > (this tunnel) > Routes > Published application,
-# hostname auth.aranyadutta.dev -> service http://gateway:8080.
+# hostname flamingo-api.aranyadutta.dev -> service http://gateway:8080.
 # The tunnel's token goes into a Secret by hand, never into the repository:
 #   kubectl create secret generic tunnel-token --from-literal=token='<token from the dashboard>'
 apiVersion: apps/v1

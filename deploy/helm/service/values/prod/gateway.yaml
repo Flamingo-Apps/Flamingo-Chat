@@ -23,4 +23,4 @@ env:
   CLIENT_IP_HEADER: "CF-Connecting-IP"
   WS_ORIGIN_PATTERNS: "CHANGE-ME.vercel.app"
   FRONTEND_URL: "https://CHANGE-ME.vercel.app"
-  GOOGLE_REDIRECT_URI: "https://auth.aranyadutta.dev/v1/auth/google/callback"
+  GOOGLE_REDIRECT_URI: "https://flamingo-api.aranyadutta.dev/v1/auth/google/callback"
