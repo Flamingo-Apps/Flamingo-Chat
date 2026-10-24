@@ -82,7 +82,7 @@ func (r *RedisOAuthState) TakeAndDelete(ctx context.Context, state string) (stri
 // Google's consent screen. This exists alongside handleAuthGoogle (the
 // original in-page-widget flow) because the widget approach needs
 // Google to trust whatever page it's embedded on; this one instead only
-// needs Google to trust the one page - auth.aranyadutta.dev - that
+// needs Google to trust the one page - flamingo-api.aranyadutta.dev - that
 // actually talks to it, regardless of where the rest of the app is
 // hosted.
 func (s *Server) handleGoogleStart(w http.ResponseWriter, r *http.Request) {
