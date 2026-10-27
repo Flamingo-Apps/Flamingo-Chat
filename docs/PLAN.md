@@ -94,7 +94,7 @@ Running before launch. (DEC-0024)
 - [x] End-to-end smoke test (`tests/e2e`), run against a live Tilt stack (DEC-0087, DEC-0088)
 - [ ] Frontend rework: the current `web/` is a working placeholder, and the maintainer will give written instructions for the real one, which are followed exactly (DEC-0104)
 - [ ] Black-box test of the reworked frontend against the live backend, as a written test plan with the results committed (DEC-0104). The suite is `web/e2e/blackbox.mjs` (19 checks); its first full run passed on the local stack on 2026-10-28 after it found and led to fixes for INC-0024 and INC-0025. Still to do: a pass against the deployed production stack, and the rest of the rework.
-- [ ] Load test, with the method and results committed (DEC-0025)
+- [ ] Load test, with the method and results committed (DEC-0025). The tool is built (`loadtest/`, DEC-0109); the real run on the GKE node is still to do, and a run on the maintainer's laptop was discarded as meaningless.
 - [ ] Security review
 - [ ] Sign-in re-tested with a KIIT account after publishing to production (DEC-0027)
 - [ ] Closed beta
