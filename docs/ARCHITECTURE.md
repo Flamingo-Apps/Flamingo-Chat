@@ -126,7 +126,9 @@ Queue keys are in section 5.5.
 
 ### 3.3 Keep chatting (Agreed scope; mechanics Proposed)
 
-During a random chat, either user can send `keep_chat`. Chat records the vote and produces a `KeepVote` event to the room. When both have voted, the room becomes **kept**: it stays open, appears in both users' Inbox, and keeps its history. A random chat that ends without both votes is closed and disappears for both users. Its messages stay on the server for moderation. (DEC-0031)
+During a random chat, either user can send `keep_chat`. Chat records the vote and produces a `KeepVote` event to the room. The other user is asked (a 25-second question whose default is to keep chatting; saying nothing never saves a chat). When both have voted, the room becomes **kept**: it appears in both users' Inbox under each other's anonymous names and keeps its history, and they can carry on chatting there. A random chat that ends without both votes is closed and disappears for both users. Its messages stay on the server for moderation. (DEC-0031)
+
+If one person leaves first, the other has a short window to save the chat alone. It is then saved for that person only and is **read-only**: it can be read but not messaged. An Inbox chat can also be closed with **Stop messaging** (read-only for both, still readable) or removed with **Delete** (gone from that person's Inbox, closed for the other, who keeps it under the same name). A room that has ended accepts no more messages. (DEC-0091, DEC-0106)
 
 ### 3.4 Presence (built, pending review - DEC-0081, DEC-0082)
 
@@ -205,10 +207,11 @@ JSON over HTTPS, prefix `/v1`. Authenticated endpoints take `Authorization: Bear
 | `POST /v1/me/gender` | `{gender}`, once |
 | `POST /v1/me/gender-change-requests` | `{requested_gender, note}` |
 | `GET /v1/presence` | `{total, guests, male, female}` |
-| `GET /v1/rooms` | My group rooms and kept conversations |
+| `GET /v1/rooms` | My group rooms, my saved conversations, and my random chat in progress. A direct room carries `partner_pseudonym`, and `ended_at_unix` once it is closed |
 | `POST /v1/rooms` | `{name}` → new group room with invite code |
 | `POST /v1/rooms/join` | `{invite_code}` |
-| `POST /v1/rooms/{id}/leave` | Leave a room |
+| `POST /v1/rooms/{id}/leave` | Leave a room. Leaving a direct room (deleting a saved chat) also closes it |
+| `POST /v1/rooms/{id}/close` | Stop messaging in a direct room: it stays readable for both but takes no more messages |
 | `POST /v1/rooms/{id}/invite-code` | Replace the invite code (owner only) |
 | `GET /v1/rooms/{id}/messages?before=&limit=` | History, newest first |
 | `POST /v1/reports` | `{reported_account_id, room_id, reason}` |
@@ -232,6 +235,7 @@ Client to server:
 | `match_next` | none (end the current random chat and queue again) |
 | `match_end` | none |
 | `keep_chat` | `room_id` |
+| `sync_rooms` | none (listen to my rooms now: sent after creating or joining a room over HTTP, DEC-0106) |
 | `ping` | none |
 
 Server to client:
@@ -246,6 +250,7 @@ Server to client:
 | `match_found` | `room_id`, `partner_pseudonym`, `partner_account_id` |
 | `match_ended` | `room_id`, `reason` |
 | `keep_status` | `room_id`, `you`, `partner`, `kept` |
+| `keep_requested` | `room_id` (the other person asked to keep this chat, DEC-0106) |
 | `room_joined`, `room_left` | `room_id` |
 | `presence` | `total`, `guests`, `male`, `female` |
 | `kicked` | `reason` |
