@@ -1,82 +1,124 @@
 import { useEffect, useState } from 'react'
 import * as api from '../api'
+import { FlagIcon, HeartIcon, LockIcon, PowerIcon, SkipIcon } from '../components/Icons'
+import { Modal } from '../components/Modal'
+import { EmptyChat, Workspace } from '../components/Workspace'
 import { useGateway } from '../gateway'
 import { GRACE_WINDOW_MS } from '../state'
 import type { Preference } from '../types'
+import { useUi } from '../ui'
 import { ChatView } from './ChatView'
+
+const CHOICES: { value: Preference; label: string }[] = [
+  { value: 'any', label: 'Anyone' },
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+]
 
 export function RandomScreen() {
   const { state, send } = useGateway()
+  const { askForIdentity } = useUi()
   const [preference, setPreference] = useState<Preference>('any')
   const [reportOpen, setReportOpen] = useState(false)
   const account = state.account
+  const match = state.currentMatch
 
   // Gender-filtered matching needs a verified account with a chosen
   // gender (services/matching/internal/server/server.go's
-  // checkGenderGate) - locked out here rather than letting the request
-  // round-trip to a PermissionDenied error.
+  // checkGenderGate). Until then the filters are visibly locked, and
+  // reaching for one opens the card that explains how to get access
+  // rather than letting the request round-trip to a PermissionDenied.
   const canFilterByGender = Boolean(account?.google_linked && account?.gender_chosen)
 
-  if (state.currentMatch?.partnerLeftAt) {
-    return <PartnerLeftPrompt roomId={state.currentMatch.roomId} partnerLeftAt={state.currentMatch.partnerLeftAt} kept={state.currentMatch.kept} />
+  function choose(value: Preference) {
+    if (value !== 'any' && !canFilterByGender) return askForIdentity()
+    setPreference(value)
   }
 
-  if (state.currentMatch) {
-    const match = state.currentMatch
-    return (
+  const list = (
+    <div className="panel">
+      <h1 className="panel__title">Random chat</h1>
+      <p className="panel__sub">Talk to a random student. You both stay anonymous.</p>
+
+      <h3 className="panel__label">Who do you want to talk to?</h3>
+      <div className="chips">
+        {CHOICES.map((c) => {
+          const locked = c.value !== 'any' && !canFilterByGender
+          return (
+            <button key={c.value} className={`chip ${preference === c.value ? 'chip--on' : ''} ${locked ? 'chip--locked' : ''}`} onClick={() => choose(c.value)}>
+              {locked && <LockIcon />}
+              {c.label}
+            </button>
+          )
+        })}
+      </div>
+      {!canFilterByGender && <p className="hint">Filtering by gender needs a verified identity. Tap one to see how.</p>}
+
+      {state.matching ? (
+        <div className="searching">
+          <div className="searching__row">
+            <span className="spinner" />
+            <span>Looking for someone...</span>
+          </div>
+          <button className="btn btn--ghost" onClick={() => send({ type: 'match_cancel' })}>
+            Cancel
+          </button>
+        </div>
+      ) : (
+        <button className="btn btn--big" disabled={Boolean(match)} onClick={() => send({ type: 'match_request', preference })}>
+          Find a match
+        </button>
+      )}
+      {state.lastError && (
+        <p className="error-text" role="alert">
+          {state.lastError}
+        </p>
+      )}
+    </div>
+  )
+
+  let chat
+  if (match?.partnerLeftAt) {
+    chat = <PartnerLeftPrompt roomId={match.roomId} partnerLeftAt={match.partnerLeftAt} kept={match.kept} />
+  } else if (match) {
+    chat = (
       <ChatView
         roomId={match.roomId}
         title={match.partnerPseudonym}
-        onReport={() => setReportOpen(true)}
-        onBlock={() => send({ type: 'match_end' })}
+        subtitle="Anonymous student"
         headerExtra={
           <>
-            <button onClick={() => send({ type: 'keep_chat', room_id: match.roomId })}>
-              {match.kept ? 'Kept' : 'Keep chatting'}
+            <button className="btn btn--sm btn--ghost" onClick={() => send({ type: 'keep_chat', room_id: match.roomId })}>
+              <HeartIcon /> {match.kept ? 'Kept' : 'Keep'}
             </button>
-            <button onClick={() => send({ type: 'match_next' })}>Next</button>
-            <button onClick={() => send({ type: 'match_end' })}>End</button>
+            <button className="btn btn--sm btn--ghost" onClick={() => send({ type: 'match_next' })}>
+              <SkipIcon /> Next
+            </button>
+            <button className="btn btn--sm btn--ghost" onClick={() => send({ type: 'match_end' })}>
+              <PowerIcon /> End
+            </button>
+            <button className="btn btn--sm btn--ghost" onClick={() => setReportOpen(true)}>
+              <FlagIcon /> Report
+            </button>
           </>
         }
       />
     )
+  } else if (state.matching) {
+    chat = (
+      <EmptyChat emoji="🔎" title="Finding someone for you" text="Hang tight. This usually takes a few seconds.">
+        <div className="pulse" />
+      </EmptyChat>
+    )
+  } else {
+    chat = <EmptyChat emoji="🦩" title="Ready when you are" text="Pick who you'd like to talk to and press Find a match." />
   }
 
   return (
-    <div className="random-screen">
-      <h2>Random chat</h2>
-      <div className="preference-picker">
-        <button className={preference === 'any' ? 'active' : ''} onClick={() => setPreference('any')}>
-          Anyone
-        </button>
-        <button
-          className={preference === 'male' ? 'active' : ''}
-          disabled={!canFilterByGender}
-          onClick={() => setPreference('male')}
-        >
-          Male
-        </button>
-        <button
-          className={preference === 'female' ? 'active' : ''}
-          disabled={!canFilterByGender}
-          onClick={() => setPreference('female')}
-        >
-          Female
-        </button>
-      </div>
-      {!canFilterByGender && <p className="hint">Get verified and choose a gender to filter matches.</p>}
-
-      {state.matching ? (
-        <>
-          <p>Looking for a match...</p>
-          <button onClick={() => send({ type: 'match_cancel' })}>Cancel</button>
-        </>
-      ) : (
-        <button onClick={() => send({ type: 'match_request', preference })}>Find a match</button>
-      )}
-
-      {reportOpen && <ReportDialog onClose={() => setReportOpen(false)} />}
-    </div>
+    <>
+      <Workspace list={list} chat={chat} hasChat={Boolean(match) || state.matching} />
+      {reportOpen && match && <ReportDialog onClose={() => setReportOpen(false)} />}
+    </>
   )
 }
 
@@ -94,17 +136,31 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="dialog">
+    <Modal onClose={onClose} label="Report">
       {submitted ? (
-        <p>Report filed. Thank you.</p>
+        <>
+          <div className="modal__emoji">🙏</div>
+          <h2>Report filed</h2>
+          <p>Thank you for helping keep this place safe.</p>
+        </>
       ) : (
         <form onSubmit={submit}>
-          <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What happened?" required />
-          <button type="submit">Submit report</button>
+          <h2>Report this person</h2>
+          <p>Tell us what happened. Only the people reviewing reports will see it.</p>
+          <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What happened?" required rows={4} />
+          <div className="modal__actions">
+            <button className="btn" type="submit">
+              Send report
+            </button>
+          </div>
         </form>
       )}
-      <button onClick={onClose}>Close</button>
-    </div>
+      <div className="modal__actions">
+        <button className="link-button" onClick={onClose}>
+          Close
+        </button>
+      </div>
+    </Modal>
   )
 }
 
@@ -133,19 +189,24 @@ function PartnerLeftPrompt({ roomId, partnerLeftAt, kept }: { roomId: string; pa
 
   if (kept) {
     return (
-      <div className="partner-left-prompt">
-        <p>Saved. You can find this conversation in Inbox.</p>
-        <button onClick={() => expireGraceWindow(roomId)}>Back to Random</button>
-      </div>
+      <EmptyChat emoji="💌" title="Saved" text="You can find this conversation in your Inbox.">
+        <button className="btn" onClick={() => expireGraceWindow(roomId)}>
+          Back to Random
+        </button>
+      </EmptyChat>
     )
   }
 
   return (
-    <div className="partner-left-prompt">
-      <p>Your partner left this chat.</p>
-      <p>Keep it anyway? ({Math.ceil(remainingMs / 1000)}s)</p>
-      <button onClick={() => send({ type: 'keep_chat', room_id: roomId })}>Keep this chat</button>
-      <button onClick={() => expireGraceWindow(roomId)}>Discard</button>
-    </div>
+    <EmptyChat emoji="👋" title="Your partner left" text={`Keep this chat anyway? You have ${Math.ceil(remainingMs / 1000)}s.`}>
+      <div className="modal__actions">
+        <button className="btn" onClick={() => send({ type: 'keep_chat', room_id: roomId })}>
+          Keep this chat
+        </button>
+        <button className="btn btn--ghost" onClick={() => expireGraceWindow(roomId)}>
+          Discard
+        </button>
+      </div>
+    </EmptyChat>
   )
 }

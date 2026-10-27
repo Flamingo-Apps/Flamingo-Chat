@@ -10,6 +10,7 @@ interface GatewayContextValue {
   state: AppState
   login: (account: Account, token: string) => void
   logout: () => void
+  updateAccount: (account: Account) => void
   send: (frame: ClientFrame) => void
   loadRooms: () => Promise<void>
   loadMessages: (roomId: string) => Promise<void>
@@ -31,6 +32,10 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
     localStorage.removeItem(SESSION_STORAGE_KEY)
     connectionRef.current?.close()
     dispatch({ type: 'logout' })
+  }, [])
+
+  const updateAccount = useCallback((account: Account) => {
+    dispatch({ type: 'accountUpdated', account })
   }, [])
 
   const expireGraceWindow = useCallback((roomId: string) => {
@@ -105,7 +110,7 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
   )
 
   return (
-    <GatewayContext.Provider value={{ state, login, logout, send, loadRooms, loadMessages, expireGraceWindow }}>
+    <GatewayContext.Provider value={{ state, login, logout, updateAccount, send, loadRooms, loadMessages, expireGraceWindow }}>
       {children}
     </GatewayContext.Provider>
   )

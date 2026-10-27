@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../api'
+import { EmptyChat, Workspace } from '../components/Workspace'
 import { useGateway } from '../gateway'
 import { ChatView } from './ChatView'
 
@@ -16,30 +17,6 @@ export function ChannelsScreen() {
 
   const groupRooms = state.rooms.filter((r) => r.type === 'group')
   const selected = groupRooms.find((r) => r.id === selectedRoomId)
-
-  if (selected) {
-    return (
-      <ChatView
-        roomId={selected.id}
-        title={selected.name ?? 'Group'}
-        headerExtra={
-          <>
-            <span className="invite-code">Invite: {selected.invite_code}</span>
-            <button
-              onClick={async () => {
-                if (!state.token) return
-                await api.leaveRoom(state.token, selected.id)
-                setSelectedRoomId(null)
-                loadRooms().catch(() => {})
-              }}
-            >
-              Leave
-            </button>
-          </>
-        }
-      />
-    )
-  }
 
   async function createRoom(e: React.FormEvent) {
     e.preventDefault()
@@ -69,26 +46,69 @@ export function ChannelsScreen() {
     }
   }
 
-  return (
-    <div className="channels-screen">
-      <h2>Channels</h2>
+  const list = (
+    <div className="panel">
+      <h1 className="panel__title">Channels</h1>
+      <p className="panel__sub">Group chats for your hostel, club or friends.</p>
+
       <ul className="room-list">
         {groupRooms.map((r) => (
           <li key={r.id}>
-            <button onClick={() => setSelectedRoomId(r.id)}>{r.name}</button>
+            <button className={`room ${r.id === selectedRoomId ? 'room--on' : ''}`} onClick={() => setSelectedRoomId(r.id)}>
+              <span className="avatar avatar--group">#</span>
+              <span className="room__name">{r.name}</span>
+            </button>
           </li>
         ))}
-        {groupRooms.length === 0 && <li className="hint">No channels yet.</li>}
+        {groupRooms.length === 0 && <li className="hint">No channels yet. Make one below or join with a code.</li>}
       </ul>
-      <form onSubmit={createRoom}>
-        <input value={name} onChange={(e) => setName(e.target.value)} placeholder="New channel name" />
-        <button type="submit">Create</button>
+
+      <form className="field" onSubmit={createRoom}>
+        <label htmlFor="new-channel">Start a channel</label>
+        <div className="field__row">
+          <input id="new-channel" value={name} onChange={(e) => setName(e.target.value)} placeholder="Channel name" />
+          <button className="btn btn--sm" type="submit" disabled={!name.trim()}>
+            Create
+          </button>
+        </div>
       </form>
-      <form onSubmit={joinRoom}>
-        <input value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} placeholder="Invite code" />
-        <button type="submit">Join</button>
+      <form className="field" onSubmit={joinRoom}>
+        <label htmlFor="invite">Join with an invite code</label>
+        <div className="field__row">
+          <input id="invite" value={inviteCode} onChange={(e) => setInviteCode(e.target.value)} placeholder="e.g. K7Q2ZP" />
+          <button className="btn btn--sm btn--ghost" type="submit" disabled={!inviteCode.trim()}>
+            Join
+          </button>
+        </div>
       </form>
       {error && <p className="error-text">{error}</p>}
     </div>
   )
+
+  const chat = selected ? (
+    <ChatView
+      roomId={selected.id}
+      title={selected.name ?? 'Group'}
+      subtitle={`Invite code: ${selected.invite_code}`}
+      group
+      onBack={() => setSelectedRoomId(null)}
+      headerExtra={
+        <button
+          className="btn btn--sm btn--ghost"
+          onClick={async () => {
+            if (!state.token) return
+            await api.leaveRoom(state.token, selected.id)
+            setSelectedRoomId(null)
+            loadRooms().catch(() => {})
+          }}
+        >
+          Leave
+        </button>
+      }
+    />
+  ) : (
+    <EmptyChat emoji="💬" title="Pick a channel" text="Or start your own and share the invite code with friends." />
+  )
+
+  return <Workspace list={list} chat={chat} hasChat={Boolean(selected)} />
 }

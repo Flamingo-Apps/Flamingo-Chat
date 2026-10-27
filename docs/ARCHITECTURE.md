@@ -348,16 +348,21 @@ The monitoring stack (where metrics, traces and logs are stored and viewed) is d
 - `deploy/docker-compose.yml` has been removed; Tilt covers everything it used to.
 - **Development-only Google verifier (Proposed, DEC-0049).** With `DEV_FAKE_GOOGLE=1`, Identity accepts tokens of the form `fake:<sub>:<email>`, so verified flows can be tested without a browser. It logs a warning at startup and is never enabled outside local development. Not built yet.
 
-## 10. Frontend (Agreed)
+## 10. Frontend (Agreed; redesigned - DEC-0105)
 
 - A React + Vite + TypeScript single-page app in `web/`, deployed to Vercel. It talks only to the gateway. (DEC-0032, DEC-0040)
-- Screens follow the earlier prototype, adapted to v1:
-  - **Random:** matching, with the gender filter locked for guests.
+- **Welcome:** one question, "Have you been here before?". A new visitor goes straight in as a guest with a made-up name, with no form and no sign-in. A returning one signs in with Google.
+- **Desktop:** a real app layout, with navigation, the online count and the profile in a left column, a controls or list pane next to it, and the conversation on the right.
+- **Phone:** one pane at a time, with the navigation along the bottom.
+- Screens:
+  - **Random:** matching, with the gender filters locked until the person has a verified identity.
   - **Channels:** group rooms.
   - **Inbox:** kept conversations.
-  - **Top bar:** pseudonym and a "Get verified" button.
-  - **Chat header:** Next, Keep chatting, Report, Block and End.
-- Phones first. A finished visual design comes later.
+  - **Chat header:** Keep, Next, End and Report. Block is not offered yet: the old button only ended the chat, which End already does, and wiring the real block endpoint is still open.
+- **Identity prompt:** reaching for a locked feature opens a card explaining why an identity is needed, with Google's own sign-in button as the one-click yes. Declining shows the person exactly what others would see of them, which is only their anonymous name.
+- **Gender:** asked once, right after a first Google sign-in, with a warning that it cannot be changed. (DEC-0028)
+- **Online count:** the number beside the green dot is the `presence` frame the gateway already pushes, and before the first one arrives the public `GET /v1/presence`. No backend change.
+- Run it without the whole local stack: `npm run dev:mock` and `npm run dev` in `web/`. The mock gateway is a stand-in for working on the UI, not a model of the real gateway's rules.
 
 ## 11. Testing (unit/integration tests Agreed and built; the end-to-end smoke test built, pending review - DEC-0087, DEC-0088)
 
