@@ -99,6 +99,22 @@ Running before launch. (DEC-0024)
 - [ ] Sign-in re-tested with a KIIT account after publishing to production (DEC-0027)
 - [ ] Closed beta
 
+### Production readiness
+
+What a production system needs that the closed beta deliberately lacks, in the maintainer's agreed order of importance. Items marked "before launch" gate the public launch; the rest are known gaps, recorded so they are chosen rather than forgotten.
+
+- [ ] Postgres backups with a restore that has actually been tested (before launch). Nothing is backed up today, and Google deletes the trial's resources after it ends.
+- [ ] Alerts routed to the maintainer's phone or email (before launch). Alertmanager runs but sends nowhere.
+- [ ] Log retention rule for Loki, and message retention per DEC-0099's D8 option B (before launch)
+- [ ] At least two copies of the gateway and a PodDisruptionBudget (before launch). One node and one copy of each service means every node upgrade is a few minutes of downtime; it happened on 2026-10-26 and 2026-10-27.
+- [ ] Throwaway staging environment, created from the same scripts, for the black-box test and the load test (before launch)
+- [ ] Services wait for Postgres and Kafka with retries instead of crash-looping after a node upgrade
+- [ ] Database migrations as a separate step before a rollout, not at service start
+- [ ] Deploys from a pipeline with a record of who deployed what, instead of from one laptop
+- [ ] Least-privilege Google Cloud access and two-step sign-in on every account
+- [ ] Written service-level targets, and a runbook per known failure
+- [ ] Distributed tracing, and network policies between pods
+
 ## After launch
 
 - [ ] Benchmarks with documented method and saved results
