@@ -21,9 +21,13 @@
 //   BB-06 partner leaves, keep    BB-14 a banned person is removed
 //   BB-07 cancel a search         BB-15 guest signup rate limit
 //   BB-08 group channels          BB-16 no uncaught errors anywhere
+//   BB-17 keep question: default is to keep chatting, mutual keep -> Inbox with names
+//   BB-18 stop messaging closes a saved chat for both, and the server refuses sends
+//   BB-19 deleting a chat removes it for one person, the other keeps it by name
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
+import WebSocket from 'ws'
 
 const WEB = process.env.WEB_URL ?? 'http://localhost:8000'
 const GATEWAY = process.env.GATEWAY_URL ?? 'http://localhost:8080'
@@ -100,6 +104,28 @@ async function say(p, text) {
 const pseudonym = async (p) => (await p.locator('.profile__name').textContent())?.trim()
 const onlineCount = async (p) => Number(((await p.locator('.online').first().textContent()) ?? '').match(/(\d[\d,]*)\s*online/)?.[1]?.replace(/,/g, '') ?? NaN)
 const tokenOf = (p) => p.evaluate(() => localStorage.getItem('flamingo_session_token'))
+const NAME = {} // pseudonyms by user label, filled in as people sign up
+
+// What the server says if a client sends a message with a raw WebSocket: the
+// way an attacker (or a buggy client) would, with no web app in between.
+function rawSend(token, roomId, body) {
+  return new Promise((resolve, reject) => {
+    const ws = new WebSocket(`${GATEWAY.replace('http', 'ws')}/v1/ws`)
+    const timer = setTimeout(() => { ws.close(); reject(new Error('no answer from the gateway')) }, 10_000)
+    ws.on('open', () => ws.send(JSON.stringify({ type: 'auth', token })))
+    ws.on('message', (raw) => {
+      const f = JSON.parse(raw)
+      if (f.type === 'auth_ok') ws.send(JSON.stringify({ type: 'send_message', room_id: roomId, client_msg_id: crypto.randomUUID(), body }))
+      else if (f.type === 'error' || f.type === 'message') { clearTimeout(timer); ws.close(); resolve(f) }
+    })
+    ws.on('error', reject)
+  })
+}
+const roomIdOf = (p, name) => p.evaluate(async ([g, who]) => {
+  const t = localStorage.getItem('flamingo_session_token')
+  const rooms = (await (await fetch(`${g}/v1/rooms`, { headers: { Authorization: `Bearer ${t}` } })).json()).rooms
+  return rooms.find((r) => r.type === 'direct' && r.partner_pseudonym === who)?.id
+}, [GATEWAY, name])
 // How long a message takes to appear on another page, in ms; Infinity if it never does within `limit`.
 async function arrival(sender, receiver, text, limit = 40_000) {
   const t0 = Date.now()
@@ -147,6 +173,7 @@ await run('BB-02', 'first visit using only the keyboard; Mochi introduces hersel
   await findMatchBtn(A.page).waitFor()
   const name = await pseudonym(A.page)
   assert(name && name.split(' ').length === 2, `unexpected pseudonym "${name}"`)
+  NAME.A = name
   await A.page.reload()
   await findMatchBtn(A.page).waitFor()
   await sleep(1200)
@@ -156,6 +183,7 @@ await run('BB-02', 'first visit using only the keyboard; Mochi introduces hersel
 
 B = await newUser(browser, 'B')
 await enterAsGuest(B)
+NAME.B = await pseudonym(B.page)
 
 await run('BB-03', 'identity prompt: opens, keeps Google behind a panel, previews the anonymous name, asks nothing of Google until pressed', async () => {
   const hits = []
@@ -224,18 +252,25 @@ await run('BB-05', 'odd and hostile input: blanks, script tags, huge words, new 
   assert(seen.length === 20 && seen.every((n, i) => n === i + 1), `a rapid burst arrived out of order or incomplete: ${seen.join(',')}`)
 })
 
-await run('BB-06', 'partner leaves: the other person gets a keep-or-discard countdown, keeps it, and finds the history in Inbox', async () => {
+await run('BB-06', 'partner leaves: the one who stayed can save the chat, read-only, named after the other; the one who left gets nothing', async () => {
   await A.page.getByRole('button', { name: 'End', exact: true }).click()
   await findMatchBtn(A.page).waitFor()
   await B.page.getByRole('heading', { name: 'Your partner left' }).waitFor()
   assert(/\d+s/.test((await B.page.locator('.empty p').textContent()) ?? ''), 'no countdown is shown')
-  await B.page.getByRole('button', { name: 'Keep this chat' }).click()
-  await B.page.getByRole('heading', { name: 'Saved!' }).waitFor()
-  await B.page.getByRole('button', { name: 'Back to Random' }).click()
-  await B.page.locator('.nav-item', { hasText: 'Inbox' }).click()
-  await B.page.getByRole('button', { name: /Chat from/ }).first().click()
+  await B.page.getByRole('button', { name: 'Save to Inbox' }).click()
+  await B.page.getByRole('heading', { name: 'Saved to your Inbox!' }).waitFor()
+  assert((await B.page.locator('.empty p').textContent())?.includes("can't message them again"), 'it does not say the chat is read-only')
+  await B.page.getByRole('button', { name: 'Open in Inbox' }).click()
+  await B.page.locator('.chat__title', { hasText: NAME.A }).waitFor()
   await B.page.getByText('hello from A').waitFor()
+  assert((await composer(B.page).count()) === 0, 'a chat saved after the other person left can still be messaged')
+  assert((await B.page.locator('.chat__closed').count()) === 1, 'no read-only notice')
+  const code = (await rawSend(await tokenOf(B.page), await roomIdOf(B.page, NAME.A), 'sneaky')).code ?? ''
+  assert(/precondition/i.test(code), `the server accepted or mis-handled a send to a closed chat: ${code}`)
+  await A.page.locator('.nav-item', { hasText: 'Inbox' }).click()
+  await A.page.getByText('Nothing here yet').waitFor()
   await B.page.locator('.nav-item', { hasText: 'Random chat' }).click()
+  await A.page.locator('.nav-item', { hasText: 'Random chat' }).click()
 })
 
 await run('BB-07', 'cancelling a search clears the screen at once, and matching still works afterwards (DEC-0103)', async () => {
@@ -245,6 +280,57 @@ await run('BB-07', 'cancelling a search clears the screen at once, and matching 
   await findMatchBtn(A.page).waitFor({ timeout: 3000 })
   assert((await A.page.getByText('Looking for someone...').count()) === 0, 'still says searching after a cancel')
   await matchPair(A, B)
+})
+
+await run('BB-17', 'keep question: the default is to keep chatting; a mutual keep moves the chat to both Inboxes under each other\'s names', async () => {
+  await A.page.getByRole('button', { name: 'Keep', exact: true }).click()
+  await A.page.getByRole('button', { name: 'Waiting...' }).waitFor()
+  await B.page.getByRole('heading', { name: `${NAME.A} wants to keep this chat` }).waitFor()
+  const focused = await B.page.evaluate(() => document.activeElement?.textContent ?? '')
+  assert(focused.includes('Keep chatting for now'), `the focused button is "${focused}", not the keep-chatting default`)
+  await sleep(26_000) // saying nothing must never save a chat
+  await B.page.getByRole('heading', { name: `${NAME.A} wants to keep this chat` }).waitFor({ state: 'detached' })
+  assert((await composer(B.page).count()) === 1, 'the chat did not carry on after the question timed out')
+  const t = await arrival(B.page, A.page, 'still here, not saved yet')
+  assert(t <= FAST, `chat stopped working after the question: ${show(t)}`)
+  await B.page.getByRole('button', { name: 'Keep', exact: true }).click() // A already asked, so this saves it
+  for (const u of [A, B]) await u.page.getByRole('heading', { name: 'Saved to your Inbox!' }).waitFor()
+  await Promise.all([A.page.getByRole('button', { name: 'Open in Inbox' }).click(), B.page.getByRole('button', { name: 'Open in Inbox' }).click()])
+  await A.page.locator('.chat__title', { hasText: NAME.B }).waitFor()
+  await B.page.locator('.chat__title', { hasText: NAME.A }).waitFor()
+  assert((await A.page.getByText('Kept conversation').count()) === 0, 'the generic "Kept conversation" name is back')
+  const ms = await arrival(A.page, B.page, 'hello from the inbox')
+  assert(ms <= FAST, `a saved chat took ${show(ms)} to deliver a message`)
+})
+
+await run('BB-18', 'stop messaging closes a saved chat for both people at once, and the server refuses sends', async () => {
+  await A.page.getByRole('button', { name: 'Stop messaging' }).click()
+  await A.page.getByRole('heading', { name: 'Stop messaging?' }).waitFor()
+  await A.page.getByRole('button', { name: 'Stop messaging', exact: true }).last().click()
+  await A.page.locator('.chat__closed').waitFor()
+  await B.page.locator('.chat__closed').waitFor({ timeout: 10_000 })
+  for (const u of [A, B]) assert((await composer(u.page).count()) === 0, 'the box is still there after the chat was closed')
+  const code = (await rawSend(await tokenOf(B.page), await roomIdOf(B.page, NAME.A), 'after close')).code ?? ''
+  assert(/precondition/i.test(code), `the server did not refuse a send to a closed chat: ${code}`)
+  await B.page.getByText('hello from the inbox').waitFor() // still readable
+})
+
+await run('BB-19', 'deleting removes the chat for that person only; the other still has it, read-only, under the same name', async () => {
+  // B also still has the earlier read-only chat from BB-06, so count rows
+  // rather than expecting an empty Inbox: deleting one removes exactly one.
+  const before = await B.page.locator('.room').count()
+  assert(before >= 2, `expected B to have two saved chats with A, found ${before}`)
+  await B.page.getByRole('button', { name: 'Delete', exact: true }).first().click()
+  await B.page.getByRole('heading', { name: 'Delete this chat?' }).waitFor()
+  await B.page.getByRole('button', { name: 'Delete', exact: true }).last().click()
+  await B.page.waitForFunction((n) => document.querySelectorAll('.room').length === n, before - 1)
+  await A.page.reload()
+  await A.page.locator('.nav-item', { hasText: 'Inbox' }).click()
+  await A.page.locator('.room', { hasText: NAME.B }).waitFor()
+  await A.page.locator('.room', { hasText: NAME.B }).click()
+  await A.page.locator('.chat__closed').waitFor()
+  await A.page.getByText('hello from the inbox').waitFor()
+  for (const u of [A, B]) await u.page.locator('.nav-item', { hasText: 'Random chat' }).click()
 })
 
 await run('BB-08', 'group channel: create, join by invite code, talk both ways, leave', async () => {
@@ -305,8 +391,10 @@ await run('BB-11', 'a verified person can search with a gender filter; a guest c
 })
 
 await run('BB-12', 'the gateway restarts mid-chat: the app shows it, reconnects by itself, and chat carries on', async () => {
-  await Promise.all([A.page.locator('.nav-item', { hasText: 'Random chat' }).click(), B.page.locator('.nav-item', { hasText: 'Random chat' }).click()])
-  await composer(A.page).waitFor()
+  for (const u of [A, B]) await u.page.locator('.nav-item', { hasText: 'Random chat' }).click()
+  await matchPair(A, B)
+  await say(A.page, 'before the restart')
+  await B.page.getByText('before the restart', { exact: true }).waitFor()
   sh('kubectl', ['rollout', 'restart', 'deploy/gateway'])
   sh('kubectl', ['rollout', 'status', 'deploy/gateway', '--timeout=120s'])
   for (const u of [A, B]) await u.page.waitForFunction(() => document.querySelector('.online')?.classList.contains('online--open'), null, { timeout: 90_000 })
@@ -357,8 +445,10 @@ await run('BB-15', 'the sixth guest signup from one address is refused with a cl
     const u = await newUser(browser, `signup${i}`)
     await u.page.goto(WEB)
     await u.page.getByText("Nope, I'm new").click()
-    const outcome = await Promise.race([findMatchBtn(u.page).waitFor().then(() => 'in'), u.page.locator('.error-text').waitFor().then(() => 'refused')])
-    if (outcome === 'refused') {
+    const outcome = await Promise.race([findMatchBtn(u.page).waitFor().then(() => 'in'), u.page.locator('.error-text').waitFor().then(() => 'error')])
+    // Every attempt counts toward the limit, including one that fails because
+    // the random name was already taken (INC-0025); only "too many" is the limit.
+    if (outcome === 'error' && /too many/i.test((await u.page.locator('.error-text').textContent()) ?? '')) {
       refusedAt = i
       last = u
     } else await u.ctx.close()

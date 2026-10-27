@@ -32,6 +32,7 @@ function Main() {
   const [dialog, setDialog] = useState<Dialog>(null)
   const [genderSnoozed, setGenderSnoozed] = useState(false)
   const [metMochi, setMetMochi] = useState(hasMetMochi)
+  const [inboxRoom, setInboxRoom] = useState<string | null>(null)
   const account = state.account
 
   // Right after a first Google sign-in the account is verified but has no
@@ -43,6 +44,10 @@ function Main() {
   const ui = useMemo(
     () => ({
       askForIdentity: () => setDialog(account?.google_linked ? 'gender' : 'identity'),
+      openInbox: (roomId?: string) => {
+        setInboxRoom(roomId ?? null)
+        setScreen('inbox')
+      },
     }),
     [account?.google_linked],
   )
@@ -63,7 +68,7 @@ function Main() {
         <main className="shell__main">
           {screen === 'random' && <RandomScreen />}
           {screen === 'channels' && <ChannelsScreen />}
-          {screen === 'inbox' && <InboxScreen />}
+          {screen === 'inbox' && <InboxScreen key={inboxRoom ?? 'none'} initialRoomId={inboxRoom} />}
         </main>
         <BottomNav screen={screen} onChange={setScreen} />
       </div>

@@ -6,7 +6,6 @@ import { Mascot } from '../components/Mascot'
 import logo from '../assets/flamingo-logo.png'
 import { OnlineBadge } from '../components/OnlineBadge'
 import { useGateway } from '../gateway'
-import { generatePseudonym } from '../pseudonym'
 import { GoogleSignInLink } from './GoogleSignInLink'
 
 // The first thing anyone sees. One question, two answers: someone new goes
@@ -23,7 +22,7 @@ export function WelcomeScreen() {
     setLoading(true)
     setError(null)
     try {
-      const resp = await api.signUpGuest(generatePseudonym())
+      const resp = await api.signUpGuest()
       login(resp.account, resp.session_token)
     } catch (err) {
       setError(err instanceof Error ? err.message : String(err))

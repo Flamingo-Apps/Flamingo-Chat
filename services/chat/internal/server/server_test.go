@@ -548,3 +548,29 @@ func TestKeepVoteEventSaysWhetherThatVoteSavedTheRoom(t *testing.T) {
 		t.Fatalf("the second vote saved the room and its event must say so: %v", second)
 	}
 }
+
+// The Inbox lists a chat under the other person's name. If they delete the
+// chat (leave the room), their name must still be known, or the chat would
+// quietly turn anonymous (DEC-0106).
+func TestListMyRoomsStillNamesSomeoneWhoHasLeft(t *testing.T) {
+	s, _, _ := newDirect(t, "room-1", "event-1", "event-2", "event-3", "event-4", "event-5")
+	for _, who := range []string{"a", "b"} {
+		if _, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "room-1", AccountId: who}); err != nil {
+			t.Fatalf("vote: %v", err)
+		}
+	}
+	if _, err := s.LeaveRoom(context.Background(), &chatv1.LeaveRoomRequest{RoomId: "room-1", AccountId: "b"}); err != nil {
+		t.Fatalf("leave: %v", err)
+	}
+	resp, _ := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: "a"})
+	if len(resp.GetRooms()) != 1 {
+		t.Fatalf("a should still have the chat, got %v", roomIDs(resp.GetRooms()))
+	}
+	if members := resp.GetRooms()[0].GetMemberAccountIds(); len(members) != 2 {
+		t.Fatalf("expected both people still named, got %v", members)
+	}
+	gone, _ := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: "b"})
+	if len(gone.GetRooms()) != 0 {
+		t.Fatalf("b deleted it, so it must be gone from b's list, got %v", roomIDs(gone.GetRooms()))
+	}
+}

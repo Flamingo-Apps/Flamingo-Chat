@@ -5,7 +5,7 @@ import { useGateway } from '../gateway'
 import { ChatView } from './ChatView'
 
 export function ChannelsScreen() {
-  const { state, loadRooms } = useGateway()
+  const { state, loadRooms, syncRooms } = useGateway()
   const [selectedRoomId, setSelectedRoomId] = useState<string | null>(null)
   const [name, setName] = useState('')
   const [inviteCode, setInviteCode] = useState('')
@@ -24,6 +24,7 @@ export function ChannelsScreen() {
     setError(null)
     try {
       const room = await api.createGroupRoom(state.token, name.trim())
+      syncRooms()
       setName('')
       await loadRooms()
       setSelectedRoomId(room.id)
@@ -38,6 +39,7 @@ export function ChannelsScreen() {
     setError(null)
     try {
       const room = await api.joinRoomByInviteCode(state.token, inviteCode.trim())
+      syncRooms()
       setInviteCode('')
       await loadRooms()
       setSelectedRoomId(room.id)

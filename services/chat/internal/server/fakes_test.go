@@ -156,10 +156,10 @@ func (f *fakeStore) ListRoomsForAccount(_ context.Context, accountID string) ([]
 		savedByMe := room.Kept && f.keepVotes[roomID][accountID]
 		activeChat := !room.Kept && room.EndedAt == nil && time.Since(room.CreatedAt) <= store.ActiveDirectRoomWindow
 		if room.Type == roomTypeGroup || savedByMe || activeChat {
-			for id, in := range f.members[roomID] {
-				if in {
-					room.MemberAccountIDs = append(room.MemberAccountIDs, id)
-				}
+			// Everyone who has ever been in the room, so a person who left
+			// (deleted the chat) can still be named by the other.
+			for id := range f.everMembers[roomID] {
+				room.MemberAccountIDs = append(room.MemberAccountIDs, id)
 			}
 			sort.Strings(room.MemberAccountIDs)
 			rooms = append(rooms, room)

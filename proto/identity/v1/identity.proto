@@ -54,6 +54,8 @@ message Account {
 }
 
 message CreateAccountRequest {
+  // Optional. Empty means the server picks a free name, retrying on a clash
+  // (INC-0025). A name that is given and already taken is AlreadyExists.
   string pseudonym = 1;
 }
 

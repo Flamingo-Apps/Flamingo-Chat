@@ -118,14 +118,12 @@ describe('reducer', () => {
     expect(state.currentMatch?.roomId).toBe('room-1')
     expect(state.currentMatch?.partnerLeftAt).not.toBeNull()
 
-    // A solo keep vote landing during the grace window should still work
-    // the same way a normal mutual keep_status does.
+    // A solo keep vote landing during the grace window saves the chat for
+    // the person who stayed: it leaves the Random screen for their Inbox,
+    // read-only because the other person is gone (DEC-0106).
     state = reducer(state, { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: false, kept: true } })
-    expect(state.currentMatch?.kept).toBe(true)
-    expect(state.currentMatch?.roomId).toBe('room-1')
-
-    state = reducer(state, { type: 'graceWindowExpired', roomId: 'room-1' })
     expect(state.currentMatch).toBeNull()
+    expect(state.savedMatch).toEqual({ roomId: 'room-1', partnerPseudonym: 'Fox', readOnly: true })
   })
 
   it('clears everything and records the reason on kicked', () => {
@@ -138,5 +136,58 @@ describe('reducer', () => {
   it('records presence counts', () => {
     const state = reducer(initialState, { type: 'frame', frame: { type: 'presence', total: 5, guests: 2, male: 2, female: 1 } })
     expect(state.presence).toEqual({ total: 5, guests: 2, male: 2, female: 1 })
+  })
+
+  describe('keeping a chat (DEC-0106)', () => {
+    const matched = () => {
+      let state = reducer(initialState, { type: 'session', account, token: 'tok' })
+      state = reducer(state, {
+        type: 'frame',
+        frame: { type: 'match_found', room_id: 'room-1', partner_account_id: 'acc-2', partner_pseudonym: 'Quiet Otter' },
+      })
+      return state
+    }
+
+    it('records that the other person asked to keep, for the current chat only', () => {
+      const state = reducer(matched(), { type: 'frame', frame: { type: 'keep_requested', room_id: 'room-1' } })
+      expect(state.keepRequest?.roomId).toBe('room-1')
+
+      const other = reducer(matched(), { type: 'frame', frame: { type: 'keep_requested', room_id: 'another-room' } })
+      expect(other.keepRequest).toBeNull()
+    })
+
+    it('does not ask someone who has already said yes themselves', () => {
+      let state = matched()
+      state = reducer(state, { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: false, kept: false } })
+      state = reducer(state, { type: 'frame', frame: { type: 'keep_requested', room_id: 'room-1' } })
+      expect(state.keepRequest).toBeNull()
+    })
+
+    it('lets the person carry on chatting, which closes the question', () => {
+      let state = reducer(matched(), { type: 'frame', frame: { type: 'keep_requested', room_id: 'room-1' } })
+      state = reducer(state, { type: 'keepRequestDismissed' })
+      expect(state.keepRequest).toBeNull()
+      expect(state.currentMatch?.roomId).toBe('room-1')
+    })
+
+    it('moves a mutually kept chat out of Random and into the Inbox', () => {
+      let state = reducer(matched(), { type: 'frame', frame: { type: 'keep_requested', room_id: 'room-1' } })
+      state = reducer(state, { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: true, kept: true } })
+      expect(state.currentMatch).toBeNull()
+      expect(state.keepRequest).toBeNull()
+      expect(state.savedMatch).toEqual({ roomId: 'room-1', partnerPseudonym: 'Quiet Otter', readOnly: false })
+    })
+
+    it('drops a pending question when the chat ends', () => {
+      let state = reducer(matched(), { type: 'frame', frame: { type: 'keep_requested', room_id: 'room-1' } })
+      state = reducer(state, { type: 'frame', frame: { type: 'match_ended', room_id: 'room-1', reason: 'partner_left' } })
+      expect(state.keepRequest).toBeNull()
+    })
+
+    it('lets the saved-chat notice be dismissed', () => {
+      let state = reducer(matched(), { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: true, kept: true } })
+      state = reducer(state, { type: 'savedMatchDismissed' })
+      expect(state.savedMatch).toBeNull()
+    })
   })
 })

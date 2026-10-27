@@ -12,6 +12,8 @@ interface ChatViewProps {
   group?: boolean
   onBack?: () => void
   headerExtra?: React.ReactNode
+  // A closed conversation: readable, but nobody can send to it (DEC-0106).
+  readOnly?: boolean
 }
 
 // ChatView renders one room's messages and a send box - shared by the
@@ -19,8 +21,8 @@ interface ChatViewProps {
 // Direct-match-only actions (Next, Keep, End, Report) are passed in as
 // headerExtra by the caller rather than built in here, since a group
 // room has none of them.
-export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra }: ChatViewProps) {
-  const { state, send, loadMessages } = useGateway()
+export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra, readOnly }: ChatViewProps) {
+  const { state, send, loadMessages, clearError } = useGateway()
   const [body, setBody] = useState('')
   const messages = state.messagesByRoom[roomId] ?? []
   const bottomRef = useRef<HTMLDivElement>(null)
@@ -89,6 +91,15 @@ export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra }
         <div ref={bottomRef} />
       </div>
 
+      {readOnly ? (
+        <div className="chat__closed">This chat is closed. You can read it, but nobody can send messages here.</div>
+      ) : (
+      <>
+      {state.lastError && (
+        <button className="chat__error" role="alert" onClick={clearError}>
+          {state.lastError} (tap to dismiss)
+        </button>
+      )}
       <form className="chat__composer" onSubmit={sendMessage}>
         <textarea
           value={body}
@@ -103,6 +114,8 @@ export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra }
           <SendIcon />
         </button>
       </form>
+      </>
+      )}
     </div>
   )
 }

@@ -5,15 +5,17 @@ export function formatCount(n: number): string {
   return n.toLocaleString('en-IN')
 }
 
-// One emoji per animal in pseudonym.ts's word list, so an anonymous name
-// has a face without us storing or asking for anything. A name whose
-// last word isn't in the table (the backend generates its own for Google
-// sign-ups) falls back to its first letter. Placeholder art: the
+// One emoji per animal the server can put in a name
+// (services/identity/internal/server/pseudonym.go), so an anonymous name has
+// a face without us storing or asking for anything. A name whose animal
+// isn't in the table falls back to its first letter. Placeholder art: the
 // maintainer plans to replace these with their own blobs.
 const ANIMALS: Record<string, string> = {
   Otter: '🦦', Falcon: '🦅', Fox: '🦊', Panda: '🐼', Tiger: '🐯', Wolf: '🐺',
   Hawk: '🦅', Heron: '🐦', Lynx: '🐱', Raven: '🐦‍⬛', Badger: '🦡', Dolphin: '🐬',
   Eagle: '🦅', Gecko: '🦎', Ibis: '🐦', Jay: '🐦',
+  Koala: '🐨', Lemur: '🐒', Moose: '🦌', Newt: '🦎', Owl: '🦉', Puffin: '🐧', Quokka: '🐹',
+  Robin: '🐦', Seal: '🦭', Toucan: '🦜', Urchin: '🦔', Viper: '🐍', Walrus: '🦭', Yak: '🐂',
 }
 
 export interface AvatarLook {
@@ -25,7 +27,9 @@ export interface AvatarLook {
 // glyph and background hue, on every device and for every viewer, which
 // is what lets two people recognise "that's Swift Fox" across a chat.
 export function avatarFor(pseudonym: string): AvatarLook {
-  const last = pseudonym.trim().split(/\s+/).pop() ?? ''
+  // A trailing number ("Swift Fox 42") only keeps the name unique.
+  const words = pseudonym.trim().split(/\s+/).filter((w) => !/^\d+$/.test(w))
+  const last = words.pop() ?? ''
   const glyph = ANIMALS[last] ?? (pseudonym.trim().charAt(0).toUpperCase() || '?')
   let hash = 0
   for (const ch of pseudonym) hash = (hash * 31 + ch.charCodeAt(0)) >>> 0

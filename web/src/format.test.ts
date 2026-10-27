@@ -18,8 +18,19 @@ describe('avatarFor', () => {
     expect(avatarFor('Quiet Otter').glyph).toBe('🦦')
   })
 
+  it('finds the animal even when the server added a number to keep the name unique', () => {
+    expect(avatarFor('Swift Fox 42').glyph).toBe('🦊')
+    expect(avatarFor('Golden Owl 17').glyph).toBe(avatarFor('Golden Owl').glyph)
+  })
+
+  it('knows every animal the server can pick (services/identity/internal/server/pseudonym.go)', () => {
+    for (const noun of ['Koala', 'Lemur', 'Moose', 'Newt', 'Owl', 'Puffin', 'Quokka', 'Robin', 'Seal', 'Toucan', 'Urchin', 'Viper', 'Walrus', 'Yak']) {
+      expect(avatarFor(`Calm ${noun}`).glyph, noun).not.toBe('C')
+    }
+  })
+
   it('falls back to the first letter for a name it has no animal for', () => {
-    expect(avatarFor('Brave Toucan').glyph).toBe('B')
+    expect(avatarFor('Brave Narwhal').glyph).toBe('B')
     expect(avatarFor('').glyph).toBe('?')
   })
 

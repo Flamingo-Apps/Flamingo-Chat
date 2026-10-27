@@ -56,9 +56,9 @@ type Room struct {
 	// EndedAt is nil while the room is still open. An ended room accepts no
 	// more messages but can still be read.
 	EndedAt *time.Time
-	// MemberAccountIDs is the current members, filled in only by
-	// ListRoomsForAccount, so a caller can tell who the other person in a
-	// direct room is (DEC-0106).
+	// MemberAccountIDs is everyone who is or ever was a member, filled in
+	// only by ListRoomsForAccount, so a caller can tell who the other person
+	// in a direct room is even after they left (DEC-0106).
 	MemberAccountIDs []string
 }
 
@@ -131,7 +131,7 @@ type RoomStore interface {
 	// it in their Inbox just because they were once in it); and a direct
 	// room that is still open, unsaved and recent, so that a connection
 	// that reconnects can listen to a random chat in progress again. Each
-	// room carries its current member ids.
+	// room carries the ids of everyone who is or was in it.
 	ListRoomsForAccount(ctx context.Context, accountID string) ([]Room, error)
 
 	// VoteKeep records a keep vote for a direct room. Idempotent: voting

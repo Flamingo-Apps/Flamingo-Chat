@@ -980,6 +980,57 @@ textarea:focus {
   box-shadow: var(--shadow-s);
 }
 
+/* the 25-second countdown on the keep question: a bar that shrinks to nothing */
+.timer {
+  width: 100%;
+  height: 12px;
+  border: 3px solid var(--ink);
+  border-radius: 999px;
+  background: var(--card);
+  overflow: hidden;
+}
+.timer__bar {
+  height: 100%;
+  background: var(--pink);
+  animation: shrink linear forwards;
+}
+@keyframes shrink {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0;
+  }
+}
+
+/* a closed conversation, and a message that could not be sent */
+.chat__closed {
+  padding: 1rem 1.2rem;
+  border-top: 3px solid var(--ink);
+  background: var(--pink-soft);
+  text-align: center;
+  font-weight: 800;
+}
+.chat__error {
+  width: 100%;
+  padding: 0.6rem 1.2rem;
+  border: 0;
+  border-top: 3px solid var(--ink);
+  background: #ffc2c9;
+  font-weight: 800;
+  cursor: pointer;
+}
+.room__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.room__meta {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: var(--muted);
+}
+
 /* the "Get your identity" panel, with Google's button inside */
 .accordion {
   width: 100%;

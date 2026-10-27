@@ -30,6 +30,12 @@ export interface AppState {
   currentMatch: CurrentMatch | null
   matching: boolean
   presence: { total: number; guests: number; male: number; female: number } | null
+  // The other person asked to keep the current chat and has not been answered.
+  keepRequest: { roomId: string } | null
+  // A chat that was just saved, shown once as a card where the chat was.
+  // readOnly is true when the other person had already left, so it can be
+  // read but not continued (DEC-0106).
+  savedMatch: { roomId: string; partnerPseudonym: string; readOnly: boolean } | null
   lastError: string | null
   kicked: string | null
 }
@@ -43,6 +49,8 @@ export const initialState: AppState = {
   currentMatch: null,
   matching: false,
   presence: null,
+  keepRequest: null,
+  savedMatch: null,
   lastError: null,
   kicked: null,
 }
@@ -57,6 +65,8 @@ export type Action =
   | { type: 'frame'; frame: ServerFrame }
   | { type: 'clearError' }
   | { type: 'graceWindowExpired'; roomId: string }
+  | { type: 'keepRequestDismissed' }
+  | { type: 'savedMatchDismissed' }
 
 // addMessageDeduped appends msg to list unless a message with the same
 // message_id is already present - docs/ARCHITECTURE.md §5.2 calls for
@@ -118,11 +128,31 @@ function applyFrame(state: AppState, frame: ServerFrame): AppState {
       // partner left, don't drop it yet: RandomScreen shows a grace-
       // window "keep this chat?" prompt instead (DEC-0091), and this
       // action only marks when that window started.
-      if (frame.reason === 'you_left') return { ...state, currentMatch: null }
-      return { ...state, currentMatch: { ...state.currentMatch, partnerLeftAt: Date.now() } }
+      if (frame.reason === 'you_left') return { ...state, currentMatch: null, keepRequest: null }
+      return { ...state, keepRequest: null, currentMatch: { ...state.currentMatch, partnerLeftAt: Date.now() } }
+
+    // The other person asked to keep this chat (DEC-0106). Not shown to
+    // someone who has already said yes themselves.
+    case 'keep_requested':
+      if (state.currentMatch?.roomId !== frame.room_id || state.currentMatch.youKept) return state
+      return { ...state, keepRequest: { roomId: frame.room_id } }
 
     case 'keep_status':
       if (state.currentMatch?.roomId !== frame.room_id) return state
+      // Saved: the chat leaves Random for the Inbox. If the other person
+      // had already left, it is saved read-only (DEC-0106).
+      if (frame.kept) {
+        return {
+          ...state,
+          currentMatch: null,
+          keepRequest: null,
+          savedMatch: {
+            roomId: frame.room_id,
+            partnerPseudonym: state.currentMatch.partnerPseudonym,
+            readOnly: state.currentMatch.partnerLeftAt !== null,
+          },
+        }
+      }
       return {
         ...state,
         currentMatch: { ...state.currentMatch, youKept: frame.you, partnerKept: frame.partner, kept: frame.kept },
@@ -172,6 +202,10 @@ export function reducer(state: AppState, action: Action): AppState {
       return applyFrame(state, action.frame)
     case 'clearError':
       return { ...state, lastError: null }
+    case 'keepRequestDismissed':
+      return { ...state, keepRequest: null }
+    case 'savedMatchDismissed':
+      return { ...state, savedMatch: null }
     case 'graceWindowExpired':
       // Unconditional once the roomId matches - RandomScreen is what
       // decides whether this should fire at all (it cancels its own

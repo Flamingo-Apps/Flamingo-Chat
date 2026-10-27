@@ -43,8 +43,19 @@ func New(accountStore store.AccountStore, verifier verify.GoogleVerifier, genID 
 }
 
 func (s *Server) CreateAccount(ctx context.Context, req *identityv1.CreateAccountRequest) (*identityv1.CreateAccountResponse, error) {
+	// No name given: the server picks a free one, retrying on a clash
+	// (INC-0025), so a new guest never meets "pseudonym already taken".
 	if strings.TrimSpace(req.GetPseudonym()) == "" {
-		return nil, status.Error(codes.InvalidArgument, "pseudonym must not be empty")
+		for attempt := range maxPseudonymAttempts {
+			acc, err := s.store.Create(ctx, s.genID(), nextPseudonym(attempt))
+			if err == nil {
+				return &identityv1.CreateAccountResponse{Account: toProto(acc)}, nil
+			}
+			if !errors.Is(err, store.ErrAlreadyExists) {
+				return nil, status.Errorf(codes.Internal, "create account: %v", err)
+			}
+		}
+		return nil, status.Error(codes.Unavailable, "could not find a free name, please try again")
 	}
 
 	acc, err := s.store.Create(ctx, s.genID(), req.GetPseudonym())
@@ -141,8 +152,8 @@ func (s *Server) SignInWithGoogle(ctx context.Context, req *identityv1.SignInWit
 }
 
 func (s *Server) createVerifiedWithGeneratedPseudonym(ctx context.Context, claims verify.GoogleClaims) (store.Account, error) {
-	for range maxPseudonymAttempts {
-		acc, err := s.store.CreateVerified(ctx, s.genID(), generatePseudonym(), claims.Sub, claims.Email)
+	for attempt := range maxPseudonymAttempts {
+		acc, err := s.store.CreateVerified(ctx, s.genID(), nextPseudonym(attempt), claims.Sub, claims.Email)
 		if err == nil {
 			return acc, nil
 		}

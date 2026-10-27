@@ -6,6 +6,8 @@ import { createContext, useContext } from 'react'
 // for someone who signed in with Google but hasn't picked yet.
 export interface UiValue {
   askForIdentity: () => void
+  // Go to the Inbox, optionally straight into one saved chat.
+  openInbox: (roomId?: string) => void
 }
 
 export const UiContext = createContext<UiValue | null>(null)

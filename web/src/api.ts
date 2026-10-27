@@ -31,7 +31,10 @@ async function request<T>(method: string, path: string, token?: string, body?: u
   return data as T
 }
 
-export function signUpGuest(pseudonym: string): Promise<{ session_token: string; account: Account }> {
+// No name is sent: the server picks a free one (INC-0025). The web app used
+// to choose from 256 names and failed with "pseudonym already taken" as
+// accounts piled up.
+export function signUpGuest(pseudonym = ''): Promise<{ session_token: string; account: Account }> {
   return request('POST', '/v1/auth/guest', undefined, { pseudonym })
 }
 
@@ -71,6 +74,12 @@ export function joinRoomByInviteCode(token: string, inviteCode: string): Promise
 
 export function leaveRoom(token: string, roomId: string): Promise<void> {
   return request('POST', `/v1/rooms/${roomId}/leave`, token)
+}
+
+// closeRoom is "stop messaging": the conversation stays readable for both
+// people but nobody can send to it any more.
+export function closeRoom(token: string, roomId: string): Promise<void> {
+  return request('POST', `/v1/rooms/${roomId}/close`, token)
 }
 
 export function listMessages(token: string, roomId: string, before?: string): Promise<{ messages: Message[] }> {

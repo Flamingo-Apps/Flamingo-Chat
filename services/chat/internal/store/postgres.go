@@ -224,8 +224,10 @@ func (p *Postgres) ListRoomsForAccount(ctx context.Context, accountID string) ([
 		return rooms, nil
 	}
 
-	// One more query for everyone's membership, rather than one per room.
-	mrows, err := p.pool.Query(ctx, `SELECT room_id, account_id FROM room_members WHERE room_id = ANY($1) AND left_at IS NULL ORDER BY account_id`, ids)
+	// One more query for everyone's membership, rather than one per room. It
+	// includes people who have since left: a chat the other person deleted
+	// must still be listed under their name.
+	mrows, err := p.pool.Query(ctx, `SELECT room_id, account_id FROM room_members WHERE room_id = ANY($1) ORDER BY account_id`, ids)
 	if err != nil {
 		return nil, fmt.Errorf("store: list rooms for account: members: %w", err)
 	}

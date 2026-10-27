@@ -17,8 +17,8 @@ const CHOICES: { value: Preference; label: string }[] = [
 ]
 
 export function RandomScreen() {
-  const { state, send } = useGateway()
-  const { askForIdentity } = useUi()
+  const { state, send, dismissKeepRequest, dismissSavedMatch } = useGateway()
+  const { askForIdentity, openInbox } = useUi()
   const [preference, setPreference] = useState<Preference>('any')
   const [reportOpen, setReportOpen] = useState(false)
   const account = state.account
@@ -80,7 +80,7 @@ export function RandomScreen() {
 
   let chat
   if (match?.partnerLeftAt) {
-    chat = <PartnerLeftPrompt roomId={match.roomId} partnerLeftAt={match.partnerLeftAt} kept={match.kept} />
+    chat = <PartnerLeftPrompt roomId={match.roomId} partnerLeftAt={match.partnerLeftAt} />
   } else if (match) {
     chat = (
       <ChatView
@@ -89,8 +89,8 @@ export function RandomScreen() {
         subtitle="Anonymous student"
         headerExtra={
           <>
-            <button className="btn btn--sm btn--ghost" onClick={() => send({ type: 'keep_chat', room_id: match.roomId })}>
-              <HeartIcon /> {match.kept ? 'Kept' : 'Keep'}
+            <button className="btn btn--sm btn--ghost" disabled={match.youKept} onClick={() => send({ type: 'keep_chat', room_id: match.roomId })}>
+              <HeartIcon /> {match.youKept ? 'Waiting...' : 'Keep'}
             </button>
             <button className="btn btn--sm btn--ghost" onClick={() => send({ type: 'match_next' })}>
               <SkipIcon /> Next
@@ -105,6 +105,30 @@ export function RandomScreen() {
         }
       />
     )
+  } else if (state.savedMatch) {
+    const saved = state.savedMatch
+    chat = (
+      <EmptyChat
+        mood="cheer"
+        title="Saved to your Inbox!"
+        text={saved.readOnly ? `You can read your chat with ${saved.partnerPseudonym} any time, but you can't message them again.` : `You and ${saved.partnerPseudonym} can keep chatting from your Inbox.`}
+      >
+        <div className="modal__actions">
+          <button
+            className="btn"
+            onClick={() => {
+              dismissSavedMatch()
+              openInbox(saved.roomId)
+            }}
+          >
+            Open in Inbox
+          </button>
+          <button className="link-button" onClick={dismissSavedMatch}>
+            Back to Random
+          </button>
+        </div>
+      </EmptyChat>
+    )
   } else if (state.matching) {
     chat = (
       <EmptyChat mood="search" title="Finding someone for you" text="Hang tight, this only takes a few seconds.">
@@ -117,8 +141,11 @@ export function RandomScreen() {
 
   return (
     <>
-      <Workspace list={list} chat={chat} hasChat={Boolean(match) || state.matching} />
+      <Workspace list={list} chat={chat} hasChat={Boolean(match) || state.matching || Boolean(state.savedMatch)} />
       {reportOpen && match && <ReportDialog onClose={() => setReportOpen(false)} />}
+      {state.keepRequest && match && !match.youKept && state.keepRequest.roomId === match.roomId && (
+        <KeepRequestPrompt name={match.partnerPseudonym} roomId={match.roomId} onContinue={dismissKeepRequest} />
+      )}
     </>
   )
 }
@@ -172,12 +199,11 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
 // short window to vote keep on their own - the partner is confirmed
 // gone and can never complete a mutual vote otherwise, so without this
 // "keep" would be permanently impossible from this point on.
-function PartnerLeftPrompt({ roomId, partnerLeftAt, kept }: { roomId: string; partnerLeftAt: number; kept: boolean }) {
+function PartnerLeftPrompt({ roomId, partnerLeftAt }: { roomId: string; partnerLeftAt: number }) {
   const { send, expireGraceWindow } = useGateway()
   const [remainingMs, setRemainingMs] = useState(() => Math.max(0, partnerLeftAt + GRACE_WINDOW_MS - Date.now()))
 
   useEffect(() => {
-    if (kept) return
     const interval = setInterval(() => {
       const left = partnerLeftAt + GRACE_WINDOW_MS - Date.now()
       setRemainingMs(Math.max(0, left))
@@ -187,28 +213,53 @@ function PartnerLeftPrompt({ roomId, partnerLeftAt, kept }: { roomId: string; pa
       }
     }, 250)
     return () => clearInterval(interval)
-  }, [kept, partnerLeftAt, roomId, expireGraceWindow])
-
-  if (kept) {
-    return (
-      <EmptyChat mood="cheer" title="Saved!" text="You can find this chat in your Inbox.">
-        <button className="btn" onClick={() => expireGraceWindow(roomId)}>
-          Back to Random
-        </button>
-      </EmptyChat>
-    )
-  }
+  }, [partnerLeftAt, roomId, expireGraceWindow])
 
   return (
-    <EmptyChat mood="worried" title="Your partner left" text={`Want to keep this chat anyway? You have ${Math.ceil(remainingMs / 1000)}s.`}>
+    <EmptyChat mood="worried" title="Your partner left" text={`You can still save this chat to read later, but you won't be able to message them again. ${Math.ceil(remainingMs / 1000)}s left.`}>
       <div className="modal__actions">
         <button className="btn" onClick={() => send({ type: 'keep_chat', room_id: roomId })}>
-          Keep this chat
+          Save to Inbox
         </button>
         <button className="btn btn--ghost" onClick={() => expireGraceWindow(roomId)}>
           Discard
         </button>
       </div>
     </EmptyChat>
+  )
+}
+
+// How long the other person has to answer before the question goes away and
+// the chat simply carries on. The default is to keep chatting: saying
+// nothing never saves a chat.
+const KEEP_PROMPT_SECONDS = 25
+
+// The other person asked to keep this chat (DEC-0106). Two answers, and the
+// calm one, "keep chatting for now", is the default: it is the focused
+// button, Escape picks it, and so does letting the time run out.
+function KeepRequestPrompt({ name, roomId, onContinue }: { name: string; roomId: string; onContinue: () => void }) {
+  const { send } = useGateway()
+  useEffect(() => {
+    const timer = setTimeout(onContinue, KEEP_PROMPT_SECONDS * 1000)
+    return () => clearTimeout(timer)
+  }, [onContinue])
+
+  return (
+    <Modal onClose={onContinue} label="Keep this chat?">
+      <Mascot mood="point" size={110} />
+      <h2>{name} wants to keep this chat</h2>
+      <p>Save it and it moves to both your Inboxes. Or just keep chatting for now.</p>
+      <div className="timer" aria-hidden="true">
+        <div className="timer__bar" style={{ animationDuration: `${KEEP_PROMPT_SECONDS}s` }} />
+      </div>
+      <div className="modal__actions">
+        <button className="btn" autoFocus onClick={onContinue}>
+          Keep chatting for now
+        </button>
+        <button className="btn btn--ghost" onClick={() => send({ type: 'keep_chat', room_id: roomId })}>
+          Save to Inbox
+        </button>
+      </div>
+    </Modal>
   )
 }

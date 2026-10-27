@@ -87,8 +87,9 @@ const http = createServer(async (req, res) => {
 
   if (req.method === 'POST' && url.pathname === '/v1/auth/guest') {
     const { pseudonym } = await readBody(req)
-    if (!pseudonym) return fail(res, 400, 'invalidargument', 'pseudonym is required')
-    const { token: t, account } = newAccount(pseudonym)
+    const pick = (l) => l[Math.floor(Math.random() * l.length)]
+    const name = pseudonym || `${pick(['Silent', 'Brave', 'Swift', 'Lucky', 'Witty'])} ${pick(['Otter', 'Fox', 'Panda', 'Lynx', 'Heron'])}`
+    const { token: t, account } = newAccount(name)
     return send(res, 200, { session_token: t, account })
   }
 

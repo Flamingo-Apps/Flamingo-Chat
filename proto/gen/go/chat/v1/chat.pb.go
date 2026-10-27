@@ -84,8 +84,9 @@ type Room struct {
 	// 0 while the room is still open. A room with this set accepts no more
 	// messages (SendMessage fails), but can still be read.
 	EndedAtUnix int64 `protobuf:"varint,8,opt,name=ended_at_unix,json=endedAtUnix,proto3" json:"ended_at_unix,omitempty"`
-	// The accounts that are currently members. For a direct room this is how
-	// a caller learns who the other person is (DEC-0106).
+	// The accounts that are or ever were members, filled in by ListMyRooms. For
+	// a direct room this is how a caller learns who the other person is, even
+	// after they left (DEC-0106).
 	MemberAccountIds []string `protobuf:"bytes,9,rep,name=member_account_ids,json=memberAccountIds,proto3" json:"member_account_ids,omitempty"`
 	unknownFields    protoimpl.UnknownFields
 	sizeCache        protoimpl.SizeCache

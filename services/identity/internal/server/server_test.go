@@ -2,6 +2,9 @@ package server
 
 import (
 	"context"
+	"fmt"
+	"regexp"
+	"strings"
 	"testing"
 	"time"
 
@@ -208,10 +211,6 @@ func TestCreateAccount(t *testing.T) {
 	}
 	if acc.GetAccount().GetId() != "acc-1" || acc.GetAccount().GetPseudonym() != "shadow_fox" || acc.GetAccount().GetGoogleLinked() {
 		t.Fatalf("unexpected account: %+v", acc)
-	}
-
-	if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: ""}); status.Code(err) != codes.InvalidArgument {
-		t.Fatalf("expected InvalidArgument for empty pseudonym, got %v", err)
 	}
 
 	s2 := New(newFakeStore(), &fakeVerifier{}, idGen("acc-1", "acc-2"), "kiit.ac.in")
@@ -444,3 +443,81 @@ func TestTouchAccount(t *testing.T) {
 }
 
 func strPtr(s string) *string { return &s }
+
+// A guest who does not choose a name is given one (INC-0025). The web app used
+// to pick from only 256 names and failed with "pseudonym already taken" as
+// accounts accumulated; the server now chooses and retries.
+func TestCreateAccountWithoutAPseudonymGeneratesOne(t *testing.T) {
+	s := New(newFakeStore(), &fakeVerifier{}, idGen("acc-1"), "kiit.ac.in")
+	for _, blank := range []string{"", "   "} {
+		resp, err := New(newFakeStore(), &fakeVerifier{}, idGen("acc-1"), "kiit.ac.in").CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: blank})
+		if err != nil {
+			t.Fatalf("CreateAccount(%q): %v", blank, err)
+		}
+		if got := resp.GetAccount().GetPseudonym(); len(strings.Fields(got)) < 2 {
+			t.Fatalf("expected a generated two-word name for %q, got %q", blank, got)
+		}
+	}
+	_ = s
+}
+
+func TestCreateAccountRetriesWhenAGeneratedNameIsTaken(t *testing.T) {
+	st := newFakeStore()
+	s := New(st, &fakeVerifier{}, idGen("acc-0", "acc-1", "acc-2", "acc-3"), "kiit.ac.in")
+	for _, taken := range []string{"Taken One", "Taken Two"} {
+		if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: taken}); err != nil {
+			t.Fatalf("setup: %v", err)
+		}
+	}
+
+	attempts := 0
+	defer func(prev func(int) string) { nextPseudonym = prev }(nextPseudonym)
+	nextPseudonym = func(int) string {
+		attempts++
+		if attempts <= 2 {
+			return map[int]string{1: "Taken One", 2: "Taken Two"}[attempts]
+		}
+		return "Free Name"
+	}
+
+	resp, err := New(st, &fakeVerifier{}, idGen("acc-a", "acc-b", "acc-c"), "kiit.ac.in").CreateAccount(context.Background(), &identityv1.CreateAccountRequest{})
+	if err != nil {
+		t.Fatalf("CreateAccount: %v", err)
+	}
+	if resp.GetAccount().GetPseudonym() != "Free Name" || attempts != 3 {
+		t.Fatalf("expected the third generated name to be used, got %q after %d attempts", resp.GetAccount().GetPseudonym(), attempts)
+	}
+}
+
+func TestCreateAccountGivesUpPolitelyWhenNoFreeNameIsFound(t *testing.T) {
+	st := newFakeStore()
+	ids := make([]string, 0, maxPseudonymAttempts+1)
+	for i := range maxPseudonymAttempts + 1 {
+		ids = append(ids, fmt.Sprintf("acc-%d", i))
+	}
+	s := New(st, &fakeVerifier{}, idGen(ids...), "kiit.ac.in")
+	if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{Pseudonym: "Always Taken"}); err != nil {
+		t.Fatalf("setup: %v", err)
+	}
+	defer func(prev func(int) string) { nextPseudonym = prev }(nextPseudonym)
+	nextPseudonym = func(int) string { return "Always Taken" }
+
+	if _, err := s.CreateAccount(context.Background(), &identityv1.CreateAccountRequest{}); status.Code(err) != codes.Unavailable {
+		t.Fatalf("expected Unavailable (try again) when no free name is found, got %v", err)
+	}
+}
+
+func TestGeneratedNamesGetANumberAfterAFewClashes(t *testing.T) {
+	plain := regexp.MustCompile(`^[A-Z][a-z]+ [A-Z][a-z]+$`)
+	numbered := regexp.MustCompile(`^[A-Z][a-z]+ [A-Z][a-z]+ \d{2}$`)
+	for attempt := range pseudonymPlainAttempts {
+		if got := generatePseudonymAttempt(attempt); !plain.MatchString(got) {
+			t.Fatalf("attempt %d should be two plain words, got %q", attempt, got)
+		}
+	}
+	for attempt := pseudonymPlainAttempts; attempt < maxPseudonymAttempts; attempt++ {
+		if got := generatePseudonymAttempt(attempt); !numbered.MatchString(got) {
+			t.Fatalf("attempt %d should end in a two-digit number, got %q", attempt, got)
+		}
+	}
+}
