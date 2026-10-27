@@ -1,0 +1,64 @@
+name: Deploy web
+
+# Deploys web/ to Vercel from here, not from Vercel's own GitHub integration
+# (DEC-0107). It runs ONLY when someone starts it (Actions tab > Deploy web >
+# Run workflow), like the backend's deploy.sh: the backend goes out first,
+# then the web app, so the web never asks for something the backend does not
+# have yet. It runs the same checks CI runs before it deploys. Nothing
+# deploys on a merge or on a pull request.
+#
+# Needs three repository secrets (Settings > Secrets and variables > Actions):
+# VERCEL_TOKEN, VERCEL_ORG_ID and VERCEL_PROJECT_ID. And Vercel's own
+# automatic deployments must be off for the project (web/vercel.json sets
+# git.deploymentEnabled to false), or every merge would deploy twice.
+
+on:
+  workflow_dispatch:
+
+# One deploy at a time, and never cancel one halfway through.
+concurrency:
+  group: web-deploy
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  deploy:
+    name: deploy to Vercel
+    runs-on: ubuntu-latest
+    env:
+      VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+      VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+
+      # The same gate as CI, so a deploy never ships what a pull request
+      # would have failed.
+      - name: Check the web app
+        working-directory: web
+        run: |
+          npm ci
+          npm run typecheck
+          npm test
+          npm run build
+
+      - name: Install the Vercel CLI
+        run: npm install --global vercel@64.0.2
+
+      # Run from the repository root: the project's Root Directory setting
+      # (web) is applied by Vercel itself.
+      - name: Pull the project's settings and environment variables
+        run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Build
+        run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy
+        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
