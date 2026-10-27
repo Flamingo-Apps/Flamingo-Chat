@@ -80,6 +80,7 @@ type fakeChat struct {
 	rotateInviteCode func(context.Context, *chatv1.RotateInviteCodeRequest) (*chatv1.RotateInviteCodeResponse, error)
 	listMyRooms      func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error)
 	listMessages     func(context.Context, *chatv1.ListMessagesRequest) (*chatv1.ListMessagesResponse, error)
+	closeDirectRoom  func(context.Context, *chatv1.CloseDirectRoomRequest) (*chatv1.CloseDirectRoomResponse, error)
 }
 
 func (f *fakeChat) CreateGroupRoom(ctx context.Context, in *chatv1.CreateGroupRoomRequest, _ ...grpc.CallOption) (*chatv1.CreateGroupRoomResponse, error) {
@@ -134,6 +135,13 @@ func (f *fakeChat) SendMessage(context.Context, *chatv1.SendMessageRequest, ...g
 
 func (f *fakeChat) VoteKeep(context.Context, *chatv1.VoteKeepRequest, ...grpc.CallOption) (*chatv1.VoteKeepResponse, error) {
 	return nil, errNotConfigured
+}
+
+func (f *fakeChat) CloseDirectRoom(ctx context.Context, in *chatv1.CloseDirectRoomRequest, _ ...grpc.CallOption) (*chatv1.CloseDirectRoomResponse, error) {
+	if f.closeDirectRoom == nil {
+		return nil, errNotConfigured
+	}
+	return f.closeDirectRoom(ctx, in)
 }
 
 func (f *fakeChat) EndDirectRoom(context.Context, *chatv1.EndDirectRoomRequest, ...grpc.CallOption) (*chatv1.EndDirectRoomResponse, error) {

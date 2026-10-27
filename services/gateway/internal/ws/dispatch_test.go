@@ -282,3 +282,30 @@ func TestTrackMatchRoomClearsOnEnded(t *testing.T) {
 		t.Fatalf("expected the tracked room to be cleared, got %q", got)
 	}
 }
+
+// sync_rooms is how the web app says "I just created or joined a room, start
+// listening to it now" instead of waiting for the periodic sync (INC-0024).
+// With no rooms to subscribe to, refreshRooms needs no pubsub, so the call
+// itself is what this asserts; the real subscription is covered by the
+// black-box test BB-08 against Redis.
+func TestSyncRoomsAsksChatForTheRoomsAtOnce(t *testing.T) {
+	asked := 0
+	chat := &fakeChat{listMyRooms: func(_ context.Context, req *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+		asked++
+		if req.GetAccountId() != "acc-1" {
+			t.Fatalf("asked about the wrong account: %q", req.GetAccountId())
+		}
+		return &chatv1.ListMyRoomsResponse{}, nil
+	}}
+	c := newTestConn(&fakeIdentity{}, chat, &fakeMatching{})
+
+	c.dispatch(context.Background(), []byte(`{"type":"sync_rooms"}`))
+	if asked != 1 {
+		t.Fatalf("expected one ListMyRooms call, got %d", asked)
+	}
+	select {
+	case b := <-c.send:
+		t.Fatalf("sync_rooms should be silent on success, got %q", b)
+	default:
+	}
+}

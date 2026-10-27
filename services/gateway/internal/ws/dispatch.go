@@ -142,6 +142,12 @@ func (c *conn) dispatch(ctx context.Context, data []byte) {
 		c.handleSendMessage(ctx, data)
 	case "keep_chat":
 		c.handleKeepChat(ctx, data)
+	case "sync_rooms":
+		// The web app just created or joined a room over HTTP, which has no
+		// live signal of its own. Check Chat's list now rather than at the
+		// next periodic tick, up to 25 seconds away, during which a message
+		// in the new room reaches nobody and is not replayed (INC-0024).
+		c.refreshRooms(ctx)
 	case "match_request":
 		c.handleMatchRequest(ctx, data)
 	case "match_cancel":

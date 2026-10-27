@@ -32,6 +32,11 @@ service ChatService {
   // chat.
   rpc EndDirectRoom(EndDirectRoomRequest) returns (EndDirectRoomResponse);
 
+  // Closes a direct room to further messages whether or not it was kept:
+  // "stop messaging" in the Inbox. Everyone can still read it. Unlike
+  // EndDirectRoom it works on a kept room (DEC-0106).
+  rpc CloseDirectRoom(CloseDirectRoomRequest) returns (CloseDirectRoomResponse);
+
   // Removes a member from a group room: the owner removing someone, or
   // the admin tool acting on a ban (DEC-0029).
   rpc RemoveMember(RemoveMemberRequest) returns (RemoveMemberResponse);
@@ -53,8 +58,12 @@ message Room {
   // conversation (DEC-0031).
   bool kept = 6;
   int64 created_at_unix = 7;
-  // 0 while the room is still open.
+  // 0 while the room is still open. A room with this set accepts no more
+  // messages (SendMessage fails), but can still be read.
   int64 ended_at_unix = 8;
+  // The accounts that are currently members. For a direct room this is how
+  // a caller learns who the other person is (DEC-0106).
+  repeated string member_account_ids = 9;
 }
 
 message Message {
@@ -164,6 +173,14 @@ message EndDirectRoomRequest {
 }
 
 message EndDirectRoomResponse {}
+
+message CloseDirectRoomRequest {
+  string room_id = 1;
+  // Must be a current member.
+  string account_id = 2;
+}
+
+message CloseDirectRoomResponse {}
 
 message RemoveMemberRequest {
   string room_id = 1;

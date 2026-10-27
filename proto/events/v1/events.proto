@@ -51,6 +51,11 @@ message MemberLeft {
 message KeepVote {
   string room_id = 1;
   string account_id = 2;
+  // True when this vote is the one that made the room kept. A consumer that
+  // wants to tell the other member "someone asked to keep this chat" only
+  // does so when it is false, since a kept room is announced by RoomKept
+  // instead (DEC-0106).
+  bool kept = 3;
 }
 
 message RoomKept {

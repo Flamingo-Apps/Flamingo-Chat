@@ -33,6 +33,12 @@ var ErrAlreadyExists = errors.New("invite code already exists")
 // TypeScript boundary, so keep them in sync by hand if this changes.
 const VoteKeepGraceWindow = 30 * time.Second
 
+// ActiveDirectRoomWindow bounds how old an open, unsaved random chat can be
+// and still count as "active" for ListRoomsForAccount. Chats abandoned by
+// closing a tab are never ended (a known gap), so without a bound every one
+// would be listed, and listened to, forever. A real chat lasts minutes.
+const ActiveDirectRoomWindow = 12 * time.Hour
+
 // Room is Chat's persistence-layer view of a room. Deliberately separate
 // from the generated chatv1.Room protobuf type, the same separation
 // identity's store.Account keeps from identityv1.Account.
@@ -47,8 +53,13 @@ type Room struct {
 	// Kept is meaningful for direct rooms only (DEC-0031).
 	Kept      bool
 	CreatedAt time.Time
-	// EndedAt is nil while the room is still open.
+	// EndedAt is nil while the room is still open. An ended room accepts no
+	// more messages but can still be read.
 	EndedAt *time.Time
+	// MemberAccountIDs is the current members, filled in only by
+	// ListRoomsForAccount, so a caller can tell who the other person in a
+	// direct room is (DEC-0106).
+	MemberAccountIDs []string
 }
 
 // Message is Chat's persistence-layer view of a message row, as written
@@ -109,10 +120,18 @@ type RoomStore interface {
 	// can still see history from while they were in the room.
 	HasEverBeenMember(ctx context.Context, roomID, accountID string) (bool, error)
 
-	// ListRoomsForAccount returns every room where the account is a
-	// current member and the room is either a group room or a kept
-	// direct room (docs/ARCHITECTURE.md §5.1's "my group rooms and kept
-	// conversations").
+	// MembershipState says whether an account is a current member of a room
+	// and whether that room is still open (not ended), in one query: what
+	// SendMessage needs on every message.
+	MembershipState(ctx context.Context, roomID, accountID string) (isMember, roomOpen bool, err error)
+
+	// ListRoomsForAccount returns the rooms an account is a current member
+	// of that matter to it (DEC-0106): every group room; a direct room the
+	// account voted to keep (so the person who skipped a chat does not get
+	// it in their Inbox just because they were once in it); and a direct
+	// room that is still open, unsaved and recent, so that a connection
+	// that reconnects can listen to a random chat in progress again. Each
+	// room carries its current member ids.
 	ListRoomsForAccount(ctx context.Context, accountID string) ([]Room, error)
 
 	// VoteKeep records a keep vote for a direct room. Idempotent: voting
@@ -128,6 +147,11 @@ type RoomStore interface {
 	// kept (a kept room stays open regardless of who leaves). Idempotent:
 	// ending an already-ended room is not an error.
 	EndDirectRoom(ctx context.Context, roomID string) error
+
+	// CloseDirectRoom marks a direct room as ended whether or not it was
+	// kept: a saved chat is closed to further messages but stays readable.
+	// Idempotent.
+	CloseDirectRoom(ctx context.Context, roomID string) error
 
 	// ListMessages returns up to limit messages in a room older than
 	// beforeMessageID (newest first), or the newest page if

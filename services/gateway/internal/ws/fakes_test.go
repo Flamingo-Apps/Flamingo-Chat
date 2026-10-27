@@ -65,6 +65,10 @@ type fakeChat struct {
 	endDirectRoom func(context.Context, *chatv1.EndDirectRoomRequest) (*chatv1.EndDirectRoomResponse, error)
 }
 
+func (f *fakeChat) CloseDirectRoom(context.Context, *chatv1.CloseDirectRoomRequest, ...grpc.CallOption) (*chatv1.CloseDirectRoomResponse, error) {
+	return nil, errNotConfigured
+}
+
 func (f *fakeChat) CreateGroupRoom(context.Context, *chatv1.CreateGroupRoomRequest, ...grpc.CallOption) (*chatv1.CreateGroupRoomResponse, error) {
 	return nil, errNotConfigured
 }

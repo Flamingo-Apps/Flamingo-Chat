@@ -68,14 +68,38 @@ func TestTranslateMemberJoinedAndLeft(t *testing.T) {
 	}
 }
 
-func TestTranslateKeepVoteHasNoFrame(t *testing.T) {
+// Someone asking to keep the chat is news for the OTHER person only, and
+// only while the room is not yet saved (a saved room is announced by
+// RoomKept instead), DEC-0106.
+func TestTranslateKeepVoteTellsTheOtherPersonThatSomeoneAskedToKeep(t *testing.T) {
 	evt := &eventsv1.ChatEvent{Payload: &eventsv1.ChatEvent_KeepVote{KeepVote: &eventsv1.KeepVote{RoomId: "r1", AccountId: "a1"}}}
-	out, err := translate(tagged(chatEventKind, mustMarshal(t, evt)), "a1")
+	out, err := translate(tagged(chatEventKind, mustMarshal(t, evt)), "a2")
 	if err != nil {
 		t.Fatalf("translate: %v", err)
 	}
-	if out != nil {
-		t.Fatalf("expected no frame for a single KeepVote, got %s", out)
+	frame := decodeFrame(t, out)
+	if frame["type"] != "keep_requested" || frame["room_id"] != "r1" {
+		t.Fatalf("expected a keep_requested frame for the other member, got %+v", frame)
+	}
+}
+
+func TestTranslateKeepVoteStaysSilentForTheVoterAndForTheVoteThatSavedTheRoom(t *testing.T) {
+	for name, tc := range map[string]struct {
+		me    string
+		saved bool
+	}{
+		"the voter's own vote":           {me: "a1", saved: false},
+		"the vote that saved the room":   {me: "a2", saved: true},
+		"the voter when it saved a room": {me: "a1", saved: true},
+	} {
+		evt := &eventsv1.ChatEvent{Payload: &eventsv1.ChatEvent_KeepVote{KeepVote: &eventsv1.KeepVote{RoomId: "r1", AccountId: "a1", Kept: tc.saved}}}
+		out, err := translate(tagged(chatEventKind, mustMarshal(t, evt)), tc.me)
+		if err != nil {
+			t.Fatalf("%s: translate: %v", name, err)
+		}
+		if out != nil {
+			t.Fatalf("%s: expected no frame, got %s", name, out)
+		}
 	}
 }
 

@@ -374,9 +374,14 @@ func (x *MemberLeft) GetAccountId() string {
 }
 
 type KeepVote struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	RoomId        string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
-	AccountId     string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	state     protoimpl.MessageState `protogen:"open.v1"`
+	RoomId    string                 `protobuf:"bytes,1,opt,name=room_id,json=roomId,proto3" json:"room_id,omitempty"`
+	AccountId string                 `protobuf:"bytes,2,opt,name=account_id,json=accountId,proto3" json:"account_id,omitempty"`
+	// True when this vote is the one that made the room kept. A consumer that
+	// wants to tell the other member "someone asked to keep this chat" only
+	// does so when it is false, since a kept room is announced by RoomKept
+	// instead (DEC-0106).
+	Kept          bool `protobuf:"varint,3,opt,name=kept,proto3" json:"kept,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -423,6 +428,13 @@ func (x *KeepVote) GetAccountId() string {
 		return x.AccountId
 	}
 	return ""
+}
+
+func (x *KeepVote) GetKept() bool {
+	if x != nil {
+		return x.Kept
+	}
+	return false
 }
 
 type RoomKept struct {
@@ -1138,11 +1150,12 @@ const file_events_v1_events_proto_rawDesc = "" +
 	"MemberLeft\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x02 \x01(\tR\taccountId\"B\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\"V\n" +
 	"\bKeepVote\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\x12\x1d\n" +
 	"\n" +
-	"account_id\x18\x02 \x01(\tR\taccountId\"#\n" +
+	"account_id\x18\x02 \x01(\tR\taccountId\x12\x12\n" +
+	"\x04kept\x18\x03 \x01(\bR\x04kept\"#\n" +
 	"\bRoomKept\x12\x17\n" +
 	"\aroom_id\x18\x01 \x01(\tR\x06roomId\"k\n" +
 	"\tRoomEnded\x12\x17\n" +

@@ -113,6 +113,7 @@ func (s *Server) Routes(mux *http.ServeMux) {
 	mux.HandleFunc("POST /v1/rooms", s.withAuth(s.handleCreateRoom))
 	mux.HandleFunc("POST /v1/rooms/join", s.withAuth(s.handleJoinRoom))
 	mux.HandleFunc("POST /v1/rooms/{id}/leave", s.withAuth(s.handleLeaveRoom))
+	mux.HandleFunc("POST /v1/rooms/{id}/close", s.withAuth(s.handleCloseRoom))
 	mux.HandleFunc("POST /v1/rooms/{id}/invite-code", s.withAuth(s.handleRotateInviteCode))
 	mux.HandleFunc("GET /v1/rooms/{id}/messages", s.withAuth(s.handleListMessages))
 

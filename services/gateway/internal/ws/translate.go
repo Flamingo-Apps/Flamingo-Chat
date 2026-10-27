@@ -90,9 +90,14 @@ func translateChatEvent(value []byte, myAccountID string) ([]byte, error) {
 		}
 		return withType("match_ended", matchEndedFrame{RoomID: p.RoomEnded.GetRoomId(), Reason: reason})
 	case *eventsv1.ChatEvent_KeepVote:
-		// A single vote with the room not yet kept has no WS frame of
-		// its own - see keepStatusFrame's doc comment.
-		return nil, nil
+		// The other member hears that someone asked to keep the chat, so
+		// the web app can offer "save it or carry on" (DEC-0106). The
+		// voter already knows (their own VoteKeep response), and the vote
+		// that completes a mutual keep is announced by RoomKept instead.
+		if p.KeepVote.GetAccountId() == myAccountID || p.KeepVote.GetKept() {
+			return nil, nil
+		}
+		return withType("keep_requested", keepRequestedFrame{RoomID: p.KeepVote.GetRoomId()})
 	default:
 		return nil, fmt.Errorf("ws: unhandled ChatEvent payload %T", evt.GetPayload())
 	}

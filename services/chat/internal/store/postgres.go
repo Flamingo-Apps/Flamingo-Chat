@@ -169,6 +169,24 @@ func (p *Postgres) HasEverBeenMember(ctx context.Context, roomID, accountID stri
 	return ok, nil
 }
 
+func (p *Postgres) MembershipState(ctx context.Context, roomID, accountID string) (bool, bool, error) {
+	q := `
+		SELECT r.ended_at IS NULL
+		FROM room_members m
+		JOIN rooms r ON r.id = m.room_id
+		WHERE m.room_id = $1 AND m.account_id = $2 AND m.left_at IS NULL
+	`
+	var open bool
+	err := p.pool.QueryRow(ctx, q, roomID, accountID).Scan(&open)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return false, false, nil
+	}
+	if err != nil {
+		return false, false, fmt.Errorf("store: membership state: %w", err)
+	}
+	return true, open, nil
+}
+
 func (p *Postgres) ListRoomsForAccount(ctx context.Context, accountID string) ([]Room, error) {
 	q := `
 		SELECT ` + prefixColumns("r", roomColumns) + `
@@ -176,25 +194,55 @@ func (p *Postgres) ListRoomsForAccount(ctx context.Context, accountID string) ([
 		JOIN room_members m ON m.room_id = r.id
 		WHERE m.account_id = $1
 		  AND m.left_at IS NULL
-		  AND (r.type = $2 OR r.kept)
+		  AND (
+		        r.type = $2
+		     OR (r.kept AND EXISTS (SELECT 1 FROM keep_votes v WHERE v.room_id = r.id AND v.account_id = $1))
+		     OR (NOT r.kept AND r.ended_at IS NULL AND r.created_at > now() - make_interval(secs => $3))
+		  )
 		ORDER BY r.created_at DESC
 	`
-	rows, err := p.pool.Query(ctx, q, accountID, chatv1.RoomType_ROOM_TYPE_GROUP)
+	rows, err := p.pool.Query(ctx, q, accountID, chatv1.RoomType_ROOM_TYPE_GROUP, ActiveDirectRoomWindow.Seconds())
 	if err != nil {
 		return nil, fmt.Errorf("store: list rooms for account: %w", err)
 	}
 	defer rows.Close()
 
 	var rooms []Room
+	var ids []string
 	for rows.Next() {
 		room, err := scanRoom(rows)
 		if err != nil {
 			return nil, fmt.Errorf("store: list rooms for account: scan: %w", err)
 		}
 		rooms = append(rooms, room)
+		ids = append(ids, room.ID)
 	}
 	if err := rows.Err(); err != nil {
 		return nil, fmt.Errorf("store: list rooms for account: %w", err)
+	}
+	if len(rooms) == 0 {
+		return rooms, nil
+	}
+
+	// One more query for everyone's membership, rather than one per room.
+	mrows, err := p.pool.Query(ctx, `SELECT room_id, account_id FROM room_members WHERE room_id = ANY($1) AND left_at IS NULL ORDER BY account_id`, ids)
+	if err != nil {
+		return nil, fmt.Errorf("store: list rooms for account: members: %w", err)
+	}
+	defer mrows.Close()
+	byRoom := map[string][]string{}
+	for mrows.Next() {
+		var roomID, memberID string
+		if err := mrows.Scan(&roomID, &memberID); err != nil {
+			return nil, fmt.Errorf("store: list rooms for account: scan member: %w", err)
+		}
+		byRoom[roomID] = append(byRoom[roomID], memberID)
+	}
+	if err := mrows.Err(); err != nil {
+		return nil, fmt.Errorf("store: list rooms for account: members: %w", err)
+	}
+	for i := range rooms {
+		rooms[i].MemberAccountIDs = byRoom[rooms[i].ID]
 	}
 	return rooms, nil
 }
@@ -251,6 +299,14 @@ func (p *Postgres) VoteKeep(ctx context.Context, roomID, accountID string) (bool
 		return false, fmt.Errorf("store: vote keep: commit: %w", err)
 	}
 	return kept, nil
+}
+
+func (p *Postgres) CloseDirectRoom(ctx context.Context, roomID string) error {
+	q := `UPDATE rooms SET ended_at = now() WHERE id = $1 AND ended_at IS NULL`
+	if _, err := p.pool.Exec(ctx, q, roomID); err != nil {
+		return fmt.Errorf("store: close direct room: %w", err)
+	}
+	return nil
 }
 
 func (p *Postgres) EndDirectRoom(ctx context.Context, roomID string) error {

@@ -29,6 +29,7 @@ const (
 	ChatService_SendMessage_FullMethodName      = "/chat.v1.ChatService/SendMessage"
 	ChatService_VoteKeep_FullMethodName         = "/chat.v1.ChatService/VoteKeep"
 	ChatService_EndDirectRoom_FullMethodName    = "/chat.v1.ChatService/EndDirectRoom"
+	ChatService_CloseDirectRoom_FullMethodName  = "/chat.v1.ChatService/CloseDirectRoom"
 	ChatService_RemoveMember_FullMethodName     = "/chat.v1.ChatService/RemoveMember"
 )
 
@@ -59,6 +60,10 @@ type ChatServiceClient interface {
 	// Ends a direct room that was never kept - "Next" or leaving a random
 	// chat.
 	EndDirectRoom(ctx context.Context, in *EndDirectRoomRequest, opts ...grpc.CallOption) (*EndDirectRoomResponse, error)
+	// Closes a direct room to further messages whether or not it was kept:
+	// "stop messaging" in the Inbox. Everyone can still read it. Unlike
+	// EndDirectRoom it works on a kept room (DEC-0106).
+	CloseDirectRoom(ctx context.Context, in *CloseDirectRoomRequest, opts ...grpc.CallOption) (*CloseDirectRoomResponse, error)
 	// Removes a member from a group room: the owner removing someone, or
 	// the admin tool acting on a ban (DEC-0029).
 	RemoveMember(ctx context.Context, in *RemoveMemberRequest, opts ...grpc.CallOption) (*RemoveMemberResponse, error)
@@ -172,6 +177,16 @@ func (c *chatServiceClient) EndDirectRoom(ctx context.Context, in *EndDirectRoom
 	return out, nil
 }
 
+func (c *chatServiceClient) CloseDirectRoom(ctx context.Context, in *CloseDirectRoomRequest, opts ...grpc.CallOption) (*CloseDirectRoomResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(CloseDirectRoomResponse)
+	err := c.cc.Invoke(ctx, ChatService_CloseDirectRoom_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *chatServiceClient) RemoveMember(ctx context.Context, in *RemoveMemberRequest, opts ...grpc.CallOption) (*RemoveMemberResponse, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(RemoveMemberResponse)
@@ -209,6 +224,10 @@ type ChatServiceServer interface {
 	// Ends a direct room that was never kept - "Next" or leaving a random
 	// chat.
 	EndDirectRoom(context.Context, *EndDirectRoomRequest) (*EndDirectRoomResponse, error)
+	// Closes a direct room to further messages whether or not it was kept:
+	// "stop messaging" in the Inbox. Everyone can still read it. Unlike
+	// EndDirectRoom it works on a kept room (DEC-0106).
+	CloseDirectRoom(context.Context, *CloseDirectRoomRequest) (*CloseDirectRoomResponse, error)
 	// Removes a member from a group room: the owner removing someone, or
 	// the admin tool acting on a ban (DEC-0029).
 	RemoveMember(context.Context, *RemoveMemberRequest) (*RemoveMemberResponse, error)
@@ -251,6 +270,9 @@ func (UnimplementedChatServiceServer) VoteKeep(context.Context, *VoteKeepRequest
 }
 func (UnimplementedChatServiceServer) EndDirectRoom(context.Context, *EndDirectRoomRequest) (*EndDirectRoomResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method EndDirectRoom not implemented")
+}
+func (UnimplementedChatServiceServer) CloseDirectRoom(context.Context, *CloseDirectRoomRequest) (*CloseDirectRoomResponse, error) {
+	return nil, status.Error(codes.Unimplemented, "method CloseDirectRoom not implemented")
 }
 func (UnimplementedChatServiceServer) RemoveMember(context.Context, *RemoveMemberRequest) (*RemoveMemberResponse, error) {
 	return nil, status.Error(codes.Unimplemented, "method RemoveMember not implemented")
@@ -456,6 +478,24 @@ func _ChatService_EndDirectRoom_Handler(srv interface{}, ctx context.Context, de
 	return interceptor(ctx, in, info, handler)
 }
 
+func _ChatService_CloseDirectRoom_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(CloseDirectRoomRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(ChatServiceServer).CloseDirectRoom(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: ChatService_CloseDirectRoom_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(ChatServiceServer).CloseDirectRoom(ctx, req.(*CloseDirectRoomRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _ChatService_RemoveMember_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RemoveMemberRequest)
 	if err := dec(in); err != nil {
@@ -520,6 +560,10 @@ var ChatService_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "EndDirectRoom",
 			Handler:    _ChatService_EndDirectRoom_Handler,
+		},
+		{
+			MethodName: "CloseDirectRoom",
+			Handler:    _ChatService_CloseDirectRoom_Handler,
 		},
 		{
 			MethodName: "RemoveMember",

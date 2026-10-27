@@ -300,3 +300,71 @@ func TestHandleFileReportSuccess(t *testing.T) {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
 	}
 }
+
+// A saved chat is listed under the other person's anonymous name, not
+// "Kept conversation" (DEC-0106). The name comes from Identity, using the
+// other member id Chat returns.
+func TestHandleListRoomsNamesTheOtherPersonInADirectRoom(t *testing.T) {
+	ts := newTestServer()
+	ts.chat.listMyRooms = func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+		return &chatv1.ListMyRoomsResponse{Rooms: []*chatv1.Room{
+			{Id: "d1", Type: chatv1.RoomType_ROOM_TYPE_DIRECT, Kept: true, EndedAtUnix: 50, MemberAccountIds: []string{"acc-1", "acc-2"}},
+			{Id: "g1", Type: chatv1.RoomType_ROOM_TYPE_GROUP, Name: "G", MemberAccountIds: []string{"acc-1", "acc-2", "acc-3"}},
+		}}, nil
+	}
+	ts.identity.getAccount = func(_ context.Context, req *identityv1.GetAccountRequest) (*identityv1.GetAccountResponse, error) {
+		if req.GetAccountId() != "acc-2" {
+			t.Fatalf("expected only the other person to be looked up, got %q", req.GetAccountId())
+		}
+		return &identityv1.GetAccountResponse{Account: &identityv1.Account{Id: "acc-2", Pseudonym: "Quiet Otter"}}, nil
+	}
+
+	rec := ts.do(t, http.MethodGet, "/v1/rooms", "session-for-acc-1", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := decodeBody[struct {
+		Rooms []roomResponse `json:"rooms"`
+	}](t, rec)
+	if len(resp.Rooms) != 2 {
+		t.Fatalf("unexpected rooms: %+v", resp.Rooms)
+	}
+	if resp.Rooms[0].PartnerPseudonym != "Quiet Otter" || resp.Rooms[0].EndedAtUnix != 50 {
+		t.Fatalf("expected the direct room to carry the other person's name and its closed time, got %+v", resp.Rooms[0])
+	}
+	if resp.Rooms[1].PartnerPseudonym != "" {
+		t.Fatalf("a group room has no single other person, got %+v", resp.Rooms[1])
+	}
+}
+
+func TestHandleListRoomsStillListsARoomWhenTheNameLookupFails(t *testing.T) {
+	ts := newTestServer()
+	ts.chat.listMyRooms = func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+		return &chatv1.ListMyRoomsResponse{Rooms: []*chatv1.Room{{Id: "d1", Type: chatv1.RoomType_ROOM_TYPE_DIRECT, Kept: true, MemberAccountIds: []string{"acc-1", "acc-2"}}}}, nil
+	}
+	// identity.getAccount is not configured: every lookup fails.
+	rec := ts.do(t, http.MethodGet, "/v1/rooms", "session-for-acc-1", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("one missing name must not fail the whole list, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleCloseRoom(t *testing.T) {
+	ts := newTestServer()
+	ts.chat.closeDirectRoom = func(_ context.Context, req *chatv1.CloseDirectRoomRequest) (*chatv1.CloseDirectRoomResponse, error) {
+		if req.GetRoomId() != "room-1" || req.GetAccountId() != "acc-1" {
+			t.Fatalf("unexpected request: %+v", req)
+		}
+		return &chatv1.CloseDirectRoomResponse{}, nil
+	}
+	if rec := ts.do(t, http.MethodPost, "/v1/rooms/room-1/close", "session-for-acc-1", nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	ts.chat.closeDirectRoom = func(context.Context, *chatv1.CloseDirectRoomRequest) (*chatv1.CloseDirectRoomResponse, error) {
+		return nil, status.Error(codes.PermissionDenied, "not a member of this room")
+	}
+	if rec := ts.do(t, http.MethodPost, "/v1/rooms/room-1/close", "session-for-acc-1", nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a non-member, got %d", rec.Code)
+	}
+}
