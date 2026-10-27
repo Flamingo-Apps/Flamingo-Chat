@@ -33,3 +33,5 @@ services/*/persistence-worker
 .claude/settings.local.json
 .vercel
 .env*
+
+__pycache__/
