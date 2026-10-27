@@ -31,3 +31,5 @@ services/*/persistence-worker
 
 # Personal Claude Code settings (not team-wide; see .claude/settings.json for those)
 .claude/settings.local.json
+.vercel
+.env*
