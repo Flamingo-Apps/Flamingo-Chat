@@ -60,6 +60,8 @@ type Server struct {
 	oauthState    OAuthStateStore
 	oauthConfig   GoogleOAuthConfig
 	devFakeGoogle bool
+
+	limits Limits
 }
 
 func NewServer(
@@ -77,6 +79,7 @@ func NewServer(
 	devFakeGoogle bool,
 ) *Server {
 	return &Server{
+		limits:        DefaultLimits(),
 		identity:      identity,
 		chat:          chat,
 		presence:      presence,

@@ -133,11 +133,23 @@ func main() {
 	bannedChecker := banned.NewRedis(redisClient)
 
 	oauthConfig := httpapi.GoogleOAuthConfig{ClientID: googleClientID, RedirectURI: googleRedirectURI, FrontendURL: frontendURL}
+	// Rate limits, adjustable per environment without a code change (DEC-0108).
+	// The defaults are for production; development and load tests raise them.
+	defaults := httpapi.DefaultLimits()
+	limits := httpapi.Limits{
+		GuestSignupsPerIPPerHour:  config.Int("LIMIT_GUEST_SIGNUPS_PER_IP_PER_HOUR", defaults.GuestSignupsPerIPPerHour),
+		GuestSignupsGlobalPerHour: config.Int("LIMIT_GUEST_SIGNUPS_GLOBAL_PER_HOUR", defaults.GuestSignupsGlobalPerHour),
+		CreateRoomPerWindow:       config.Int("LIMIT_CREATE_ROOM_PER_5_MIN", defaults.CreateRoomPerWindow),
+		CreateRoomWindow:          defaults.CreateRoomWindow,
+		JoinRoomPerMinute:         config.Int("LIMIT_JOIN_ROOM_PER_MIN", defaults.JoinRoomPerMinute),
+		MaxChannelsGuest:          config.Int("LIMIT_MAX_CHANNELS_GUEST", defaults.MaxChannelsGuest),
+		MaxChannelsVerified:       config.Int("LIMIT_MAX_CHANNELS_VERIFIED", defaults.MaxChannelsVerified),
+	}
 	api := httpapi.NewServer(
 		identityClient, chatClient, presenceClient, moderationClient,
 		sessions, rateLimiter, bannedChecker, turnstileVerifier,
 		exchanger, httpapi.NewRedisOAuthState(redisClient), oauthConfig, devFakeGoogle,
-	)
+	).WithLimits(limits)
 	wsDeps := ws.Deps{
 		Identity: identityClient, Chat: chatClient, Matching: matchingClient, Presence: presenceClient,
 		Sessions: sessions, RateLimiter: rateLimiter, Banned: bannedChecker, Redis: redisClient, Logger: logger,

@@ -38,3 +38,7 @@ env:
   # Local development only (DEC-0049, mirrored as DEC-0092) - never set
   # this outside a local cluster.
   DEV_FAKE_GOOGLE: "1"
+  # Rate limits (DEC-0108). Production uses the code's defaults; locally the
+  # per-address signup limit stays tiny so the black-box test (BB-15) can
+  # reach it in a few attempts.
+  LIMIT_GUEST_SIGNUPS_PER_IP_PER_HOUR: "5"

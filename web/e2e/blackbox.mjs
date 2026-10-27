@@ -24,6 +24,7 @@
 //   BB-17 keep question: default is to keep chatting, mutual keep -> Inbox with names
 //   BB-18 stop messaging closes a saved chat for both, and the server refuses sends
 //   BB-19 deleting a chat removes it for one person, the other keeps it by name
+//   BB-20 channel limits: a guest can be in 10, and guessing invite codes is throttled
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
@@ -53,6 +54,9 @@ function requireLocalStack() {
   const ctx = sh('kubectl', ['config', 'current-context']).trim()
   assert(ctx.startsWith('kind-'), `refusing to run: kubectl context is "${ctx}", not a local kind cluster`)
   assert(WEB.includes('localhost') && GATEWAY.includes('localhost'), 'refusing to run against anything but localhost')
+}
+function resetAllLimits() {
+  sh('kubectl', ['exec', 'deploy/redis', '--', 'sh', '-c', "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"])
 }
 function resetGuestLimiter() {
   sh('kubectl', ['exec', 'deploy/redis', '--', 'sh', '-c', "redis-cli --scan --pattern 'rl:guest_signup:*' | xargs -r redis-cli del"])
@@ -435,6 +439,33 @@ await run('BB-14', 'a banned person is removed from the app and cannot get back 
   } finally {
     sh('go', ['run', './tools/admin', 'unban', `-account=${me.id}`, '-by=blackbox'], { env: { ...process.env, MODERATION_ADDR: 'localhost:50055' } })
   }
+})
+
+await run('BB-20', 'a guest can be in 10 channels and no more; guessing invite codes is throttled after 10 tries a minute', async () => {
+  const post = (u, path, body) =>
+    u.page.evaluate(async ([g, path, body]) => {
+      const res = await fetch(`${g}${path}`, { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${localStorage.getItem('flamingo_session_token')}` }, body: JSON.stringify(body) })
+      const j = await res.json().catch(() => ({}))
+      return { status: res.status, message: j.error?.message ?? '' }
+    }, [GATEWAY, path, body])
+  resetAllLimits()
+  let made = 0
+  let refused
+  for (let i = 0; i < 14 && !refused; i++) {
+    const r = await post(A, '/v1/rooms', { name: `cap test ${i}` })
+    if (r.status === 200) made++
+    else refused = r
+  }
+  // A is already in one channel from BB-08, so the cap of 10 stops the 10th creation.
+  assert(refused?.status === 429 && /most allowed|too quickly/.test(refused.message), `expected a refusal after about 10 channels, got ${made} made and ${JSON.stringify(refused)}`)
+  assert(made >= 8 && made <= 10, `a guest created ${made} channels before being stopped`)
+
+  resetAllLimits()
+  const statuses = []
+  for (let i = 0; i < 13; i++) statuses.push((await post(V, '/v1/rooms/join', { invite_code: `NOSUCH${i}` })).status)
+  assert(statuses.slice(0, 10).every((c) => c === 404), `the first ten wrong guesses should just be "not found": ${statuses}`)
+  assert(statuses.slice(10).every((c) => c === 429), `guesses past ten a minute should be throttled: ${statuses}`)
+  resetAllLimits()
 })
 
 await run('BB-15', 'the sixth guest signup from one address is refused with a clear message, and the page is not left stuck', async () => {

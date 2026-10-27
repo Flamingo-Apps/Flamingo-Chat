@@ -256,10 +256,35 @@ func (f *fakeSessions) Verify(tokenString string) (string, bool, error) {
 // is set - set it to test the 429 path without needing a real Redis.
 type fakeRateLimiter struct {
 	deny bool
+	// denyAction, when set, denies only that action.
+	denyAction string
+	calls      []limiterCall
 }
 
-func (f *fakeRateLimiter) Allow(context.Context, string, string, int, time.Duration) (bool, error) {
+// limiterCall records one Allow call so a test can check which limit was
+// applied and with what numbers.
+type limiterCall struct {
+	action  string
+	subject string
+	max     int
+	window  time.Duration
+}
+
+func (f *fakeRateLimiter) Allow(_ context.Context, action, subject string, max int, window time.Duration) (bool, error) {
+	f.calls = append(f.calls, limiterCall{action, subject, max, window})
+	if f.denyAction != "" {
+		return action != f.denyAction, nil
+	}
 	return !f.deny, nil
+}
+
+func (f *fakeRateLimiter) call(action string) (limiterCall, bool) {
+	for _, c := range f.calls {
+		if c.action == action {
+			return c, true
+		}
+	}
+	return limiterCall{}, false
 }
 
 // fakeBanned implements BannedChecker, always reporting not banned

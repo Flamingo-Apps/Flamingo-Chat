@@ -100,13 +100,17 @@ func (s *Server) partnerPseudonym(r *http.Request, room *chatv1.Room, accountID 
 }
 
 func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request, accountID string) {
-	allowed, err := s.rateLimiter.Allow(r.Context(), "create_group_room", accountID, 3, 24*time.Hour)
+	allowed, err := s.rateLimiter.Allow(r.Context(), "create_group_room", accountID, s.limits.CreateRoomPerWindow, s.limits.CreateRoomWindow)
 	if err != nil {
 		writeError(w, status.Errorf(codes.Internal, "rate limit: %v", err))
 		return
 	}
 	if !allowed {
-		writeError(w, status.Error(codes.ResourceExhausted, "too many rooms created today"))
+		writeError(w, status.Error(codes.ResourceExhausted, "you are creating channels too quickly, wait a few minutes"))
+		return
+	}
+	if err := s.checkChannelCap(r.Context(), accountID); err != nil {
+		writeError(w, err)
 		return
 	}
 
@@ -126,11 +130,25 @@ func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request, accoun
 }
 
 func (s *Server) handleJoinRoom(w http.ResponseWriter, r *http.Request, accountID string) {
+	// Without a limit, invite codes could be guessed in a loop.
+	allowed, err := s.rateLimiter.Allow(r.Context(), "join_room", accountID, s.limits.JoinRoomPerMinute, time.Minute)
+	if err != nil {
+		writeError(w, status.Errorf(codes.Internal, "rate limit: %v", err))
+		return
+	}
+	if !allowed {
+		writeError(w, status.Error(codes.ResourceExhausted, "too many join attempts, wait a minute"))
+		return
+	}
 	var req struct {
 		InviteCode string `json:"invite_code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, status.Error(codes.InvalidArgument, "malformed request body"))
+		return
+	}
+	if err := s.checkChannelCap(r.Context(), accountID); err != nil {
+		writeError(w, err)
 		return
 	}
 	resp, err := s.chat.JoinRoomByCode(r.Context(), &chatv1.JoinRoomByCodeRequest{AccountId: accountID, InviteCode: req.InviteCode})

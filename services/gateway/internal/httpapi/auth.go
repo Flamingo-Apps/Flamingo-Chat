@@ -80,13 +80,24 @@ func (s *Server) handleAuthGuest(w http.ResponseWriter, r *http.Request) {
 	}
 
 	ip := clientIP(r)
-	allowed, err := s.rateLimiter.Allow(r.Context(), "guest_signup", ip, 5, time.Hour)
+	allowed, err := s.rateLimiter.Allow(r.Context(), "guest_signup", ip, s.limits.GuestSignupsPerIPPerHour, time.Hour)
 	if err != nil {
 		writeError(w, status.Errorf(codes.Internal, "rate limit: %v", err))
 		return
 	}
 	if !allowed {
 		writeError(w, status.Error(codes.ResourceExhausted, "too many guest signups from this address"))
+		return
+	}
+	// The backstop for the whole app, in case accounts are being made from many
+	// addresses at once (DEC-0108).
+	allowed, err = s.rateLimiter.Allow(r.Context(), "guest_signup_global", "all", s.limits.GuestSignupsGlobalPerHour, time.Hour)
+	if err != nil {
+		writeError(w, status.Errorf(codes.Internal, "rate limit: %v", err))
+		return
+	}
+	if !allowed {
+		writeError(w, status.Error(codes.ResourceExhausted, "signups are very busy right now, please try again in a few minutes"))
 		return
 	}
 
