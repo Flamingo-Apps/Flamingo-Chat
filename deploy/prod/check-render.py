@@ -6,7 +6,7 @@ DEV_FAKE_GOOGLE present at all (any value but "1" is off since DEC-0099,
 but production must not carry it), a secret in a plain env var instead of
 a Secret, an env var that is present but empty (it would override the same
 name coming from a Secret), the CHANGE-ME placeholder, an image that isn't
-a GHCR image with a real tag, or a pod without the ghcr-pull Secret its
+a GHCR image with a real tag, a dev-sized signup limit, or a pod without the ghcr-pull Secret its
 private images need (DEC-0101).
 """
 import sys
@@ -41,6 +41,9 @@ def main():
                     problems.append(f"{name}: {key} is present but empty")
                 if "CHANGE-ME" in str(value):
                     problems.append(f"{name}: {key} still contains the CHANGE-ME placeholder")
+            limit = env.get("LIMIT_GUEST_SIGNUPS_PER_IP_PER_HOUR")
+            if limit is not None and int(limit) < 20:
+                problems.append(f"{name}: LIMIT_GUEST_SIGNUPS_PER_IP_PER_HOUR={limit} is a dev value; production would let in only {limit} new guests an hour per address")
             if "DEV_FAKE_GOOGLE" in env:
                 problems.append(f"{name}: DEV_FAKE_GOOGLE must not be set in production")
             for key in SECRET_KEYS:

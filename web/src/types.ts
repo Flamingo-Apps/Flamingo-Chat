@@ -21,7 +21,10 @@ export interface Room {
   invite_code?: string
   kept: boolean
   created_at_unix: number
+  // Set once the room is closed: it can be read but nobody can send to it.
   ended_at_unix?: number
+  // Direct rooms: the other person's anonymous name.
+  partner_pseudonym?: string
 }
 
 export interface Message {
@@ -48,6 +51,8 @@ export type ClientFrame =
   | { type: 'match_next' }
   | { type: 'match_end' }
   | { type: 'keep_chat'; room_id: string }
+  // Check my rooms now: sent right after creating or joining one over HTTP.
+  | { type: 'sync_rooms' }
   | { type: 'ping' }
 
 // Server to client frames (§5.2's second table).
@@ -69,6 +74,8 @@ export type ServerFrame =
   | { type: 'match_found'; room_id: string; partner_pseudonym: string; partner_account_id: string }
   | { type: 'match_ended'; room_id: string; reason: 'you_left' | 'partner_left' }
   | { type: 'keep_status'; room_id: string; you: boolean; partner: boolean; kept: boolean }
+  // The other person asked to keep this chat.
+  | { type: 'keep_requested'; room_id: string }
   | { type: 'room_joined'; room_id: string }
   | { type: 'room_left'; room_id: string }
   | { type: 'presence'; total: number; guests: number; male: number; female: number }

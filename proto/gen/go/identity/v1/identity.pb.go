@@ -165,8 +165,10 @@ func (x *Account) GetGenderChosen() bool {
 }
 
 type CreateAccountRequest struct {
-	state         protoimpl.MessageState `protogen:"open.v1"`
-	Pseudonym     string                 `protobuf:"bytes,1,opt,name=pseudonym,proto3" json:"pseudonym,omitempty"`
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Optional. Empty means the server picks a free name, retrying on a clash
+	// (INC-0025). A name that is given and already taken is AlreadyExists.
+	Pseudonym     string `protobuf:"bytes,1,opt,name=pseudonym,proto3" json:"pseudonym,omitempty"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }

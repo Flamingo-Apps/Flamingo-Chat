@@ -10,10 +10,18 @@ interface GatewayContextValue {
   state: AppState
   login: (account: Account, token: string) => void
   logout: () => void
+  updateAccount: (account: Account) => void
   send: (frame: ClientFrame) => void
   loadRooms: () => Promise<void>
   loadMessages: (roomId: string) => Promise<void>
   expireGraceWindow: (roomId: string) => void
+  dismissKeepRequest: () => void
+  dismissSavedMatch: () => void
+  clearError: () => void
+  // Tell the gateway to start listening to a room just created or joined
+  // over HTTP, which it would otherwise only notice up to 25 seconds later
+  // (INC-0024).
+  syncRooms: () => void
 }
 
 const GatewayContext = createContext<GatewayContextValue | null>(null)
@@ -21,6 +29,10 @@ const GatewayContext = createContext<GatewayContextValue | null>(null)
 export function GatewayProvider({ children }: { children: ReactNode }) {
   const [state, dispatch] = useReducer(reducer, initialState)
   const connectionRef = useRef<GatewayConnection | null>(null)
+  // The latest messages, readable from the connection's callbacks, which
+  // are created once per sign-in and would otherwise see a stale copy.
+  const messagesRef = useRef(state.messagesByRoom)
+  messagesRef.current = state.messagesByRoom
 
   const login = useCallback((account: Account, token: string) => {
     localStorage.setItem(SESSION_STORAGE_KEY, token)
@@ -32,6 +44,14 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
     connectionRef.current?.close()
     dispatch({ type: 'logout' })
   }, [])
+
+  const updateAccount = useCallback((account: Account) => {
+    dispatch({ type: 'accountUpdated', account })
+  }, [])
+
+  const dismissKeepRequest = useCallback(() => dispatch({ type: 'keepRequestDismissed' }), [])
+  const dismissSavedMatch = useCallback(() => dispatch({ type: 'savedMatchDismissed' }), [])
+  const clearError = useCallback(() => dispatch({ type: 'clearError' }), [])
 
   const expireGraceWindow = useCallback((roomId: string) => {
     dispatch({ type: 'graceWindowExpired', roomId })
@@ -72,15 +92,34 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
       connectionRef.current = null
       return
     }
-    const conn = new GatewayConnection(state.token, {
+    const token = state.token
+    let everOpen = false
+    const conn = new GatewayConnection(token, {
       onFrame: (frame) => {
         if (frame.type === 'auth_ok') {
           dispatch({ type: 'accountUpdated', account: frame.account })
           if (frame.token) localStorage.setItem(SESSION_STORAGE_KEY, frame.token)
         }
         dispatch({ type: 'frame', frame })
+        // A chat being saved or closed, or someone leaving a room, changes
+        // what the Inbox and the room lists should show.
+        if (frame.type === 'keep_status' || frame.type === 'match_ended' || frame.type === 'room_left' || frame.type === 'room_joined') {
+          api.listRooms(token).then((resp) => dispatch({ type: 'roomsLoaded', rooms: resp.rooms }), () => {})
+        }
       },
-      onStatusChange: (status) => dispatch({ type: 'connectionStatus', status }),
+      onStatusChange: (status) => {
+        dispatch({ type: 'connectionStatus', status })
+        if (status !== 'open') return
+        // Back after a drop: messages sent while the connection was down were
+        // not delivered live, so reload what each open room should hold
+        // (docs/ARCHITECTURE.md §5.2). Duplicates are removed by message id.
+        if (everOpen) {
+          for (const roomId of Object.keys(messagesRef.current)) {
+            api.listMessages(token, roomId).then((resp) => dispatch({ type: 'messagesLoaded', roomId, messages: resp.messages }), () => {})
+          }
+        }
+        everOpen = true
+      },
     })
     connectionRef.current = conn
     conn.connect()
@@ -88,6 +127,7 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
   }, [state.token])
 
   const send = useCallback((frame: ClientFrame) => connectionRef.current?.send(frame), [])
+  const syncRooms = useCallback(() => connectionRef.current?.send({ type: 'sync_rooms' }), [])
 
   const loadRooms = useCallback(async () => {
     if (!state.token) return
@@ -105,7 +145,7 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
   )
 
   return (
-    <GatewayContext.Provider value={{ state, login, logout, send, loadRooms, loadMessages, expireGraceWindow }}>
+    <GatewayContext.Provider value={{ state, login, logout, updateAccount, send, loadRooms, loadMessages, expireGraceWindow, dismissKeepRequest, dismissSavedMatch, clearError, syncRooms }}>
       {children}
     </GatewayContext.Provider>
   )

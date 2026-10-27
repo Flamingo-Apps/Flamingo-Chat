@@ -10,6 +10,7 @@ import (
 	"google.golang.org/grpc/status"
 
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
+	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
 )
 
 type roomResponse struct {
@@ -21,6 +22,9 @@ type roomResponse struct {
 	Kept           bool   `json:"kept"`
 	CreatedAtUnix  int64  `json:"created_at_unix"`
 	EndedAtUnix    int64  `json:"ended_at_unix,omitempty"`
+	// PartnerPseudonym is the other person's anonymous name in a direct
+	// room, so a saved chat is listed under it (DEC-0106).
+	PartnerPseudonym string `json:"partner_pseudonym,omitempty"`
 }
 
 func toRoomResponse(r *chatv1.Room) roomResponse {
@@ -69,20 +73,44 @@ func (s *Server) handleListRooms(w http.ResponseWriter, r *http.Request, account
 	rooms := make([]roomResponse, len(resp.GetRooms()))
 	for i, room := range resp.GetRooms() {
 		rooms[i] = toRoomResponse(room)
+		if room.GetType() == chatv1.RoomType_ROOM_TYPE_DIRECT {
+			rooms[i].PartnerPseudonym = s.partnerPseudonym(r, room, accountID)
+		}
 	}
 	writeJSON(w, http.StatusOK, struct {
 		Rooms []roomResponse `json:"rooms"`
 	}{rooms})
 }
 
+// partnerPseudonym is the anonymous name of the other member of a direct room,
+// or "" when it cannot be found. A missing name must not fail the whole list:
+// the web app falls back to a generic label.
+func (s *Server) partnerPseudonym(r *http.Request, room *chatv1.Room, accountID string) string {
+	for _, id := range room.GetMemberAccountIds() {
+		if id == accountID {
+			continue
+		}
+		resp, err := s.identity.GetAccount(r.Context(), &identityv1.GetAccountRequest{AccountId: id})
+		if err != nil {
+			return ""
+		}
+		return resp.GetAccount().GetPseudonym()
+	}
+	return ""
+}
+
 func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request, accountID string) {
-	allowed, err := s.rateLimiter.Allow(r.Context(), "create_group_room", accountID, 3, 24*time.Hour)
+	allowed, err := s.rateLimiter.Allow(r.Context(), "create_group_room", accountID, s.limits.CreateRoomPerWindow, s.limits.CreateRoomWindow)
 	if err != nil {
 		writeError(w, status.Errorf(codes.Internal, "rate limit: %v", err))
 		return
 	}
 	if !allowed {
-		writeError(w, status.Error(codes.ResourceExhausted, "too many rooms created today"))
+		writeError(w, status.Error(codes.ResourceExhausted, "you are creating channels too quickly, wait a few minutes"))
+		return
+	}
+	if err := s.checkChannelCap(r.Context(), accountID); err != nil {
+		writeError(w, err)
 		return
 	}
 
@@ -102,11 +130,25 @@ func (s *Server) handleCreateRoom(w http.ResponseWriter, r *http.Request, accoun
 }
 
 func (s *Server) handleJoinRoom(w http.ResponseWriter, r *http.Request, accountID string) {
+	// Without a limit, invite codes could be guessed in a loop.
+	allowed, err := s.rateLimiter.Allow(r.Context(), "join_room", accountID, s.limits.JoinRoomPerMinute, time.Minute)
+	if err != nil {
+		writeError(w, status.Errorf(codes.Internal, "rate limit: %v", err))
+		return
+	}
+	if !allowed {
+		writeError(w, status.Error(codes.ResourceExhausted, "too many join attempts, wait a minute"))
+		return
+	}
 	var req struct {
 		InviteCode string `json:"invite_code"`
 	}
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		writeError(w, status.Error(codes.InvalidArgument, "malformed request body"))
+		return
+	}
+	if err := s.checkChannelCap(r.Context(), accountID); err != nil {
+		writeError(w, err)
 		return
 	}
 	resp, err := s.chat.JoinRoomByCode(r.Context(), &chatv1.JoinRoomByCodeRequest{AccountId: accountID, InviteCode: req.InviteCode})
@@ -120,6 +162,18 @@ func (s *Server) handleJoinRoom(w http.ResponseWriter, r *http.Request, accountI
 func (s *Server) handleLeaveRoom(w http.ResponseWriter, r *http.Request, accountID string) {
 	roomID := r.PathValue("id")
 	if _, err := s.chat.LeaveRoom(r.Context(), &chatv1.LeaveRoomRequest{RoomId: roomID, AccountId: accountID}); err != nil {
+		writeError(w, err)
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleCloseRoom is "stop messaging" on a direct conversation: it stays in
+// both Inboxes and stays readable, but nobody can send to it any more
+// (DEC-0106).
+func (s *Server) handleCloseRoom(w http.ResponseWriter, r *http.Request, accountID string) {
+	roomID := r.PathValue("id")
+	if _, err := s.chat.CloseDirectRoom(r.Context(), &chatv1.CloseDirectRoomRequest{RoomId: roomID, AccountId: accountID}); err != nil {
 		writeError(w, err)
 		return
 	}

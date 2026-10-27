@@ -117,7 +117,7 @@ func TestJoinRoomByCode(t *testing.T) {
 }
 
 func TestLeaveRoom(t *testing.T) {
-	s, st, prod := newTestServer("room-1", "event-1")
+	s, st, prod := newTestServer("room-1", "event-1", "event-2")
 	if _, err := s.CreateDirectRoom(context.Background(), &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "b"}}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
@@ -133,8 +133,13 @@ func TestLeaveRoom(t *testing.T) {
 	if isMember {
 		t.Fatalf("expected a to no longer be a member")
 	}
-	if len(prod.published) != 1 {
-		t.Fatalf("expected one MemberLeft event, got %d", len(prod.published))
+	// A direct room closes when someone leaves it (DEC-0106), so two events:
+	// the room ending, then the member leaving.
+	if len(prod.published) != 2 {
+		t.Fatalf("expected RoomEnded and MemberLeft events, got %d", len(prod.published))
+	}
+	if st.rooms["room-1"].EndedAt == nil {
+		t.Fatalf("expected leaving a direct room to close it")
 	}
 }
 
@@ -180,11 +185,11 @@ func TestListMyRooms(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListMyRooms: %v", err)
 	}
-	// Expect the group room and the KEPT direct room, but not the
-	// unkept one - "my group rooms and kept conversations"
-	// (docs/ARCHITECTURE.md §5.1).
-	if len(resp.GetRooms()) != 2 {
-		t.Fatalf("expected 2 rooms (group + kept direct), got %d: %+v", len(resp.GetRooms()), resp.GetRooms())
+	// The group room, the kept direct room, and the still-open random chat
+	// (direct-2): the last is listed so that a connection that reconnects can
+	// listen to it again (DEC-0106, INC-0024).
+	if len(resp.GetRooms()) != 3 {
+		t.Fatalf("expected 3 rooms (group + kept direct + active chat), got %d: %+v", len(resp.GetRooms()), resp.GetRooms())
 	}
 }
 
@@ -395,5 +400,177 @@ func TestListMessagesRequiresMembership(t *testing.T) {
 	}
 	if _, err := s.ListMessages(context.Background(), &chatv1.ListMessagesRequest{RoomId: "room-1", AccountId: "a"}); err != nil {
 		t.Fatalf("expected a current member to be allowed to list messages, got %v", err)
+	}
+}
+
+// --- DEC-0106: what a saved chat is, who sees it, and when it goes quiet ---
+
+func newDirect(t *testing.T, ids ...string) (*Server, *fakeStore, *fakeProducer) {
+	t.Helper()
+	s, st, prod := newTestServer(ids...)
+	if _, err := s.CreateDirectRoom(context.Background(), &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "b"}}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	return s, st, prod
+}
+
+func roomIDs(rooms []*chatv1.Room) []string {
+	var ids []string
+	for _, r := range rooms {
+		ids = append(ids, r.GetId())
+	}
+	return ids
+}
+
+func TestListMyRoomsIncludesAnActiveRandomChatForBothMembers(t *testing.T) {
+	s, _, _ := newDirect(t, "room-1")
+	for _, who := range []string{"a", "b"} {
+		resp, err := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: who})
+		if err != nil {
+			t.Fatalf("ListMyRooms(%s): %v", who, err)
+		}
+		if got := roomIDs(resp.GetRooms()); len(got) != 1 || got[0] != "room-1" {
+			t.Fatalf("%s should see the open chat, got %v", who, got)
+		}
+		if members := resp.GetRooms()[0].GetMemberAccountIds(); len(members) != 2 || members[0] != "a" || members[1] != "b" {
+			t.Fatalf("expected both members listed so the other person can be named, got %v", members)
+		}
+	}
+}
+
+func TestListMyRoomsDropsAChatThatEndedWithoutBeingSaved(t *testing.T) {
+	s, _, _ := newDirect(t, "room-1", "event-1")
+	if _, err := s.EndDirectRoom(context.Background(), &chatv1.EndDirectRoomRequest{RoomId: "room-1", AccountId: "a"}); err != nil {
+		t.Fatalf("end: %v", err)
+	}
+	resp, _ := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: "b"})
+	if len(resp.GetRooms()) != 0 {
+		t.Fatalf("an ended, unsaved chat should not be listed, got %v", roomIDs(resp.GetRooms()))
+	}
+}
+
+// The person who stayed and saved the chat has it; the person who skipped
+// does not get it in their Inbox just because they were once a member.
+func TestASoloSavedChatIsInTheKeepersInboxOnly(t *testing.T) {
+	s, _, _ := newDirect(t, "room-1", "event-1", "event-2", "event-3")
+	if _, err := s.EndDirectRoom(context.Background(), &chatv1.EndDirectRoomRequest{RoomId: "room-1", AccountId: "a"}); err != nil {
+		t.Fatalf("end: %v", err)
+	}
+	if resp, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "room-1", AccountId: "b"}); err != nil || !resp.GetKept() {
+		t.Fatalf("expected the solo keep within the grace window to save it: %v kept=%v", err, resp.GetKept())
+	}
+	mine, _ := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: "b"})
+	if got := roomIDs(mine.GetRooms()); len(got) != 1 || got[0] != "room-1" {
+		t.Fatalf("the keeper should have it, got %v", got)
+	}
+	theirs, _ := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: "a"})
+	if len(theirs.GetRooms()) != 0 {
+		t.Fatalf("the person who skipped must not see it, got %v", roomIDs(theirs.GetRooms()))
+	}
+}
+
+func TestSendMessageIsRefusedInAClosedRoomButStillWorksInAnOpenOne(t *testing.T) {
+	s, _, _ := newDirect(t, "room-1", "event-1", "event-2", "event-3")
+	send := func(who, id string) error {
+		_, err := s.SendMessage(context.Background(), &chatv1.SendMessageRequest{RoomId: "room-1", SenderAccountId: who, SenderPseudonym: who, Body: "hi", ClientMsgId: id})
+		return err
+	}
+	if err := send("a", "m1"); err != nil {
+		t.Fatalf("an open room should accept messages: %v", err)
+	}
+	if _, err := s.EndDirectRoom(context.Background(), &chatv1.EndDirectRoomRequest{RoomId: "room-1", AccountId: "a"}); err != nil {
+		t.Fatalf("end: %v", err)
+	}
+	if err := send("b", "m2"); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected FailedPrecondition for a message into an ended room, got %v", err)
+	}
+	if err := send("stranger", "m3"); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("a stranger is still PermissionDenied, got %v", err)
+	}
+}
+
+func TestCloseDirectRoomStopsMessagingEvenInASavedChat(t *testing.T) {
+	s, st, prod := newDirect(t, "room-1", "event-1", "event-2", "event-3", "event-4")
+	for _, who := range []string{"a", "b"} {
+		if _, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "room-1", AccountId: who}); err != nil {
+			t.Fatalf("vote: %v", err)
+		}
+	}
+	if !st.rooms["room-1"].Kept {
+		t.Fatalf("setup: expected a saved chat")
+	}
+	before := len(prod.published)
+
+	if _, err := s.CloseDirectRoom(context.Background(), &chatv1.CloseDirectRoomRequest{RoomId: "room-1", AccountId: "stranger"}); status.Code(err) != codes.PermissionDenied {
+		t.Fatalf("expected PermissionDenied for a non-member, got %v", err)
+	}
+	if _, err := s.CloseDirectRoom(context.Background(), &chatv1.CloseDirectRoomRequest{RoomId: "room-1", AccountId: "a"}); err != nil {
+		t.Fatalf("CloseDirectRoom: %v", err)
+	}
+	if st.rooms["room-1"].EndedAt == nil || !st.rooms["room-1"].Kept {
+		t.Fatalf("expected the room closed but still saved")
+	}
+	ended := prod.published[before].GetRoomEnded()
+	if ended == nil || ended.GetEndedByAccountId() != "a" {
+		t.Fatalf("expected a RoomEnded event naming who closed it, got %v", prod.published[before])
+	}
+	if _, err := s.SendMessage(context.Background(), &chatv1.SendMessageRequest{RoomId: "room-1", SenderAccountId: "b", Body: "hi", ClientMsgId: "x"}); status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("expected the closed room to refuse messages, got %v", err)
+	}
+	// Closing again changes nothing and is not an error.
+	if _, err := s.CloseDirectRoom(context.Background(), &chatv1.CloseDirectRoomRequest{RoomId: "room-1", AccountId: "b"}); err != nil {
+		t.Fatalf("closing twice: %v", err)
+	}
+}
+
+func TestCloseDirectRoomRefusesAGroupRoom(t *testing.T) {
+	s, _, _ := newTestServer("group-1")
+	if _, err := s.CreateGroupRoom(context.Background(), &chatv1.CreateGroupRoomRequest{OwnerAccountId: "o", Name: "g"}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := s.CloseDirectRoom(context.Background(), &chatv1.CloseDirectRoomRequest{RoomId: "group-1", AccountId: "o"}); status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("expected InvalidArgument for a group room, got %v", err)
+	}
+}
+
+func TestKeepVoteEventSaysWhetherThatVoteSavedTheRoom(t *testing.T) {
+	s, _, prod := newDirect(t, "room-1", "event-1", "event-2", "event-3")
+	for _, who := range []string{"a", "b"} {
+		if _, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "room-1", AccountId: who}); err != nil {
+			t.Fatalf("vote: %v", err)
+		}
+	}
+	first, second := prod.published[0].GetKeepVote(), prod.published[1].GetKeepVote()
+	if first == nil || first.GetKept() {
+		t.Fatalf("the first vote has not saved the room: %v", first)
+	}
+	if second == nil || !second.GetKept() {
+		t.Fatalf("the second vote saved the room and its event must say so: %v", second)
+	}
+}
+
+// The Inbox lists a chat under the other person's name. If they delete the
+// chat (leave the room), their name must still be known, or the chat would
+// quietly turn anonymous (DEC-0106).
+func TestListMyRoomsStillNamesSomeoneWhoHasLeft(t *testing.T) {
+	s, _, _ := newDirect(t, "room-1", "event-1", "event-2", "event-3", "event-4", "event-5")
+	for _, who := range []string{"a", "b"} {
+		if _, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "room-1", AccountId: who}); err != nil {
+			t.Fatalf("vote: %v", err)
+		}
+	}
+	if _, err := s.LeaveRoom(context.Background(), &chatv1.LeaveRoomRequest{RoomId: "room-1", AccountId: "b"}); err != nil {
+		t.Fatalf("leave: %v", err)
+	}
+	resp, _ := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: "a"})
+	if len(resp.GetRooms()) != 1 {
+		t.Fatalf("a should still have the chat, got %v", roomIDs(resp.GetRooms()))
+	}
+	if members := resp.GetRooms()[0].GetMemberAccountIds(); len(members) != 2 {
+		t.Fatalf("expected both people still named, got %v", members)
+	}
+	gone, _ := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: "b"})
+	if len(gone.GetRooms()) != 0 {
+		t.Fatalf("b deleted it, so it must be gone from b's list, got %v", roomIDs(gone.GetRooms()))
 	}
 }

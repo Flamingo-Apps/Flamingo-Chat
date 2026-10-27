@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"sort"
 	"time"
 
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
@@ -71,7 +72,7 @@ func (f *fakeStore) CreateGroupRoom(_ context.Context, id, ownerAccountID, name,
 }
 
 func (f *fakeStore) CreateDirectRoom(_ context.Context, id string, memberAccountIDs []string) (store.Room, error) {
-	room := store.Room{ID: id, Type: roomTypeDirect, CreatedAt: time.Unix(0, 0)}
+	room := store.Room{ID: id, Type: roomTypeDirect, CreatedAt: time.Now()}
 	f.rooms[id] = room
 	for _, accountID := range memberAccountIDs {
 		f.addMemberLocked(id, accountID)
@@ -132,6 +133,19 @@ func (f *fakeStore) HasEverBeenMember(_ context.Context, roomID, accountID strin
 	return f.everMembers[roomID][accountID], nil
 }
 
+// MembershipState mirrors the real store's single query: whether the
+// account is a current member, and whether the room is still open.
+func (f *fakeStore) MembershipState(_ context.Context, roomID, accountID string) (bool, bool, error) {
+	if !f.members[roomID][accountID] {
+		return false, false, nil
+	}
+	return true, f.rooms[roomID].EndedAt == nil, nil
+}
+
+// ListRoomsForAccount mirrors the real query's rules (DEC-0106): every group
+// room; a direct room the person voted to keep; and a direct room that is
+// still an open, unkept, recent random chat, so a reconnecting connection
+// can listen to it again.
 func (f *fakeStore) ListRoomsForAccount(_ context.Context, accountID string) ([]store.Room, error) {
 	var rooms []store.Room
 	for roomID, current := range f.members {
@@ -139,11 +153,30 @@ func (f *fakeStore) ListRoomsForAccount(_ context.Context, accountID string) ([]
 			continue
 		}
 		room := f.rooms[roomID]
-		if room.Type == roomTypeGroup || room.Kept {
+		savedByMe := room.Kept && f.keepVotes[roomID][accountID]
+		activeChat := !room.Kept && room.EndedAt == nil && time.Since(room.CreatedAt) <= store.ActiveDirectRoomWindow
+		if room.Type == roomTypeGroup || savedByMe || activeChat {
+			// Everyone who has ever been in the room, so a person who left
+			// (deleted the chat) can still be named by the other.
+			for id := range f.everMembers[roomID] {
+				room.MemberAccountIDs = append(room.MemberAccountIDs, id)
+			}
+			sort.Strings(room.MemberAccountIDs)
 			rooms = append(rooms, room)
 		}
 	}
 	return rooms, nil
+}
+
+func (f *fakeStore) CloseDirectRoom(_ context.Context, roomID string) error {
+	room, ok := f.rooms[roomID]
+	if !ok || room.EndedAt != nil {
+		return nil
+	}
+	now := time.Now()
+	room.EndedAt = &now
+	f.rooms[roomID] = room
+	return nil
 }
 
 func (f *fakeStore) VoteKeep(_ context.Context, roomID, accountID string) (bool, error) {

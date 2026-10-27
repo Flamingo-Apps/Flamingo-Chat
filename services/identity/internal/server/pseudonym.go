@@ -1,17 +1,39 @@
 package server
 
-import "math/rand/v2"
+import (
+	"fmt"
+	"math/rand/v2"
+)
 
-// generatePseudonym returns a random two-word pseudonym like "Silent
-// Otter", for an account SignInWithGoogle creates directly with no guest
-// account to carry an existing pseudonym over from (docs/ARCHITECTURE.md
-// §4.2). The caller is responsible for retrying with a new one on a
-// collision - 900 combinations is plenty given how few sign-ins are
-// expected to take this path (most start as a guest first).
+// pseudonymPlainAttempts is how many tries get a plain two-word name before
+// a number is added. Names must be unique, and there are only 900 two-word
+// combinations: once a few hundred accounts exist, plain names clash often,
+// and with the web app choosing from an even smaller list guests failed with
+// "pseudonym already taken" (INC-0025). Adding two digits after a few clashes
+// makes the space about 80,000 while most people still get a plain name.
+const pseudonymPlainAttempts = 3
+
+// generatePseudonym returns a random two-word pseudonym like "Silent Otter".
 func generatePseudonym() string {
 	//nolint:gosec // a display name, not a token or session id - predictability here isn't a security concern
 	return pseudonymAdjectives[rand.IntN(len(pseudonymAdjectives))] + " " + pseudonymNouns[rand.IntN(len(pseudonymNouns))]
 }
+
+// generatePseudonymAttempt is the name to try on the given attempt (counting
+// from 0): two words at first, then two words and a two-digit number, like
+// "Silent Otter 42". The caller retries on a collision.
+func generatePseudonymAttempt(attempt int) string {
+	name := generatePseudonym()
+	if attempt < pseudonymPlainAttempts {
+		return name
+	}
+	//nolint:gosec // a display name, not a secret
+	return fmt.Sprintf("%s %d", name, 10+rand.IntN(90))
+}
+
+// nextPseudonym is generatePseudonymAttempt, as a variable only so tests can
+// force collisions.
+var nextPseudonym = generatePseudonymAttempt
 
 var pseudonymAdjectives = []string{
 	"Silent", "Quiet", "Brave", "Calm", "Curious", "Gentle", "Happy", "Lucky",

@@ -20,6 +20,8 @@ env:
   GOOGLE_CLIENT_SECRET: null
   TURNSTILE_SECRET: null
   DEV_FAKE_GOOGLE: null
+  # The dev value of 5 would let only five new guests an hour in.
+  LIMIT_GUEST_SIGNUPS_PER_IP_PER_HOUR: null
   # Cloudflare Tunnel is the only way in (gateway's Service is ClusterIP),
   # so Cloudflare's header can be trusted for the client's real IP.
   CLIENT_IP_HEADER: "CF-Connecting-IP"

@@ -131,6 +131,25 @@ func (s *Server) LeaveRoom(ctx context.Context, req *chatv1.LeaveRoomRequest) (*
 		return nil, status.Error(codes.NotFound, "not a member of this room")
 	}
 
+	// Deleting a saved chat (or leaving any direct room) closes it for the
+	// other person too: with one side gone nobody is left to talk to, and a
+	// room that still accepted messages would swallow them silently
+	// (DEC-0106).
+	room, err := s.store.GetRoom(ctx, req.GetRoomId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "leave room: %v", err)
+	}
+	if room.Type == chatv1.RoomType_ROOM_TYPE_DIRECT && room.EndedAt == nil {
+		if err := s.store.CloseDirectRoom(ctx, req.GetRoomId()); err != nil {
+			return nil, status.Errorf(codes.Internal, "leave room: %v", err)
+		}
+		if err := s.publish(ctx, req.GetRoomId(), &eventsv1.ChatEvent_RoomEnded{
+			RoomEnded: &eventsv1.RoomEnded{RoomId: req.GetRoomId(), Reason: "left", EndedByAccountId: req.GetAccountId()},
+		}); err != nil {
+			return nil, status.Errorf(codes.Internal, "leave room: %v", err)
+		}
+	}
+
 	if err := s.store.RemoveMember(ctx, req.GetRoomId(), req.GetAccountId()); err != nil {
 		return nil, status.Errorf(codes.Internal, "leave room: %v", err)
 	}
@@ -225,12 +244,17 @@ func (s *Server) SendMessage(ctx context.Context, req *chatv1.SendMessageRequest
 		return nil, status.Error(codes.InvalidArgument, "client_msg_id is required")
 	}
 
-	isMember, err := s.store.IsCurrentMember(ctx, req.GetRoomId(), req.GetSenderAccountId())
+	isMember, roomOpen, err := s.store.MembershipState(ctx, req.GetRoomId(), req.GetSenderAccountId())
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "send message: %v", err)
 	}
 	if !isMember {
 		return nil, status.Error(codes.PermissionDenied, "not a member of this room")
+	}
+	// An ended room can be read but takes no more messages: a chat saved
+	// after the other person skipped, or one closed with "stop messaging".
+	if !roomOpen {
+		return nil, status.Error(codes.FailedPrecondition, "this conversation is closed")
 	}
 
 	candidate := dedup.Result{MessageID: s.genID(), SentAtUnix: time.Now().Unix()}
@@ -280,7 +304,7 @@ func (s *Server) VoteKeep(ctx context.Context, req *chatv1.VoteKeepRequest) (*ch
 	}
 
 	if err := s.publish(ctx, req.GetRoomId(), &eventsv1.ChatEvent_KeepVote{
-		KeepVote: &eventsv1.KeepVote{RoomId: req.GetRoomId(), AccountId: req.GetAccountId()},
+		KeepVote: &eventsv1.KeepVote{RoomId: req.GetRoomId(), AccountId: req.GetAccountId(), Kept: kept},
 	}); err != nil {
 		return nil, status.Errorf(codes.Internal, "vote keep: %v", err)
 	}
@@ -320,6 +344,41 @@ func (s *Server) EndDirectRoom(ctx context.Context, req *chatv1.EndDirectRoomReq
 // (T9 in .claude/build-plan.md) and the contract has no field to tell
 // the two callers apart - that authorization gap is deferred until the
 // admin tool is actually built, rather than guessed at now.
+// CloseDirectRoom stops further messages in a direct room, kept or not
+// ("stop messaging" in the Inbox, DEC-0106). Everyone can still read it.
+func (s *Server) CloseDirectRoom(ctx context.Context, req *chatv1.CloseDirectRoomRequest) (*chatv1.CloseDirectRoomResponse, error) {
+	isMember, err := s.store.IsCurrentMember(ctx, req.GetRoomId(), req.GetAccountId())
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "close direct room: %v", err)
+	}
+	if !isMember {
+		return nil, status.Error(codes.PermissionDenied, "not a member of this room")
+	}
+	room, err := s.store.GetRoom(ctx, req.GetRoomId())
+	if errors.Is(err, store.ErrNotFound) {
+		return nil, status.Error(codes.NotFound, "room not found")
+	}
+	if err != nil {
+		return nil, status.Errorf(codes.Internal, "close direct room: %v", err)
+	}
+	if room.Type != chatv1.RoomType_ROOM_TYPE_DIRECT {
+		return nil, status.Error(codes.InvalidArgument, "only a direct conversation can be closed this way")
+	}
+	if room.EndedAt != nil {
+		return &chatv1.CloseDirectRoomResponse{}, nil
+	}
+
+	if err := s.store.CloseDirectRoom(ctx, req.GetRoomId()); err != nil {
+		return nil, status.Errorf(codes.Internal, "close direct room: %v", err)
+	}
+	if err := s.publish(ctx, req.GetRoomId(), &eventsv1.ChatEvent_RoomEnded{
+		RoomEnded: &eventsv1.RoomEnded{RoomId: req.GetRoomId(), Reason: "closed", EndedByAccountId: req.GetAccountId()},
+	}); err != nil {
+		return nil, status.Errorf(codes.Internal, "close direct room: %v", err)
+	}
+	return &chatv1.CloseDirectRoomResponse{}, nil
+}
+
 func (s *Server) RemoveMember(ctx context.Context, req *chatv1.RemoveMemberRequest) (*chatv1.RemoveMemberResponse, error) {
 	room, err := s.store.GetRoom(ctx, req.GetRoomId())
 	if errors.Is(err, store.ErrNotFound) {
@@ -392,6 +451,7 @@ func toProtoRoom(r store.Room) *chatv1.Room {
 	if r.EndedAt != nil {
 		room.EndedAtUnix = r.EndedAt.Unix()
 	}
+	room.MemberAccountIds = r.MemberAccountIDs
 	return room
 }
 

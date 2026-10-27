@@ -6,7 +6,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strconv"
+	"strings"
 	"testing"
+	"time"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -22,6 +25,7 @@ type testServer struct {
 	moderation *fakeModeration
 	banned     *fakeBanned
 	oauthState *fakeOAuthState
+	limiter    *fakeRateLimiter
 	mux        *http.ServeMux
 }
 
@@ -32,10 +36,11 @@ func newTestServer() *testServer {
 		moderation: &fakeModeration{},
 		banned:     &fakeBanned{},
 		oauthState: newFakeOAuthState(),
+		limiter:    &fakeRateLimiter{},
 	}
 	s := NewServer(
 		ts.identity, ts.chat, &fakePresence{}, ts.moderation,
-		&fakeSessions{}, &fakeRateLimiter{}, ts.banned, &fakeTurnstile{ok: true},
+		&fakeSessions{}, ts.limiter, ts.banned, &fakeTurnstile{ok: true},
 		&fakeExchanger{}, ts.oauthState,
 		GoogleOAuthConfig{ClientID: "test-client-id", RedirectURI: "http://localhost:8080/v1/auth/google/callback", FrontendURL: "http://localhost:8000"},
 		false,
@@ -235,6 +240,7 @@ func TestHandleCreateRoomEnforcesRateLimit(t *testing.T) {
 
 func TestHandleCreateRoomSuccess(t *testing.T) {
 	ts := newTestServer()
+	ts.asAccount(false, 0) // the channel cap needs to know who and how many
 	ts.chat.createGroupRoom = func(_ context.Context, req *chatv1.CreateGroupRoomRequest) (*chatv1.CreateGroupRoomResponse, error) {
 		if req.GetOwnerAccountId() != "acc-1" || req.GetName() != "Study group" {
 			t.Fatalf("unexpected request: %+v", req)
@@ -298,5 +304,211 @@ func TestHandleFileReportSuccess(t *testing.T) {
 	rec := ts.do(t, http.MethodPost, "/v1/reports", "session-for-acc-1", map[string]string{"reported_account_id": "acc-2", "reason": "spam"})
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+// A saved chat is listed under the other person's anonymous name, not
+// "Kept conversation" (DEC-0106). The name comes from Identity, using the
+// other member id Chat returns.
+func TestHandleListRoomsNamesTheOtherPersonInADirectRoom(t *testing.T) {
+	ts := newTestServer()
+	ts.chat.listMyRooms = func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+		return &chatv1.ListMyRoomsResponse{Rooms: []*chatv1.Room{
+			{Id: "d1", Type: chatv1.RoomType_ROOM_TYPE_DIRECT, Kept: true, EndedAtUnix: 50, MemberAccountIds: []string{"acc-1", "acc-2"}},
+			{Id: "g1", Type: chatv1.RoomType_ROOM_TYPE_GROUP, Name: "G", MemberAccountIds: []string{"acc-1", "acc-2", "acc-3"}},
+		}}, nil
+	}
+	ts.identity.getAccount = func(_ context.Context, req *identityv1.GetAccountRequest) (*identityv1.GetAccountResponse, error) {
+		if req.GetAccountId() != "acc-2" {
+			t.Fatalf("expected only the other person to be looked up, got %q", req.GetAccountId())
+		}
+		return &identityv1.GetAccountResponse{Account: &identityv1.Account{Id: "acc-2", Pseudonym: "Quiet Otter"}}, nil
+	}
+
+	rec := ts.do(t, http.MethodGet, "/v1/rooms", "session-for-acc-1", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	resp := decodeBody[struct {
+		Rooms []roomResponse `json:"rooms"`
+	}](t, rec)
+	if len(resp.Rooms) != 2 {
+		t.Fatalf("unexpected rooms: %+v", resp.Rooms)
+	}
+	if resp.Rooms[0].PartnerPseudonym != "Quiet Otter" || resp.Rooms[0].EndedAtUnix != 50 {
+		t.Fatalf("expected the direct room to carry the other person's name and its closed time, got %+v", resp.Rooms[0])
+	}
+	if resp.Rooms[1].PartnerPseudonym != "" {
+		t.Fatalf("a group room has no single other person, got %+v", resp.Rooms[1])
+	}
+}
+
+func TestHandleListRoomsStillListsARoomWhenTheNameLookupFails(t *testing.T) {
+	ts := newTestServer()
+	ts.chat.listMyRooms = func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+		return &chatv1.ListMyRoomsResponse{Rooms: []*chatv1.Room{{Id: "d1", Type: chatv1.RoomType_ROOM_TYPE_DIRECT, Kept: true, MemberAccountIds: []string{"acc-1", "acc-2"}}}}, nil
+	}
+	// identity.getAccount is not configured: every lookup fails.
+	rec := ts.do(t, http.MethodGet, "/v1/rooms", "session-for-acc-1", nil)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("one missing name must not fail the whole list, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestHandleCloseRoom(t *testing.T) {
+	ts := newTestServer()
+	ts.chat.closeDirectRoom = func(_ context.Context, req *chatv1.CloseDirectRoomRequest) (*chatv1.CloseDirectRoomResponse, error) {
+		if req.GetRoomId() != "room-1" || req.GetAccountId() != "acc-1" {
+			t.Fatalf("unexpected request: %+v", req)
+		}
+		return &chatv1.CloseDirectRoomResponse{}, nil
+	}
+	if rec := ts.do(t, http.MethodPost, "/v1/rooms/room-1/close", "session-for-acc-1", nil); rec.Code != http.StatusNoContent {
+		t.Fatalf("expected 204, got %d: %s", rec.Code, rec.Body.String())
+	}
+
+	ts.chat.closeDirectRoom = func(context.Context, *chatv1.CloseDirectRoomRequest) (*chatv1.CloseDirectRoomResponse, error) {
+		return nil, status.Error(codes.PermissionDenied, "not a member of this room")
+	}
+	if rec := ts.do(t, http.MethodPost, "/v1/rooms/room-1/close", "session-for-acc-1", nil); rec.Code != http.StatusForbidden {
+		t.Fatalf("expected 403 for a non-member, got %d", rec.Code)
+	}
+}
+
+// --- DEC-0108: limits meant to stop spam, not students ---
+
+func groupRooms(n int) []*chatv1.Room {
+	rooms := make([]*chatv1.Room, n)
+	for i := range rooms {
+		rooms[i] = &chatv1.Room{Id: "g" + strconv.Itoa(i), Type: chatv1.RoomType_ROOM_TYPE_GROUP}
+	}
+	return rooms
+}
+
+// A guest account has fewer channels allowed than a verified one; the person
+// is "verified" once they have linked Google.
+func (ts *testServer) asAccount(verified bool, groups int) {
+	ts.identity.getAccount = func(context.Context, *identityv1.GetAccountRequest) (*identityv1.GetAccountResponse, error) {
+		return &identityv1.GetAccountResponse{Account: &identityv1.Account{Id: "acc-1", GoogleLinked: verified}}, nil
+	}
+	ts.chat.listMyRooms = func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+		return &chatv1.ListMyRoomsResponse{Rooms: append(groupRooms(groups), &chatv1.Room{Id: "d1", Type: chatv1.RoomType_ROOM_TYPE_DIRECT})}, nil
+	}
+	ts.chat.createGroupRoom = func(context.Context, *chatv1.CreateGroupRoomRequest) (*chatv1.CreateGroupRoomResponse, error) {
+		return &chatv1.CreateGroupRoomResponse{Room: &chatv1.Room{Id: "new", Type: chatv1.RoomType_ROOM_TYPE_GROUP}}, nil
+	}
+	ts.chat.joinRoomByCode = func(context.Context, *chatv1.JoinRoomByCodeRequest) (*chatv1.JoinRoomByCodeResponse, error) {
+		return &chatv1.JoinRoomByCodeResponse{Room: &chatv1.Room{Id: "joined", Type: chatv1.RoomType_ROOM_TYPE_GROUP}}, nil
+	}
+}
+
+func TestGuestSignupUsesTheConfiguredPerAddressAndGlobalLimits(t *testing.T) {
+	ts := newTestServer()
+	ts.identity.createAccount = func(context.Context, *identityv1.CreateAccountRequest) (*identityv1.CreateAccountResponse, error) {
+		return &identityv1.CreateAccountResponse{Account: &identityv1.Account{Id: "acc-1", Pseudonym: "Fox"}}, nil
+	}
+	if rec := ts.do(t, http.MethodPost, "/v1/auth/guest", "", map[string]string{}); rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	perIP, ok := ts.limiter.call("guest_signup")
+	if !ok || perIP.max != 60 || perIP.window != time.Hour {
+		t.Fatalf("expected 60 signups an hour per address, got %+v (ok=%v)", perIP, ok)
+	}
+	global, ok := ts.limiter.call("guest_signup_global")
+	if !ok || global.max != 1000 || global.window != time.Hour {
+		t.Fatalf("expected a global backstop of 1000 an hour, got %+v (ok=%v)", global, ok)
+	}
+}
+
+func TestGuestSignupTellsApartTheAddressLimitAndTheGlobalBackstop(t *testing.T) {
+	ts := newTestServer()
+	ts.limiter.denyAction = "guest_signup_global"
+	rec := ts.do(t, http.MethodPost, "/v1/auth/guest", "", map[string]string{})
+	if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), "busy") {
+		t.Fatalf("expected 429 saying signups are busy, got %d: %s", rec.Code, rec.Body.String())
+	}
+	ts = newTestServer()
+	ts.limiter.denyAction = "guest_signup"
+	rec = ts.do(t, http.MethodPost, "/v1/auth/guest", "", map[string]string{})
+	if rec.Code != http.StatusTooManyRequests || !strings.Contains(rec.Body.String(), "this address") {
+		t.Fatalf("expected 429 about this address, got %d: %s", rec.Code, rec.Body.String())
+	}
+}
+
+func TestCreatingAChannelIsLimitedToTenEveryFiveMinutes(t *testing.T) {
+	ts := newTestServer()
+	ts.asAccount(false, 0)
+	if rec := ts.do(t, http.MethodPost, "/v1/rooms", "session-for-acc-1", map[string]string{"name": "x"}); rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	call, ok := ts.limiter.call("create_group_room")
+	if !ok || call.max != 10 || call.window != 5*time.Minute || call.subject != "acc-1" {
+		t.Fatalf("expected 10 per 5 minutes per account, got %+v (ok=%v)", call, ok)
+	}
+}
+
+func TestAGuestCanBeInTenChannelsAndAVerifiedPersonTwenty(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		verified bool
+		groups   int
+		want     int
+	}{
+		{"guest below the cap", false, 9, http.StatusOK},
+		{"guest at the cap", false, 10, http.StatusTooManyRequests},
+		{"verified below the cap", true, 19, http.StatusOK},
+		{"verified at the cap", true, 20, http.StatusTooManyRequests},
+		{"verified with ten, which would stop a guest", true, 10, http.StatusOK},
+	} {
+		ts := newTestServer()
+		ts.asAccount(tc.verified, tc.groups)
+		rec := ts.do(t, http.MethodPost, "/v1/rooms", "session-for-acc-1", map[string]string{"name": "x"})
+		if rec.Code != tc.want {
+			t.Fatalf("%s: expected %d, got %d: %s", tc.name, tc.want, rec.Code, rec.Body.String())
+		}
+	}
+}
+
+func TestJoiningIsRateLimitedAndRespectsTheSameCap(t *testing.T) {
+	ts := newTestServer()
+	ts.asAccount(false, 3)
+	if rec := ts.do(t, http.MethodPost, "/v1/rooms/join", "session-for-acc-1", map[string]string{"invite_code": "ABCD1234"}); rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d: %s", rec.Code, rec.Body.String())
+	}
+	call, ok := ts.limiter.call("join_room")
+	if !ok || call.max != 10 || call.window != time.Minute {
+		t.Fatalf("expected 10 join attempts a minute per account, got %+v (ok=%v)", call, ok)
+	}
+
+	ts = newTestServer()
+	ts.limiter.denyAction = "join_room"
+	ts.asAccount(false, 0)
+	if rec := ts.do(t, http.MethodPost, "/v1/rooms/join", "session-for-acc-1", map[string]string{"invite_code": "X"}); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected 429 once the join limit is hit, got %d", rec.Code)
+	}
+
+	ts = newTestServer()
+	ts.asAccount(false, 10)
+	if rec := ts.do(t, http.MethodPost, "/v1/rooms/join", "session-for-acc-1", map[string]string{"invite_code": "ABCD1234"}); rec.Code != http.StatusTooManyRequests {
+		t.Fatalf("expected a guest already in 10 channels to be refused, got %d", rec.Code)
+	}
+}
+
+func TestLimitsCanBeChangedWithoutTouchingTheCode(t *testing.T) {
+	ts := newTestServer()
+	s := NewServer(ts.identity, ts.chat, &fakePresence{}, ts.moderation, &fakeSessions{}, ts.limiter, ts.banned, &fakeTurnstile{ok: true}, &fakeExchanger{}, ts.oauthState, GoogleOAuthConfig{}, false).
+		WithLimits(Limits{GuestSignupsPerIPPerHour: 7, GuestSignupsGlobalPerHour: 9, CreateRoomPerWindow: 2, CreateRoomWindow: time.Minute, JoinRoomPerMinute: 3, MaxChannelsGuest: 4, MaxChannelsVerified: 5})
+	mux := http.NewServeMux()
+	s.Routes(mux)
+	ts.mux = mux
+	ts.identity.createAccount = func(context.Context, *identityv1.CreateAccountRequest) (*identityv1.CreateAccountResponse, error) {
+		return &identityv1.CreateAccountResponse{Account: &identityv1.Account{Id: "acc-1"}}, nil
+	}
+	ts.do(t, http.MethodPost, "/v1/auth/guest", "", map[string]string{})
+	if c, _ := ts.limiter.call("guest_signup"); c.max != 7 {
+		t.Fatalf("expected the configured per-address limit of 7, got %d", c.max)
+	}
+	if c, _ := ts.limiter.call("guest_signup_global"); c.max != 9 {
+		t.Fatalf("expected the configured global limit of 9, got %d", c.max)
 	}
 }

@@ -22,3 +22,9 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Black-box test output (screenshots of failures, results.json)
+e2e/out
+
+# Created by `vercel link`; holds the project and team ids
+.vercel

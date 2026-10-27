@@ -80,6 +80,7 @@ type fakeChat struct {
 	rotateInviteCode func(context.Context, *chatv1.RotateInviteCodeRequest) (*chatv1.RotateInviteCodeResponse, error)
 	listMyRooms      func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error)
 	listMessages     func(context.Context, *chatv1.ListMessagesRequest) (*chatv1.ListMessagesResponse, error)
+	closeDirectRoom  func(context.Context, *chatv1.CloseDirectRoomRequest) (*chatv1.CloseDirectRoomResponse, error)
 }
 
 func (f *fakeChat) CreateGroupRoom(ctx context.Context, in *chatv1.CreateGroupRoomRequest, _ ...grpc.CallOption) (*chatv1.CreateGroupRoomResponse, error) {
@@ -134,6 +135,13 @@ func (f *fakeChat) SendMessage(context.Context, *chatv1.SendMessageRequest, ...g
 
 func (f *fakeChat) VoteKeep(context.Context, *chatv1.VoteKeepRequest, ...grpc.CallOption) (*chatv1.VoteKeepResponse, error) {
 	return nil, errNotConfigured
+}
+
+func (f *fakeChat) CloseDirectRoom(ctx context.Context, in *chatv1.CloseDirectRoomRequest, _ ...grpc.CallOption) (*chatv1.CloseDirectRoomResponse, error) {
+	if f.closeDirectRoom == nil {
+		return nil, errNotConfigured
+	}
+	return f.closeDirectRoom(ctx, in)
 }
 
 func (f *fakeChat) EndDirectRoom(context.Context, *chatv1.EndDirectRoomRequest, ...grpc.CallOption) (*chatv1.EndDirectRoomResponse, error) {
@@ -248,10 +256,35 @@ func (f *fakeSessions) Verify(tokenString string) (string, bool, error) {
 // is set - set it to test the 429 path without needing a real Redis.
 type fakeRateLimiter struct {
 	deny bool
+	// denyAction, when set, denies only that action.
+	denyAction string
+	calls      []limiterCall
 }
 
-func (f *fakeRateLimiter) Allow(context.Context, string, string, int, time.Duration) (bool, error) {
+// limiterCall records one Allow call so a test can check which limit was
+// applied and with what numbers.
+type limiterCall struct {
+	action  string
+	subject string
+	max     int
+	window  time.Duration
+}
+
+func (f *fakeRateLimiter) Allow(_ context.Context, action, subject string, max int, window time.Duration) (bool, error) {
+	f.calls = append(f.calls, limiterCall{action, subject, max, window})
+	if f.denyAction != "" {
+		return action != f.denyAction, nil
+	}
 	return !f.deny, nil
+}
+
+func (f *fakeRateLimiter) call(action string) (limiterCall, bool) {
+	for _, c := range f.calls {
+		if c.action == action {
+			return c, true
+		}
+	}
+	return limiterCall{}, false
 }
 
 // fakeBanned implements BannedChecker, always reporting not banned

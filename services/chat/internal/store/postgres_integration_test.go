@@ -272,8 +272,102 @@ func TestPostgresListRoomsForAccountReturnsGroupAndKeptDirectOnly(t *testing.T) 
 	if err != nil {
 		t.Fatalf("ListRoomsForAccount: %v", err)
 	}
-	if len(rooms) != 2 {
-		t.Fatalf("expected 2 rooms (group + kept direct), got %d: %+v", len(rooms), rooms)
+	// Group, kept, and the still-open recent chat (DEC-0106).
+	if len(rooms) != 3 {
+		t.Fatalf("expected 3 rooms (group + kept direct + active chat), got %d: %+v", len(rooms), rooms)
+	}
+	for _, r := range rooms {
+		if r.ID == keptDirectID && (len(r.MemberAccountIDs) != 2) {
+			t.Fatalf("expected both members on the kept room, got %v", r.MemberAccountIDs)
+		}
+	}
+}
+
+// The person who skipped must not get a solo-saved chat in their Inbox.
+func TestPostgresSoloSavedChatIsListedForTheKeeperOnly(t *testing.T) {
+	st := newTestPostgres(t)
+	ctx := context.Background()
+	roomID, keeper, skipper := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if _, err := st.CreateDirectRoom(ctx, roomID, []string{keeper, skipper}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if err := st.EndDirectRoom(ctx, roomID); err != nil {
+		t.Fatalf("end: %v", err)
+	}
+	if kept, err := st.VoteKeep(ctx, roomID, keeper); err != nil || !kept {
+		t.Fatalf("expected the grace-window solo keep to save it, kept=%v err=%v", kept, err)
+	}
+
+	for who, want := range map[string]int{keeper: 1, skipper: 0} {
+		rooms, err := st.ListRoomsForAccount(ctx, who)
+		if err != nil {
+			t.Fatalf("list: %v", err)
+		}
+		if len(rooms) != want {
+			t.Fatalf("account %s: expected %d rooms, got %d", who, want, len(rooms))
+		}
+	}
+}
+
+func TestPostgresActiveChatListingIsBoundedAndSkipsEndedOnes(t *testing.T) {
+	st := newTestPostgres(t)
+	ctx := context.Background()
+	me, other := uuid.NewString(), uuid.NewString()
+	fresh, stale, ended := uuid.NewString(), uuid.NewString(), uuid.NewString()
+	for _, id := range []string{fresh, stale, ended} {
+		if _, err := st.CreateDirectRoom(ctx, id, []string{me, other}); err != nil {
+			t.Fatalf("create: %v", err)
+		}
+	}
+	if _, err := st.pool.Exec(ctx, "UPDATE rooms SET created_at = now() - interval '13 hours' WHERE id = $1", stale); err != nil {
+		t.Fatalf("age room: %v", err)
+	}
+	if err := st.EndDirectRoom(ctx, ended); err != nil {
+		t.Fatalf("end: %v", err)
+	}
+
+	rooms, err := st.ListRoomsForAccount(ctx, me)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(rooms) != 1 || rooms[0].ID != fresh {
+		t.Fatalf("expected only the fresh open chat, got %+v", rooms)
+	}
+}
+
+func TestPostgresMembershipStateAndClosingAKeptRoom(t *testing.T) {
+	st := newTestPostgres(t)
+	ctx := context.Background()
+	roomID, a, b, stranger := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	for _, who := range []string{a, b} {
+		if _, err := st.VoteKeep(ctx, roomID, who); err != nil {
+			t.Fatalf("vote: %v", err)
+		}
+	}
+
+	if member, open, err := st.MembershipState(ctx, roomID, a); err != nil || !member || !open {
+		t.Fatalf("a member of an open room: member=%v open=%v err=%v", member, open, err)
+	}
+	if member, _, err := st.MembershipState(ctx, roomID, stranger); err != nil || member {
+		t.Fatalf("a stranger is not a member: member=%v err=%v", member, err)
+	}
+
+	// EndDirectRoom leaves a saved chat alone; CloseDirectRoom does not.
+	if err := st.CloseDirectRoom(ctx, roomID); err != nil {
+		t.Fatalf("CloseDirectRoom: %v", err)
+	}
+	if member, open, err := st.MembershipState(ctx, roomID, a); err != nil || !member || open {
+		t.Fatalf("a closed room: member=%v open=%v err=%v", member, open, err)
+	}
+	room, _ := st.GetRoom(ctx, roomID)
+	if !room.Kept || room.EndedAt == nil {
+		t.Fatalf("expected the room closed but still saved, got %+v", room)
+	}
+	if err := st.CloseDirectRoom(ctx, roomID); err != nil {
+		t.Fatalf("closing twice should be harmless: %v", err)
 	}
 }
 

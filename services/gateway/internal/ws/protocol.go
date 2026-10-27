@@ -87,6 +87,13 @@ type matchEndedFrame struct {
 	Reason string `json:"reason"`
 }
 
+// keepRequestedFrame tells a member that the OTHER person asked to keep the
+// conversation, so the web app can ask whether to save it or carry on
+// (DEC-0106). Sent only while the room is not yet saved.
+type keepRequestedFrame struct {
+	RoomID string `json:"room_id"`
+}
+
 type keepStatusFrame struct {
 	RoomID string `json:"room_id"`
 	// You and Partner are only known with certainty for the connection
