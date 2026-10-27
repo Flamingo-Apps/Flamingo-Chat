@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import * as api from '../api'
 import { FlagIcon, HeartIcon, LockIcon, PowerIcon, SkipIcon } from '../components/Icons'
+import { Mascot } from '../components/Mascot'
 import { Modal } from '../components/Modal'
 import { EmptyChat, Workspace } from '../components/Workspace'
 import { useGateway } from '../gateway'
@@ -106,12 +107,12 @@ export function RandomScreen() {
     )
   } else if (state.matching) {
     chat = (
-      <EmptyChat emoji="🔎" title="Finding someone for you" text="Hang tight. This usually takes a few seconds.">
+      <EmptyChat mood="search" title="Finding someone for you" text="Hang tight, this only takes a few seconds.">
         <div className="pulse" />
       </EmptyChat>
     )
   } else {
-    chat = <EmptyChat emoji="🦩" title="Ready when you are" text="Pick who you'd like to talk to and press Find a match." />
+    chat = <EmptyChat mood="wave" title="Say hi to someone new" text="Pick who you'd like to meet, then tap Find a match." />
   }
 
   return (
@@ -139,14 +140,15 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} label="Report">
       {submitted ? (
         <>
-          <div className="modal__emoji">🙏</div>
-          <h2>Report filed</h2>
-          <p>Thank you for helping keep this place safe.</p>
+          <Mascot mood="love" size={96} />
+          <h2>Thank you</h2>
+          <p>You're helping keep this place kind.</p>
         </>
       ) : (
         <form onSubmit={submit}>
+          <Mascot mood="shy" size={96} />
           <h2>Report this person</h2>
-          <p>Tell us what happened. Only the people reviewing reports will see it.</p>
+          <p>Tell us what happened. Only our safety team sees this.</p>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What happened?" required rows={4} />
           <div className="modal__actions">
             <button className="btn" type="submit">
@@ -189,7 +191,7 @@ function PartnerLeftPrompt({ roomId, partnerLeftAt, kept }: { roomId: string; pa
 
   if (kept) {
     return (
-      <EmptyChat emoji="💌" title="Saved" text="You can find this conversation in your Inbox.">
+      <EmptyChat mood="love" title="Saved!" text="You can find this chat in your Inbox.">
         <button className="btn" onClick={() => expireGraceWindow(roomId)}>
           Back to Random
         </button>
@@ -198,7 +200,7 @@ function PartnerLeftPrompt({ roomId, partnerLeftAt, kept }: { roomId: string; pa
   }
 
   return (
-    <EmptyChat emoji="👋" title="Your partner left" text={`Keep this chat anyway? You have ${Math.ceil(remainingMs / 1000)}s.`}>
+    <EmptyChat mood="shy" title="Your partner left" text={`Want to keep this chat anyway? You have ${Math.ceil(remainingMs / 1000)}s.`}>
       <div className="modal__actions">
         <button className="btn" onClick={() => send({ type: 'keep_chat', room_id: roomId })}>
           Keep this chat

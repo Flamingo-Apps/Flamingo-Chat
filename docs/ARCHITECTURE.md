@@ -350,6 +350,8 @@ The monitoring stack (where metrics, traces and logs are stored and viewed) is d
 
 ## 10. Frontend (Agreed; redesigned - DEC-0105)
 
+Look: a light "pop brutal" theme (cream paper, thick ink outlines, hard offset shadows), the maintainer's own logo, and a cat-shaped blob mascot on prompts and empty screens.
+
 - A React + Vite + TypeScript single-page app in `web/`, deployed to Vercel. It talks only to the gateway. (DEC-0032, DEC-0040)
 - **Welcome:** one question, "Have you been here before?". A new visitor goes straight in as a guest with a made-up name, with no form and no sign-in. A returning one signs in with Google.
 - **Desktop:** a real app layout, with navigation, the online count and the profile in a left column, a controls or list pane next to it, and the conversation on the right.
@@ -359,8 +361,8 @@ The monitoring stack (where metrics, traces and logs are stored and viewed) is d
   - **Channels:** group rooms.
   - **Inbox:** kept conversations.
   - **Chat header:** Keep, Next, End and Report. Block is not offered yet: the old button only ended the chat, which End already does, and wiring the real block endpoint is still open.
-- **Identity prompt:** reaching for a locked feature opens a card explaining why an identity is needed, with Google's own sign-in button as the one-click yes. Declining shows the person exactly what others would see of them, which is only their anonymous name.
-- **Gender:** asked once, right after a first Google sign-in, with a warning that it cannot be changed. (DEC-0028)
+- **Identity prompt:** reaching for a locked feature opens a short, warm card that leads with what stays private. Google's own sign-in button sits in a "Get your identity" panel that opens on tap. Declining shows the person what others would see of them, which is only their anonymous name.
+- **Gender:** asked once, right after a first Google sign-in, with a friendly note that it can only be set once. (DEC-0028)
 - **Online count:** the number beside the green dot is the `presence` frame the gateway already pushes, and before the first one arrives the public `GET /v1/presence`. No backend change.
 - Run it without the whole local stack: `npm run dev:mock` and `npm run dev` in `web/`. The mock gateway is a stand-in for working on the UI, not a model of the real gateway's rules.
 

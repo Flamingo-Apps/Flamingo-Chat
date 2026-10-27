@@ -1,6 +1,9 @@
 import { useState } from 'react'
 import * as api from '../api'
 import { Avatar } from '../components/Avatar'
+import { Brand } from '../components/Brand'
+import { Mascot } from '../components/Mascot'
+import logo from '../assets/flamingo-logo.png'
 import { OnlineBadge } from '../components/OnlineBadge'
 import { useGateway } from '../gateway'
 import { generatePseudonym } from '../pseudonym'
@@ -31,10 +34,7 @@ export function WelcomeScreen() {
   return (
     <div className="welcome">
       <div className="welcome__main">
-        <div className="brand brand--big">
-          <span className="brand__mark">🦩</span>
-          <span className="brand__name">Flamingo</span>
-        </div>
+        <Brand big />
         <h1>Talk to anyone at KIIT. Nobody knows it's you.</h1>
         <p className="welcome__lede">Random chats and group channels with a made-up name. You only share who you are if you choose to.</p>
         <OnlineBadge />
@@ -44,12 +44,12 @@ export function WelcomeScreen() {
         <h2 className="welcome__question">Have you been here before?</h2>
         <div className="welcome__options">
           <button className="option option--new" onClick={startAsGuest} disabled={loading}>
-            <span className="option__emoji">✨</span>
+            <Mascot mood="wave" size={64} />
             <span className="option__title">{loading ? 'Getting you in...' : "Nope, I'm new"}</span>
             <span className="option__sub">Jump straight in. No sign-up.</span>
           </button>
           <button className={`option ${returning ? 'option--on' : ''}`} onClick={() => setReturning(true)} disabled={loading}>
-            <span className="option__emoji">👋</span>
+            <Mascot mood="love" size={64} />
             <span className="option__title">Yes, sign me in</span>
             <span className="option__sub">Use the Google account you verified with.</span>
           </button>
@@ -57,7 +57,7 @@ export function WelcomeScreen() {
 
         {returning && (
           <div className="welcome__returning">
-            <p>Welcome back! Sign in with the same Google account as before.</p>
+            <p>Welcome back! Use the same Google account as before.</p>
             <GoogleSignInLink href={api.googleSignInURL()} />
           </div>
         )}
@@ -65,10 +65,9 @@ export function WelcomeScreen() {
       </div>
 
       <div className="welcome__art" aria-hidden="true">
+        <img className="welcome__logo" src={logo} alt="" />
         <div className="art-bubble art-bubble--a"><Avatar name="Swift Fox" size={34} /> hey, anyone up?</div>
-        <div className="art-bubble art-bubble--b">which hostel are you in? <Avatar name="Quiet Otter" size={34} /></div>
-        <div className="art-bubble art-bubble--c"><Avatar name="Lucky Panda" size={34} /> mess food again 😭</div>
-        <div className="art-bubble art-bubble--d">same 😂 <Avatar name="Witty Lynx" size={34} /></div>
+        <div className="art-bubble art-bubble--b">mess food again <Avatar name="Quiet Otter" size={34} /></div>
       </div>
     </div>
   )

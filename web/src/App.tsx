@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react'
 import './app.css'
 import { GenderPrompt } from './components/GenderPrompt'
 import { IdentityCard } from './components/IdentityCard'
+import { Mascot } from './components/Mascot'
 import { Modal } from './components/Modal'
 import { BottomNav, MobileTopBar, Sidebar, type Screen } from './components/Nav'
 import { GatewayProvider, useGateway } from './gateway'
@@ -58,9 +59,9 @@ function Main() {
       {shown === 'gender' && <GenderPrompt onClose={closeGender} />}
       {shown === 'signout' && (
         <Modal onClose={close} label="Sign out">
-          <div className="modal__emoji">👋</div>
-          <h2>Sign out?</h2>
-          <p>{account.google_linked ? 'You can sign back in any time with Google.' : "You're a guest, so this name and your chats can't be recovered once you sign out."}</p>
+          <Mascot mood="wave" size={104} />
+          <h2>Leaving already?</h2>
+          <p>{account.google_linked ? 'Come back any time. Just sign in with Google.' : "Heads up: as a guest, your name and chats can't be brought back once you sign out."}</p>
           <div className="modal__actions">
             <button
               className="btn"

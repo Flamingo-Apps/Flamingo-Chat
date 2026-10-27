@@ -2,12 +2,13 @@ import { useState } from 'react'
 import * as api from '../api'
 import { useGateway } from '../gateway'
 import type { Gender } from '../types'
+import { Mascot } from './Mascot'
 import { Modal } from './Modal'
 
-const CHOICES: { value: Gender; label: string; emoji: string }[] = [
-  { value: 'male', label: 'Male', emoji: '👦' },
-  { value: 'female', label: 'Female', emoji: '👧' },
-  { value: 'prefer_not_to_say', label: 'Prefer not to say', emoji: '🤐' },
+const CHOICES: { value: Gender; label: string }[] = [
+  { value: 'male', label: 'Male' },
+  { value: 'female', label: 'Female' },
+  { value: 'prefer_not_to_say', label: 'Prefer not to say' },
 ]
 
 // The one-time gender choice after a first Google sign-in. The backend
@@ -34,15 +35,14 @@ export function GenderPrompt({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal onClose={onClose} label="Choose your gender">
-      <div className="modal__emoji">🔒</div>
-      <h2>One last thing</h2>
+      <Mascot mood="shy" size={104} />
+      <h2>Last step, promise</h2>
       <p>
-        You can choose this <b>only once</b>, so please don't fake it and choose carefully. It's what makes gender-filtered matching fair for everyone.
+        Pick what fits you. It helps everyone get matched fairly. You can only set it <b>once</b>, so take a second.
       </p>
       <div className="choices" role="radiogroup" aria-label="Gender">
         {CHOICES.map((c) => (
           <button key={c.value} role="radio" aria-checked={choice === c.value} className={`choice ${choice === c.value ? 'choice--on' : ''}`} onClick={() => setChoice(c.value)}>
-            <span className="choice__emoji">{c.emoji}</span>
             {c.label}
           </button>
         ))}

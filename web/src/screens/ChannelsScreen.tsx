@@ -107,7 +107,7 @@ export function ChannelsScreen() {
       }
     />
   ) : (
-    <EmptyChat emoji="💬" title="Pick a channel" text="Or start your own and share the invite code with friends." />
+    <EmptyChat mood="sleepy" title="Pick a channel" text="Or start your own and share the code with friends." />
   )
 
   return <Workspace list={list} chat={chat} hasChat={Boolean(selected)} />

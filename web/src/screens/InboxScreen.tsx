@@ -25,7 +25,7 @@ export function InboxScreen() {
         {keptRooms.map((r) => (
           <li key={r.id}>
             <button className={`room ${r.id === selectedRoomId ? 'room--on' : ''}`} onClick={() => setSelectedRoomId(r.id)}>
-              <span className="avatar avatar--group">💌</span>
+              <span className="avatar avatar--group">♥</span>
               <span className="room__name">Chat from {when(r.created_at_unix)}</span>
             </button>
           </li>
@@ -38,7 +38,7 @@ export function InboxScreen() {
   const chat = selected ? (
     <ChatView roomId={selected.id} title="Kept conversation" subtitle={when(selected.created_at_unix)} onBack={() => setSelectedRoomId(null)} />
   ) : (
-    <EmptyChat emoji="💌" title="Your kept chats live here" text="When both of you press Keep, the conversation moves to your Inbox." />
+    <EmptyChat mood="sleepy" title="Your kept chats live here" text="When you both press Keep, the chat moves to your Inbox." />
   )
 
   return <Workspace list={list} chat={chat} hasChat={Boolean(selected)} />

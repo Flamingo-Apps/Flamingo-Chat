@@ -1,5 +1,6 @@
 import { useGateway } from '../gateway'
 import { Avatar } from './Avatar'
+import { Brand } from './Brand'
 import { CheckBadgeIcon, HashIcon, InboxIcon, ShuffleIcon } from './Icons'
 import { OnlineBadge } from './OnlineBadge'
 
@@ -25,10 +26,7 @@ export function Sidebar({ screen, onChange, onGetIdentity, onSignOut }: NavProps
 
   return (
     <aside className="sidebar">
-      <div className="brand">
-        <span className="brand__mark">🦩</span>
-        <span className="brand__name">Flamingo</span>
-      </div>
+      <Brand />
 
       <nav className="sidebar__nav" aria-label="Main">
         {ITEMS.map((item) => (
@@ -76,10 +74,7 @@ export function MobileTopBar({ onProfile }: { onProfile: () => void }) {
   if (!state.account) return null
   return (
     <header className="topbar">
-      <div className="brand">
-        <span className="brand__mark">🦩</span>
-        <span className="brand__name">Flamingo</span>
-      </div>
+      <Brand />
       <OnlineBadge />
       <button className="topbar__me" onClick={onProfile} aria-label="Your profile">
         <Avatar name={state.account.pseudonym} size={36} />

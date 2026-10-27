@@ -1,7 +1,7 @@
-import { useEffect, useRef, useState } from 'react'
+import { Fragment, useEffect, useRef, useState } from 'react'
 import { Avatar } from '../components/Avatar'
 import { BackIcon, SendIcon } from '../components/Icons'
-import { clockTime } from '../format'
+import { clockTime, dayLabel } from '../format'
 import { useGateway } from '../gateway'
 
 interface ChatViewProps {
@@ -33,12 +33,21 @@ export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra }
     bottomRef.current?.scrollIntoView({ block: 'end' })
   }, [messages.length])
 
-  function sendMessage(e: React.FormEvent) {
-    e.preventDefault()
+  function sendMessage(e?: React.FormEvent) {
+    e?.preventDefault()
     const text = body.trim()
     if (!text) return
     send({ type: 'send_message', room_id: roomId, client_msg_id: crypto.randomUUID(), body: text })
     setBody('')
+  }
+
+  // Enter sends, Shift+Enter starts a new line, and the box grows with
+  // what is typed (up to a few lines, then it scrolls).
+  function onKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
+      e.preventDefault()
+      sendMessage()
+    }
   }
 
   return (
@@ -58,25 +67,38 @@ export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra }
       </header>
 
       <div className="chat__messages">
-        {messages.length === 0 && <p className="chat__hint">Say hi 👋 The first message is the hardest.</p>}
+        {messages.length === 0 && <p className="chat__hint">Say hi! The first message is always the hardest.</p>}
         {messages.map((m, i) => {
           const mine = m.sender_account_id === state.account?.id
-          const startsRun = i === 0 || messages[i - 1].sender_account_id !== m.sender_account_id
+          const label = dayLabel(m.sent_at_unix)
+          const newDay = i === 0 || dayLabel(messages[i - 1].sent_at_unix) !== label
+          const startsRun = newDay || messages[i - 1].sender_account_id !== m.sender_account_id
           return (
-            <div key={m.message_id} className={`msg ${mine ? 'msg--mine' : ''} ${startsRun ? 'msg--first' : ''}`}>
-              {!mine && startsRun && <span className="msg__sender">{m.sender_pseudonym}</span>}
-              <div className={`bubble ${mine ? 'bubble--mine' : 'bubble--theirs'}`}>
-                <span>{m.body}</span>
-                <time className="bubble__time">{clockTime(m.sent_at_unix)}</time>
+            <Fragment key={m.message_id}>
+              {newDay && <div className="day">{label}</div>}
+              <div className={`msg ${mine ? 'msg--mine' : ''} ${startsRun ? 'msg--first' : ''}`}>
+                {!mine && startsRun && <span className="msg__sender">{m.sender_pseudonym}</span>}
+                <div className={`bubble ${mine ? 'bubble--mine' : 'bubble--theirs'}`}>
+                  <span>{m.body}</span>
+                  <time className="bubble__time">{clockTime(m.sent_at_unix)}</time>
+                </div>
               </div>
-            </div>
+            </Fragment>
           )
         })}
         <div ref={bottomRef} />
       </div>
 
       <form className="chat__composer" onSubmit={sendMessage}>
-        <input value={body} onChange={(e) => setBody(e.target.value)} placeholder="Type a message" maxLength={2000} aria-label="Message" />
+        <textarea
+          value={body}
+          rows={1}
+          onChange={(e) => setBody(e.target.value)}
+          onKeyDown={onKeyDown}
+          placeholder="Type a message"
+          maxLength={2000}
+          aria-label="Message"
+        />
         <button className="btn btn--round" type="submit" aria-label="Send" disabled={!body.trim()}>
           <SendIcon />
         </button>
