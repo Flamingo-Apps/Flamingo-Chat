@@ -3,6 +3,7 @@ import './app.css'
 import { GenderPrompt } from './components/GenderPrompt'
 import { IdentityCard } from './components/IdentityCard'
 import { Mascot } from './components/Mascot'
+import { MeetMochi } from './components/MeetMochi'
 import { Modal } from './components/Modal'
 import { BottomNav, MobileTopBar, Sidebar, type Screen } from './components/Nav'
 import { GatewayProvider, useGateway } from './gateway'
@@ -14,11 +15,23 @@ import { UiContext } from './ui'
 
 type Dialog = 'identity' | 'gender' | 'signout' | null
 
+// Whether this browser has already met Mochi. Storage can be blocked
+// (private windows), in which case the card just shows each visit.
+const MET_KEY = 'flamingo_met_mochi'
+function hasMetMochi(): boolean {
+  try {
+    return localStorage.getItem(MET_KEY) === '1'
+  } catch {
+    return false
+  }
+}
+
 function Main() {
   const { state, logout } = useGateway()
   const [screen, setScreen] = useState<Screen>('random')
   const [dialog, setDialog] = useState<Dialog>(null)
   const [genderSnoozed, setGenderSnoozed] = useState(false)
+  const [metMochi, setMetMochi] = useState(hasMetMochi)
   const account = state.account
 
   // Right after a first Google sign-in the account is verified but has no
@@ -55,11 +68,23 @@ function Main() {
         <BottomNav screen={screen} onChange={setScreen} />
       </div>
 
+      {shown === null && !metMochi && (
+        <MeetMochi
+          onClose={() => {
+            setMetMochi(true)
+            try {
+              localStorage.setItem(MET_KEY, '1')
+            } catch {
+              /* storage blocked: the card will simply show again next visit */
+            }
+          }}
+        />
+      )}
       {shown === 'identity' && <IdentityCard onClose={close} />}
       {shown === 'gender' && <GenderPrompt onClose={closeGender} />}
       {shown === 'signout' && (
         <Modal onClose={close} label="Sign out">
-          <Mascot mood="wave" size={104} />
+          <Mascot mood="worried" size={108} />
           <h2>Leaving already?</h2>
           <p>{account.google_linked ? 'Come back any time. Just sign in with Google.' : "Heads up: as a guest, your name and chats can't be brought back once you sign out."}</p>
           <div className="modal__actions">

@@ -41,15 +41,19 @@ export function WelcomeScreen() {
 
         {state.kicked && <p className="error-text">You were removed: {state.kicked}</p>}
 
+        <div className="mochi-says">
+          <Mascot mood="hello" size={104} />
+          <p className="speech">Hi, I'm Mochi! Tell me if you've been here before, and I'll take it from there.</p>
+        </div>
         <h2 className="welcome__question">Have you been here before?</h2>
         <div className="welcome__options">
           <button className="option option--new" onClick={startAsGuest} disabled={loading}>
-            <Mascot mood="wave" size={64} />
+            <Mascot mood="cheer" size={72} />
             <span className="option__title">{loading ? 'Getting you in...' : "Nope, I'm new"}</span>
             <span className="option__sub">Jump straight in. No sign-up.</span>
           </button>
           <button className={`option ${returning ? 'option--on' : ''}`} onClick={() => setReturning(true)} disabled={loading}>
-            <Mascot mood="love" size={64} />
+            <Mascot mood="hello" size={72} />
             <span className="option__title">Yes, sign me in</span>
             <span className="option__sub">Use the Google account you verified with.</span>
           </button>

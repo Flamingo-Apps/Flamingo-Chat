@@ -293,7 +293,55 @@ textarea {
 
 .mascot {
   flex: none;
-  filter: drop-shadow(3px 3px 0 var(--ink));
+  max-width: 100%;
+  filter: drop-shadow(2px 3px 0 rgba(22, 16, 28, 0.85));
+}
+
+/* Mochi talking: a speech bubble with a tail pointing back at her */
+.mochi-says {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+}
+.speech {
+  position: relative;
+  max-width: 24rem;
+  padding: 0.8rem 1.1rem;
+  border: 3px solid var(--ink);
+  border-radius: 20px;
+  background: var(--card);
+  box-shadow: var(--shadow-s);
+  font-weight: 800;
+}
+.speech::before {
+  content: '';
+  position: absolute;
+  left: -11px;
+  top: 50%;
+  width: 18px;
+  height: 18px;
+  margin-top: -9px;
+  border-left: 3px solid var(--ink);
+  border-bottom: 3px solid var(--ink);
+  background: var(--card);
+  transform: rotate(45deg);
+}
+.tips {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  width: 100%;
+  text-align: left;
+}
+.tips li {
+  padding: 0.65rem 0.9rem;
+  border: 3px solid var(--ink);
+  border-radius: 14px;
+  background: var(--pink-soft);
+  font-weight: 700;
 }
 
 /* ---------- welcome ---------- */

@@ -35,7 +35,7 @@ export function GenderPrompt({ onClose }: { onClose: () => void }) {
 
   return (
     <Modal onClose={onClose} label="Choose your gender">
-      <Mascot mood="shy" size={104} />
+      <Mascot mood="hello" size={108} />
       <h2>Last step, promise</h2>
       <p>
         Pick what fits you. It helps everyone get matched fairly. You can only set it <b>once</b>, so take a second.

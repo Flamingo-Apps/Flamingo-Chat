@@ -112,7 +112,7 @@ export function RandomScreen() {
       </EmptyChat>
     )
   } else {
-    chat = <EmptyChat mood="wave" title="Say hi to someone new" text="Pick who you'd like to meet, then tap Find a match." />
+    chat = <EmptyChat mood="hello" title="Say hi to someone new" text="Pick who you'd like to meet, then tap Find a match." />
   }
 
   return (
@@ -140,13 +140,13 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} label="Report">
       {submitted ? (
         <>
-          <Mascot mood="love" size={96} />
+          <Mascot mood="cheer" size={110} />
           <h2>Thank you</h2>
           <p>You're helping keep this place kind.</p>
         </>
       ) : (
         <form onSubmit={submit}>
-          <Mascot mood="shy" size={96} />
+          <Mascot mood="peek" size={110} />
           <h2>Report this person</h2>
           <p>Tell us what happened. Only our safety team sees this.</p>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What happened?" required rows={4} />
@@ -191,7 +191,7 @@ function PartnerLeftPrompt({ roomId, partnerLeftAt, kept }: { roomId: string; pa
 
   if (kept) {
     return (
-      <EmptyChat mood="love" title="Saved!" text="You can find this chat in your Inbox.">
+      <EmptyChat mood="cheer" title="Saved!" text="You can find this chat in your Inbox.">
         <button className="btn" onClick={() => expireGraceWindow(roomId)}>
           Back to Random
         </button>
@@ -200,7 +200,7 @@ function PartnerLeftPrompt({ roomId, partnerLeftAt, kept }: { roomId: string; pa
   }
 
   return (
-    <EmptyChat mood="shy" title="Your partner left" text={`Want to keep this chat anyway? You have ${Math.ceil(remainingMs / 1000)}s.`}>
+    <EmptyChat mood="worried" title="Your partner left" text={`Want to keep this chat anyway? You have ${Math.ceil(remainingMs / 1000)}s.`}>
       <div className="modal__actions">
         <button className="btn" onClick={() => send({ type: 'keep_chat', room_id: roomId })}>
           Keep this chat

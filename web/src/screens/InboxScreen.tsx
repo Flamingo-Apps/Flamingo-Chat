@@ -38,7 +38,7 @@ export function InboxScreen() {
   const chat = selected ? (
     <ChatView roomId={selected.id} title="Kept conversation" subtitle={when(selected.created_at_unix)} onBack={() => setSelectedRoomId(null)} />
   ) : (
-    <EmptyChat mood="sleepy" title="Your kept chats live here" text="When you both press Keep, the chat moves to your Inbox." />
+    <EmptyChat mood="read" title="Your kept chats live here" text="When you both press Keep, the chat moves to your Inbox." />
   )
 
   return <Workspace list={list} chat={chat} hasChat={Boolean(selected)} />

@@ -52,7 +52,7 @@ export function IdentityCard({ onClose }: { onClose: () => void }) {
     <Modal onClose={onClose} label="Get your identity">
       {step === 'ask' ? (
         <>
-          <Mascot mood="wave" size={112} />
+          <Mascot mood="hello" size={116} />
           <h2>Want to unlock this?</h2>
           <p>
             You'll still be <b>{name}</b>. Nobody ever sees your email.
@@ -64,7 +64,7 @@ export function IdentityCard({ onClose }: { onClose: () => void }) {
         </>
       ) : (
         <>
-          <Mascot mood="shy" size={112} />
+          <Mascot mood="think" size={116} />
           <h2>Here's how others see you</h2>
           <div className="preview-chat">
             <div className="preview-chat__row">

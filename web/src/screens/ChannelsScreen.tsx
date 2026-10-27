@@ -107,7 +107,7 @@ export function ChannelsScreen() {
       }
     />
   ) : (
-    <EmptyChat mood="sleepy" title="Pick a channel" text="Or start your own and share the code with friends." />
+    <EmptyChat mood="read" title="Pick a channel" text="Or start your own and share the code with friends." />
   )
 
   return <Workspace list={list} chat={chat} hasChat={Boolean(selected)} />
