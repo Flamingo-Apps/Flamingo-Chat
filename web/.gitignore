@@ -22,3 +22,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Black-box test output (screenshots of failures, results.json)
+e2e/out
