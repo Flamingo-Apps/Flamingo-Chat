@@ -1,0 +1,69 @@
+{
+  "meta": {
+    "environment": "gke",
+    "cluster": "gke_flamingo-512316_asia-south1-a_flamingo",
+    "nodes": 1,
+    "node_type": "e2-standard-2",
+    "node_cpu": "2",
+    "node_memory": "8135296Ki",
+    "gateway_image": "ghcr.io/flamingo-apps/flamingo-gateway:b093bac45f0bebe44fd2b31f96b12635de588ecd",
+    "k6_image": "grafana/k6:2.3.0",
+    "started_utc": "2026-10-28T15:19:50Z",
+    "ended_utc": "2026-10-28T15:23:01Z",
+    "generator": "k6 Job inside the cluster, talking to the gateway service directly"
+  },
+  "k6": {
+    "users": {
+      "target": 300,
+      "ramp_s": 30,
+      "hold_s": 120,
+      "session_s": 60,
+      "send_every_s": 3,
+      "vus_max": 300
+    },
+    "messages": {
+      "sent": 14870,
+      "received": 14737
+    },
+    "msg_latency_ms": {
+      "avg": 241.5096016828391,
+      "med": 169,
+      "p90": 550.3999999999996,
+      "p95": 719.1999999999989,
+      "p99": 1026,
+      "max": 1516
+    },
+    "match_wait_ms": {
+      "med": 575,
+      "p95": 1534.9
+    },
+    "sessions_matched_rate": 0.9983471074380166,
+    "errors": {
+      "frame_errors": 48,
+      "http_req_failed_rate": 0
+    },
+    "thresholds": {
+      "frame_errors": false,
+      "session_matched": true,
+      "msg_latency_ms": true
+    }
+  },
+  "cluster": {
+    "app_cpu_cores_peak": 1.0816400973354388,
+    "app_memory_gib_peak": 2.691608428955078,
+    "generator_cpu_cores_peak": 0.13300930254521415,
+    "generator_memory_gib_peak": 0.12946319580078125,
+    "busiest_services_cpu_cores_peak": {
+      "gateway": 0.156,
+      "chat": 0.115,
+      "delivery-worker": 0.067,
+      "persistence-worker": 0.089,
+      "matching": 0.015,
+      "identity": 0.036,
+      "presence": 0.001,
+      "kafka": 0.149,
+      "postgres": 0.216,
+      "redis": 0.066
+    }
+  }
+}
