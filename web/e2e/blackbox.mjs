@@ -29,6 +29,16 @@
 //   BB-22 Next still works after the gateway restarts, with no internal text on screen
 //   BB-23 a returning visitor lands straight in the app, never on the welcome screen
 //   BB-24 a verified person sees the Verified check on a phone-sized screen
+//   BB-25 a saved session with the server unreachable never shows the welcome screen
+//   BB-26 a session the server refuses (401, 403, 404) is ended with a clear message
+//   BB-27 a reload mid-chat never offers a new search while the chat is being restored
+//   BB-28 a match that arrives before its acknowledgement is not wiped (INC-0030)
+//   BB-29 a match announcement that never arrives is found by asking the server
+//   BB-30 signing out in one tab signs out the other
+//   BB-31 a dropped connection keeps the typed message and says why it cannot be sent
+//   BB-32 a session that died while the app was open is noticed and ended
+//   BB-33 closing the tab while searching leaves no ghost in the queue
+//   BB-34 a refresh while searching keeps the search going
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
@@ -62,6 +72,11 @@ function requireLocalStack() {
 function resetAllLimits() {
   sh('kubectl', ['exec', 'deploy/redis', '--', 'sh', '-c', "redis-cli --scan --pattern 'rl:*' | xargs -r redis-cli del"])
 }
+// People still waiting to be matched, from an earlier run or a page that was
+// closed, would be paired with this run's users. Local stack only.
+function resetMatchingQueue() {
+  sh('kubectl', ['exec', 'deploy/redis', '--', 'sh', '-c', "for p in 'mq:*' 'match:members:*'; do redis-cli --scan --pattern \"$p\" | xargs -r redis-cli del; done"])
+}
 function resetGuestLimiter() {
   sh('kubectl', ['exec', 'deploy/redis', '--', 'sh', '-c', "redis-cli --scan --pattern 'rl:guest_signup:*' | xargs -r redis-cli del"])
 }
@@ -77,9 +92,24 @@ async function run(id, title, fn) {
   } catch (e) {
     results.push({ id, title, status: 'FAIL', ms: Date.now() - t0, error: String(e.message).split('\n')[0] })
     for (const { page, label } of live) await page.screenshot({ path: `${OUT}${id}-${label}.png` }).catch(() => {})
+  } finally {
+    await closeScratch()
   }
   const r = results.at(-1)
   console.log(`${r.status === 'PASS' ? 'PASS' : 'FAIL'}  ${id}  ${title}${r.error ? `\n        ${r.error}` : ''}`)
+}
+
+// Users created for one check only. They are closed when the check ends, pass
+// or fail, so a failure cannot leave pages behind that keep searching and get
+// paired with the next check's users.
+const scratch = []
+async function newScratch(browser, label, opts = {}) {
+  const u = await newUser(browser, label, opts)
+  scratch.push(u)
+  return u
+}
+async function closeScratch() {
+  while (scratch.length) await scratch.pop().ctx.close().catch(() => {})
 }
 
 async function newUser(browser, label, opts = {}) {
@@ -155,6 +185,25 @@ async function matchPair(a, b) {
 requireLocalStack()
 for (const url of [WEB, `${GATEWAY}/v1/presence`]) assert((await fetch(url).catch(() => null))?.ok, `${url} is not answering - is the stack up (tilt up)?`)
 resetGuestLimiter()
+resetMatchingQueue()
+
+// Watches the page from before it loads and records what must never happen.
+const watchForWelcome = () => {
+  window.__sawWelcome = false
+  new MutationObserver(() => {
+    if (document.body && document.body.innerText.includes('Have you been here before?')) window.__sawWelcome = true
+  }).observe(document, { childList: true, subtree: true, characterData: true })
+}
+const watchForOfferedSearch = () => {
+  window.__sawOfferedSearch = false
+  new MutationObserver(() => {
+    const offered = [...document.querySelectorAll('button')].some((b) => /^Find a match$/.test((b.textContent ?? '').trim()) && !b.disabled)
+    if (offered) window.__sawOfferedSearch = true
+  }).observe(document, { childList: true, subtree: true, characterData: true, attributes: true })
+}
+const accountOf = (p) => p.evaluate(() => localStorage.getItem('flamingo_account'))
+// The shapes the gateway really sends over HTTP (httpapi/errors.go): underscores in the code.
+const gatewayError = (status, code, message) => ({ status, contentType: 'application/json', body: JSON.stringify({ error: { code, message } }) })
 
 const browser = await chromium.launch()
 let A, B, M
@@ -499,8 +548,8 @@ await run('BB-15', 'the sixth guest signup from one address is refused with a cl
 
 await run('BB-21', 'a refresh in the middle of a random chat puts the person back in it, and the chat carries on both ways (DEC-0112)', async () => {
   resetGuestLimiter()
-  const P = await newUser(browser, 'refresher')
-  const Q = await newUser(browser, 'stayer')
+  const P = await newScratch(browser, 'refresher')
+  const Q = await newScratch(browser, 'stayer')
   await enterAsGuest(P)
   await enterAsGuest(Q)
   NAME.P = await pseudonym(P.page)
@@ -529,8 +578,8 @@ await run('BB-21', 'a refresh in the middle of a random chat puts the person bac
 
 await run('BB-22', 'Next still works after the gateway restarts, and nothing internal is ever shown (DEC-0112)', async () => {
   resetGuestLimiter()
-  const P = await newUser(browser, 'next-after-restart')
-  const Q = await newUser(browser, 'partner')
+  const P = await newScratch(browser, 'next-after-restart')
+  const Q = await newScratch(browser, 'partner')
   await enterAsGuest(P)
   await enterAsGuest(Q)
   await matchPair(P, Q)
@@ -557,26 +606,21 @@ await run('BB-23', 'a returning visitor lands straight in the app and never sees
   resetGuestLimiter()
   const U = await newUser(browser, 'returning')
   await enterAsGuest(U)
-  await U.ctx.addInitScript(() => {
-    window.__sawWelcome = false
-    const look = () => {
-      if (document.body && document.body.innerText.includes('Have you been here before?')) window.__sawWelcome = true
-    }
-    new MutationObserver(look).observe(document, { childList: true, subtree: true, characterData: true })
-  })
+  await U.ctx.addInitScript(watchForWelcome)
   const second = await U.ctx.newPage()
   second.on('pageerror', (e) => pageErrors.push(`returning: ${e}`))
-  // The server taking two seconds to answer must not put the welcome screen up.
+  // The server takes four seconds to answer who this is. The app must not wait for it.
+  let answeredAt = Infinity
   await second.route('**/v1/me', async (route) => {
-    await new Promise((r) => setTimeout(r, 2000))
+    await new Promise((r) => setTimeout(r, 4000))
+    answeredAt = Date.now()
     await route.continue()
   })
-  const t0 = Date.now()
   await second.goto(WEB)
-  await second.locator('.profile__name').waitFor({ timeout: 10_000 })
-  const ms = Date.now() - t0
+  await second.locator('.profile__name').waitFor({ timeout: 15_000 })
+  const shownAt = Date.now()
   assert(!(await second.evaluate(() => window.__sawWelcome)), 'the welcome screen showed before the app')
-  assert(ms < 1800, `the app waited for the server before showing (${ms} ms with a 2 s delay on /v1/me)`)
+  assert(shownAt < answeredAt, 'the app waited for the server before showing anything')
   await U.ctx.close()
 })
 
@@ -588,6 +632,236 @@ await run('BB-24', 'a verified person sees the Verified check on a phone-sized s
   await V.page.setViewportSize({ width: 1440, height: 900 })
   assert(M, 'BB-13 did not leave a guest on a phone')
   assert((await M.page.locator('.topbar__verified').count()) === 0, 'a guest was shown the Verified check')
+})
+
+await run('BB-25', 'a saved session with the server unreachable never shows the welcome screen; it says so, retries, and recovers', async () => {
+  resetGuestLimiter()
+  const U = await newScratch(browser, 'unreachable')
+  await enterAsGuest(U)
+  const name = await pseudonym(U.page)
+  const token = await tokenOf(U.page)
+  await U.page.evaluate(() => localStorage.removeItem('flamingo_account')) // a session saved before the account copy existed
+  const second = await U.ctx.newPage()
+  await second.addInitScript(watchForWelcome)
+  let down = true
+  await second.route('**/v1/me', (route) => (down ? route.abort('failed') : route.continue()))
+  await second.goto(WEB)
+  await second.getByText("Can't reach Flamingo right now").waitFor({ timeout: 10_000 })
+  assert(!(await second.evaluate(() => window.__sawWelcome)), 'the welcome screen showed while the server was unreachable')
+  assert((await second.getByText("Nope, I'm new").count()) === 0, 'it offered a new account, which would have replaced the saved one')
+  assert((await tokenOf(second)) === token, 'the saved session was lost')
+  down = false // the server is back
+  await second.getByRole('button', { name: 'Try again' }).click()
+  await second.locator('.profile__name').waitFor({ timeout: 10_000 })
+  assert((await pseudonym(second)) === name, 'a different person came back')
+  assert(!(await second.evaluate(() => window.__sawWelcome)), 'the welcome screen showed on the way back')
+  await U.ctx.close()
+})
+
+await run('BB-26', 'a session the server refuses (401, 403 or 404) is ended with a clear message, and storage is cleared', async () => {
+  resetGuestLimiter()
+  const U = await newScratch(browser, 'refused')
+  await enterAsGuest(U)
+  const token = await tokenOf(U.page)
+  const account = await accountOf(U.page)
+  const cases = [
+    ['expired (401)', gatewayError(401, 'unauthenticated', 'invalid session token'), /session has ended/i],
+    ['account deleted (404)', gatewayError(404, 'not_found', 'account not found'), /session has ended/i],
+    ['blocked (403)', gatewayError(403, 'permission_denied', 'account is banned'), /can't be used/i],
+  ]
+  for (const [label, reply, message] of cases) {
+    await U.page.evaluate(([t, a]) => { localStorage.setItem('flamingo_session_token', t); localStorage.setItem('flamingo_account', a) }, [token, account])
+    await U.page.unroute('**/v1/me').catch(() => {})
+    await U.page.route('**/v1/me', (route) => route.fulfill(reply))
+    await U.page.reload()
+    await U.page.getByRole('heading', { name: 'Have you been here before?' }).waitFor({ timeout: 10_000 })
+    await U.page.getByText(message).waitFor({ timeout: 5000 })
+    assert((await tokenOf(U.page)) === null && (await accountOf(U.page)) === null, `${label}: the refused session was kept in storage`)
+  }
+  // And a server error is NOT a refusal.
+  await U.page.evaluate(([t, a]) => { localStorage.setItem('flamingo_session_token', t); localStorage.setItem('flamingo_account', a) }, [token, account])
+  await U.page.unroute('**/v1/me').catch(() => {})
+  await U.page.route('**/v1/me', (route) => route.fulfill(gatewayError(503, 'unavailable', 'try later')))
+  await U.page.reload()
+  await U.page.locator('.profile__name').waitFor({ timeout: 10_000 })
+  assert((await tokenOf(U.page)) === token, 'a 503 ended the session')
+  await U.ctx.close()
+})
+
+await run('BB-27', 'a reload mid-chat never offers a new search while the chat is being restored, and the chat comes back', async () => {
+  resetGuestLimiter()
+  const P = await newScratch(browser, 'reload-mid-chat')
+  const Q = await newScratch(browser, 'reload-partner')
+  await enterAsGuest(P)
+  await enterAsGuest(Q)
+  await matchPair(P, Q)
+  await say(P.page, 'before the reload')
+  await Q.page.getByText('before the reload', { exact: true }).waitFor()
+  await P.page.addInitScript(watchForOfferedSearch)
+  // Slow the server's answer so the "restoring" moment is long enough to see.
+  await P.page.route('**/v1/rooms', async (route) => { await new Promise((r) => setTimeout(r, 1200)); await route.continue() })
+  for (let i = 0; i < 3; i++) await P.page.reload() // an impatient person pressing Ctrl+R
+  await composer(P.page).waitFor({ timeout: 20_000 })
+  await P.page.getByText('before the reload', { exact: true }).waitFor()
+  assert(!(await P.page.evaluate(() => window.__sawOfferedSearch)), 'Find a match was offered to someone who was mid-chat')
+  await P.ctx.close()
+  await Q.ctx.close()
+})
+
+await run('BB-28', 'a match that reaches the screen before its acknowledgement is not wiped (INC-0030)', async () => {
+  resetGuestLimiter()
+  const A = await newScratch(browser, 'waits-first')
+  const P = await newScratch(browser, 'completes-pairing')
+  // P's connection delivers "queued" 500 ms late, so the match comes first: the order that stranded a person.
+  await P.page.routeWebSocket(/\/v1\/ws/, (ws) => {
+    const server = ws.connectToServer()
+    ws.onMessage((m) => server.send(m))
+    server.onMessage((m) => {
+      if (JSON.parse(String(m)).type === 'match_queued') setTimeout(() => ws.send(m), 500)
+      else ws.send(m)
+    })
+  })
+  await enterAsGuest(A)
+  await enterAsGuest(P)
+  await findMatchBtn(A.page).click()
+  await A.page.getByText('Looking for someone...').waitFor()
+  await findMatchBtn(P.page).click() // P's request completes the pairing
+  await composer(P.page).waitFor({ timeout: 15_000 })
+  await P.page.waitForTimeout(1500) // long enough for the late "queued" to arrive
+  assert((await composer(P.page).count()) === 1, 'the chat was erased by the late acknowledgement')
+  assert((await P.page.getByText('Looking for someone...').count()) === 0, 'it still says searching while chatting')
+  const t = await arrival(A.page, P.page, 'both sides are in the chat')
+  assert(t <= FAST, `delivery took ${show(t)}`)
+  await A.ctx.close()
+  await P.ctx.close()
+})
+
+await run('BB-29', 'a match announcement that never arrives is found by asking the server', async () => {
+  resetGuestLimiter()
+  const A = await newScratch(browser, 'waits')
+  const P = await newScratch(browser, 'never-told')
+  await P.page.routeWebSocket(/\/v1\/ws/, (ws) => {
+    const server = ws.connectToServer()
+    ws.onMessage((m) => server.send(m))
+    server.onMessage((m) => {
+      if (JSON.parse(String(m)).type !== 'match_found') ws.send(m) // lost on the way
+    })
+  })
+  await enterAsGuest(A)
+  await enterAsGuest(P)
+  await findMatchBtn(A.page).click()
+  await A.page.getByText('Looking for someone...').waitFor()
+  await findMatchBtn(P.page).click()
+  await composer(P.page).waitFor({ timeout: 15_000 }) // found by the periodic check, not by the lost message
+  await A.ctx.close()
+  await P.ctx.close()
+})
+
+await run('BB-30', 'signing out in one tab signs out the other tab of the same browser', async () => {
+  resetGuestLimiter()
+  const U = await newScratch(browser, 'two-tabs')
+  await enterAsGuest(U)
+  const second = await U.ctx.newPage()
+  await second.goto(WEB)
+  await second.locator('.profile__name').waitFor()
+  await U.page.getByRole('button', { name: 'Sign out' }).first().click()
+  await U.page.getByRole('dialog').getByRole('button', { name: 'Sign out' }).click()
+  await U.page.getByRole('heading', { name: 'Have you been here before?' }).waitFor()
+  await second.getByRole('heading', { name: 'Have you been here before?' }).waitFor({ timeout: 5000 })
+  assert((await tokenOf(second)) === null, 'the second tab brought the signed-out session back')
+  await U.ctx.close()
+})
+
+await run('BB-31', 'a dropped connection keeps the typed message, says why it cannot be sent, and lets it go once back', async () => {
+  resetGuestLimiter()
+  const P = await newScratch(browser, 'drops')
+  const Q = await newScratch(browser, 'drops-partner')
+  let current = null
+  let hold = false
+  await P.page.routeWebSocket(/\/v1\/ws/, (ws) => {
+    if (hold) return void ws.close()
+    current = ws
+    const server = ws.connectToServer()
+    ws.onMessage((m) => server.send(m))
+    server.onMessage((m) => ws.send(m))
+  })
+  await enterAsGuest(P)
+  await enterAsGuest(Q)
+  await matchPair(P, Q)
+  hold = true
+  current.close() // the connection drops and cannot come back for now
+  await P.page.locator('.chat__offline').waitFor({ timeout: 10_000 })
+  await composer(P.page).fill('typed while offline')
+  await P.page.keyboard.press('Enter')
+  assert((await composer(P.page).inputValue()) === 'typed while offline', 'the message was thrown away while offline')
+  assert(await P.page.getByRole('button', { name: 'Send' }).isDisabled(), 'Send was enabled with no connection')
+  assert(await P.page.getByRole('button', { name: 'Next', exact: true }).isDisabled(), 'Next was enabled with no connection')
+  hold = false
+  await P.page.locator('.chat__offline').waitFor({ state: 'detached', timeout: 40_000 })
+  await P.page.keyboard.press('Enter')
+  await Q.page.getByText('typed while offline', { exact: true }).waitFor({ timeout: 10_000 })
+  await P.ctx.close()
+  await Q.ctx.close()
+})
+
+await run('BB-32', 'a session that dies while the app is open is noticed and ended, not retried in silence', async () => {
+  resetGuestLimiter()
+  const U = await newScratch(browser, 'dies-open')
+  let live = null
+  let dead = false
+  await U.page.routeWebSocket(/\/v1\/ws/, (ws) => {
+    if (dead) return void ws.close() // the gateway closes a dead session's login without a word
+    live = ws
+    const server = ws.connectToServer()
+    ws.onMessage((m) => server.send(m))
+    server.onMessage((m) => ws.send(m))
+  })
+  await enterAsGuest(U)
+  // The account is cleaned up on the server while this tab is open.
+  await U.page.route('**/v1/me', (route) => route.fulfill(gatewayError(404, 'not_found', 'account not found')))
+  dead = true
+  live.close() // the connection drops and every login after it is closed
+  // Three failed logins later the app asks the server, hears "no such account", and ends the session.
+  await U.page.getByRole('heading', { name: 'Have you been here before?' }).waitFor({ timeout: 40_000 })
+  await U.page.getByText(/session has ended/i).waitFor({ timeout: 5000 })
+  assert((await tokenOf(U.page)) === null, 'the dead session was kept in storage')
+  await U.ctx.close()
+})
+
+await run('BB-33', 'someone who closes the tab while searching leaves no ghost: the next two people are paired with each other (INC-0030)', async () => {
+  resetGuestLimiter()
+  const gone = await newScratch(browser, 'closes-tab')
+  await enterAsGuest(gone)
+  await findMatchBtn(gone.page).click()
+  await gone.page.getByText('Looking for someone...').waitFor()
+  await gone.ctx.close() // the tab closes with the search still open
+  await sleep(6000) // longer than the gateway's grace period locally (3 s)
+  const A = await newScratch(browser, 'pair-a')
+  const B = await newScratch(browser, 'pair-b')
+  await enterAsGuest(A)
+  await enterAsGuest(B)
+  NAME.A33 = await pseudonym(A.page)
+  NAME.B33 = await pseudonym(B.page)
+  await matchPair(A, B)
+  await A.page.locator('.chat__title', { hasText: NAME.B33 }).waitFor({ timeout: 5000 })
+  await B.page.locator('.chat__title', { hasText: NAME.A33 }).waitFor({ timeout: 5000 })
+  const t = await arrival(A.page, B.page, 'paired with each other, not with a ghost')
+  assert(t <= FAST, `delivery took ${show(t)}`)
+})
+
+await run('BB-34', 'a refresh while searching keeps the search going: the person is still found', async () => {
+  resetGuestLimiter()
+  const A = await newScratch(browser, 'refreshes-while-searching')
+  const B = await newScratch(browser, 'finds-them')
+  await enterAsGuest(A)
+  await enterAsGuest(B)
+  await findMatchBtn(A.page).click()
+  await A.page.getByText('Looking for someone...').waitFor()
+  await A.page.reload() // back within the grace period
+  await sleep(4000) // longer than the grace, so a lost search would have been cancelled by now
+  await findMatchBtn(B.page).click()
+  await composer(B.page).waitFor({ timeout: 15_000 })
+  await composer(A.page).waitFor({ timeout: 15_000 }) // A was found, even though the page was refreshed while waiting
 })
 
 await run('BB-16', 'no uncaught errors in any page during the whole run', async () => {

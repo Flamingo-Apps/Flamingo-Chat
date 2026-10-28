@@ -19,6 +19,11 @@ export interface CurrentMatch {
   // RandomScreen uses it to show a "keep this chat?" countdown instead
   // of silently dropping the conversation (DEC-0091).
   partnerLeftAt: number | null
+  // Where this chat falls in the order of things on this screen (see
+  // AppState.seq). match_queued is only the answer to a request; if the chat
+  // appeared after the request was made, the request has already been answered
+  // by a match and a late match_queued must not undo it (see match_queued).
+  foundSeq: number
 }
 
 export interface AppState {
@@ -32,6 +37,12 @@ export interface AppState {
   presence: { total: number; guests: number; male: number; female: number } | null
   // The other person asked to keep the current chat and has not been answered.
   keepRequest: { roomId: string } | null
+  // A counter that orders what happens on this screen without a clock: each
+  // request for a match and each match found takes the next number. Two events
+  // in the same millisecond still have an order.
+  seq: number
+  // The number the person's latest request for a match (Find a match or Next) took.
+  searchSeq: number
   // A chat that was just saved, shown once as a card where the chat was.
   // readOnly is true when the other person had already left, so it can be
   // read but not continued (DEC-0106).
@@ -47,6 +58,9 @@ export function signInErrorMessage(reason: string): string {
   switch (reason) {
     case 'session_expired':
       return 'Your session has ended. Please start again.'
+    case 'account_blocked':
+      return "This account can't be used any more. If you think that is a mistake, please get in touch."
+
     case 'sign_in_failed':
       return 'That Google account could not be verified. Pick your KIIT Google account and try again.'
     case 'missing_code_or_state':
@@ -68,6 +82,8 @@ export const initialState: AppState = {
   matching: false,
   presence: null,
   keepRequest: null,
+  seq: 0,
+  searchSeq: 0,
   savedMatch: null,
   lastError: null,
   kicked: null,
@@ -96,6 +112,7 @@ export type Action =
   | { type: 'frame'; frame: ServerFrame }
   | { type: 'clearError' }
   | { type: 'signInFailed'; reason: string }
+  | { type: 'searchRequested' }
   | { type: 'graceWindowExpired'; roomId: string }
   | { type: 'keepRequestDismissed' }
   | { type: 'savedMatchDismissed' }
@@ -128,7 +145,14 @@ function applyFrame(state: AppState, frame: ServerFrame): AppState {
         }),
       )
 
+    // The answer to "find me a match": searching. It must not undo a match
+    // that has already arrived. The match itself travels on a different path
+    // (Kafka and Redis) from this acknowledgement, and in a small share of
+    // pairings it reaches the screen first; wiping it left the person on
+    // "Looking for someone" while the other side was already chatting with
+    // them (INC-0030).
     case 'match_queued':
+      if (state.currentMatch && state.currentMatch.foundSeq > state.searchSeq) return state
       return { ...state, matching: true, currentMatch: null }
 
     // The server's confirmation that we are no longer searching
@@ -141,6 +165,7 @@ function applyFrame(state: AppState, frame: ServerFrame): AppState {
     case 'match_found':
       return {
         ...state,
+        seq: state.seq + 1,
         matching: false,
         currentMatch: {
           roomId: frame.room_id,
@@ -150,6 +175,7 @@ function applyFrame(state: AppState, frame: ServerFrame): AppState {
           partnerKept: false,
           kept: false,
           partnerLeftAt: null,
+          foundSeq: state.seq + 1,
         },
       }
 
@@ -215,7 +241,11 @@ function applyFrame(state: AppState, frame: ServerFrame): AppState {
 export function reducer(state: AppState, action: Action): AppState {
   switch (action.type) {
     case 'session':
-      return { ...state, account: action.account, token: action.token, kicked: null }
+      // A new sign-in starts clean: an old "your session has ended" must not
+      // stay on screen once the person is back in.
+      return { ...state, account: action.account, token: action.token, kicked: null, lastError: null }
+    case 'searchRequested':
+      return { ...state, seq: state.seq + 1, searchSeq: state.seq + 1 }
     case 'logout':
       return { ...initialState }
     case 'connectionStatus':
@@ -255,7 +285,9 @@ export function reducer(state: AppState, action: Action): AppState {
             partnerKept: false,
             kept: false,
             partnerLeftAt: null,
+            foundSeq: state.seq + 1,
           },
+          seq: state.seq + 1,
         }
       }
       // No open chat on the server. One whose partner has just left is in its

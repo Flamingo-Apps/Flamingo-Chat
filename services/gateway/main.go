@@ -154,6 +154,10 @@ func main() {
 		Identity: identityClient, Chat: chatClient, Matching: matchingClient, Presence: presenceClient,
 		Sessions: sessions, RateLimiter: rateLimiter, Banned: bannedChecker, Redis: redisClient, Logger: logger,
 		PresenceRegistry: presenceRegistry,
+		// A search left behind by someone who has gone is cancelled this long
+		// after their last connection closes (DEC-0114).
+		Connections:        ws.NewConnections(),
+		SearchAbandonGrace: time.Duration(config.Int("SEARCH_ABANDON_GRACE_SECONDS", 20)) * time.Second,
 	}
 
 	mux := http.NewServeMux()

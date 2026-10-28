@@ -189,4 +189,58 @@ describe('GatewayConnection', () => {
     expect(first.readyState).toBe(3)
     expect(FakeWebSocket.instances.length).toBe(2)
   })
+
+  it('says whether a send actually went out', () => {
+    const conn = new GatewayConnection('tok', { onFrame: vi.fn(), onStatusChange: vi.fn() }, factory)
+    expect(conn.send({ type: 'ping' })).toBe(false) // not connected yet
+    conn.connect()
+    const sock = FakeWebSocket.instances[0]
+    expect(conn.send({ type: 'ping' })).toBe(false) // connecting
+    sock.simulateOpen()
+    expect(conn.send({ type: 'ping' })).toBe(true)
+    sock.simulateServerClose()
+    expect(conn.send({ type: 'ping' })).toBe(false) // dropped
+  })
+
+  it('reports trouble after several connections in a row that never log in, and not for ordinary drops', () => {
+    const onAuthTrouble = vi.fn()
+    const conn = new GatewayConnection('tok', { onFrame: vi.fn(), onStatusChange: vi.fn(), onAuthTrouble }, factory)
+    conn.connect()
+    const failOnce = () => {
+      const sock = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
+      sock.simulateOpen()
+      sock.simulateServerClose() // closed by the gateway before auth_ok, as it does for a dead session
+      vi.advanceTimersByTime(40_000)
+    }
+    failOnce()
+    failOnce()
+    expect(onAuthTrouble).not.toHaveBeenCalled()
+    failOnce()
+    expect(onAuthTrouble).toHaveBeenCalledTimes(1)
+
+    // A connection that logged in and later dropped is an ordinary drop.
+    const sock = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
+    sock.simulateOpen()
+    sock.simulateMessage({ type: 'auth_ok', account: { id: 'a' } })
+    sock.simulateServerClose()
+    vi.advanceTimersByTime(40_000)
+    expect(onAuthTrouble).toHaveBeenCalledTimes(1)
+  })
+
+  it('nudge reconnects at once, but not while a socket exists or after a deliberate close', () => {
+    const conn = new GatewayConnection('tok', { onFrame: vi.fn(), onStatusChange: vi.fn() }, factory)
+    conn.connect()
+    conn.nudge() // a socket already exists
+    expect(FakeWebSocket.instances.length).toBe(1)
+
+    FakeWebSocket.instances[0].simulateServerClose() // now waiting out a backoff
+    conn.nudge()
+    expect(FakeWebSocket.instances.length).toBe(2) // did not wait for the timer
+    vi.advanceTimersByTime(60_000)
+    expect(FakeWebSocket.instances.length).toBe(2) // and the old timer was cancelled
+
+    conn.close()
+    conn.nudge()
+    expect(FakeWebSocket.instances.length).toBe(2)
+  })
 })

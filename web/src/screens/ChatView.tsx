@@ -24,6 +24,10 @@ interface ChatViewProps {
 export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra, readOnly }: ChatViewProps) {
   const { state, send, loadMessages, clearError } = useGateway()
   const [body, setBody] = useState('')
+  // Nothing can be sent while the connection is down. The box keeps what was
+  // typed, and says why it cannot be sent yet, instead of clearing it and
+  // dropping the message without a word.
+  const online = state.connectionStatus === 'open'
   const messages = state.messagesByRoom[roomId] ?? []
   const bottomRef = useRef<HTMLDivElement>(null)
 
@@ -38,9 +42,8 @@ export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra, 
   function sendMessage(e?: React.FormEvent) {
     e?.preventDefault()
     const text = body.trim()
-    if (!text) return
-    send({ type: 'send_message', room_id: roomId, client_msg_id: crypto.randomUUID(), body: text })
-    setBody('')
+    if (!text || !online) return
+    if (send({ type: 'send_message', room_id: roomId, client_msg_id: crypto.randomUUID(), body: text })) setBody('')
   }
 
   // Enter sends, Shift+Enter starts a new line, and the box grows with
@@ -100,6 +103,11 @@ export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra, 
           {state.lastError} (tap to dismiss)
         </button>
       )}
+      {!online && (
+        <div className="chat__offline" role="status">
+          Reconnecting... you can send again in a moment.
+        </div>
+      )}
       <form className="chat__composer" onSubmit={sendMessage}>
         <textarea
           value={body}
@@ -110,7 +118,7 @@ export function ChatView({ roomId, title, subtitle, group, onBack, headerExtra, 
           maxLength={2000}
           aria-label="Message"
         />
-        <button className="btn btn--round" type="submit" aria-label="Send" disabled={!body.trim()}>
+        <button className="btn btn--round" type="submit" aria-label="Send" disabled={!body.trim() || !online}>
           <SendIcon />
         </button>
       </form>

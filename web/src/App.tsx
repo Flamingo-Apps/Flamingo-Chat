@@ -28,7 +28,7 @@ function hasMetMochi(): boolean {
 }
 
 function Main() {
-  const { state, restoring, logout } = useGateway()
+  const { state, restoring, holding, retryRestore, logout } = useGateway()
   const [screen, setScreen] = useState<Screen>('random')
   const [dialog, setDialog] = useState<Dialog>(null)
   const [genderSnoozed, setGenderSnoozed] = useState(false)
@@ -53,7 +53,7 @@ function Main() {
     [account?.google_linked],
   )
 
-  if (!account) return restoring ? <Splash /> : <WelcomeScreen />
+  if (!account) return restoring ? <Splash holding={holding} onRetry={retryRestore} /> : <WelcomeScreen />
 
   const closeGender = () => {
     setGenderSnoozed(true)

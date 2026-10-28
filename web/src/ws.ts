@@ -18,7 +18,15 @@ export type ConnectionStatus = 'connecting' | 'open' | 'closed'
 export interface GatewayConnectionHandlers {
   onFrame: (frame: ServerFrame) => void
   onStatusChange: (status: ConnectionStatus) => void
+  // Called after several attempts in a row ended without ever logging in. The
+  // gateway closes the same way for a dead session as for a hiccup, so the
+  // caller should ask the server whether the session is still good.
+  onAuthTrouble?: () => void
 }
+
+// This many connection attempts in a row that never reach auth_ok count as
+// trouble worth asking the server about.
+const AUTH_TROUBLE_AFTER = 3
 
 // GatewayConnection owns the WebSocket's lifecycle (connect, auth,
 // reconnect, keepalive) - everything else (room/message state,
@@ -33,6 +41,7 @@ export class GatewayConnection {
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
   private stableTimer: ReturnType<typeof setTimeout> | null = null
   private reconnectAttempt = 0
+  private failedWithoutAuth = 0
   private closedByCaller = false
   private wsFactory: (url: string) => WebSocket
 
@@ -56,10 +65,25 @@ export class GatewayConnection {
     this.detach()
   }
 
-  send(frame: ClientFrame): void {
+  // nudge reconnects at once instead of waiting out the backoff, for when the
+  // network has just come back or the tab has been brought forward. It does
+  // nothing if a socket already exists or the connection was closed on purpose.
+  nudge(): void {
+    if (this.closedByCaller || this.ws) return
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
+    this.reconnectTimer = null
+    this.open()
+  }
+
+  // send returns whether the frame was actually handed to an open socket. A
+  // caller must not behave as if it was sent (clear the message box, say
+  // "searching") when it was not.
+  send(frame: ClientFrame): boolean {
     if (this.ws?.readyState === WebSocket.OPEN) {
       this.ws.send(JSON.stringify(frame))
+      return true
     }
+    return false
   }
 
   private open(): void {
@@ -74,6 +98,7 @@ export class GatewayConnection {
     ws.onmessage = (event) => {
       const frame = JSON.parse(event.data) as ServerFrame
       if (frame.type === 'auth_ok') {
+        this.failedWithoutAuth = 0
         this.clearStableTimer()
         this.stableTimer = setTimeout(() => (this.reconnectAttempt = 0), STABLE_AFTER_MS)
         this.startPing()
@@ -107,6 +132,13 @@ export class GatewayConnection {
   private socketEnded(ws: WebSocket): void {
     if (ws !== this.ws) return
     this.ws = null
+    // A socket that closed before ever logging in. Counted so a session that
+    // has died (expired, account deleted) is noticed instead of retried for
+    // ever in silence.
+    if (this.stableTimer === null && !this.closedByCaller) {
+      this.failedWithoutAuth += 1
+      if (this.failedWithoutAuth % AUTH_TROUBLE_AFTER === 0) this.handlers.onAuthTrouble?.()
+    }
     this.handleDisconnect()
   }
 

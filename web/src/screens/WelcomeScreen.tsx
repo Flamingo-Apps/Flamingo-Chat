@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import * as api from '../api'
+import { friendlyError } from '../api'
 import { Avatar } from '../components/Avatar'
 import { Brand } from '../components/Brand'
 import { Mascot } from '../components/Mascot'
@@ -25,7 +26,7 @@ export function WelcomeScreen() {
       const resp = await api.signUpGuest()
       login(resp.account, resp.session_token)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyError(err))
       setLoading(false)
     }
   }

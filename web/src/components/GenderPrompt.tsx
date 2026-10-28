@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import * as api from '../api'
+import { friendlyError } from '../api'
 import { useGateway } from '../gateway'
 import type { Gender } from '../types'
 import { Mascot } from './Mascot'
@@ -28,7 +29,7 @@ export function GenderPrompt({ onClose }: { onClose: () => void }) {
       updateAccount(await api.setGender(state.token, choice))
       onClose()
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyError(err))
       setSaving(false)
     }
   }

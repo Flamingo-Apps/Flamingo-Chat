@@ -71,7 +71,7 @@ describe('reducer', () => {
     expect(state.matching).toBe(false)
     expect(state.currentMatch).toEqual({
       roomId: 'room-1', partnerPseudonym: 'Hound', partnerAccountId: 'acc-2', youKept: false, partnerKept: false, kept: false,
-      partnerLeftAt: null,
+      partnerLeftAt: null, foundSeq: expect.any(Number),
     })
 
     state = reducer(state, { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: false, kept: false } })
@@ -238,7 +238,7 @@ describe('reducer', () => {
       const state = reducer(initialState, { type: 'matchReconciled', rooms: [room()] })
       expect(state.currentMatch).toEqual({
         roomId: 'room-1', partnerPseudonym: 'Quiet Otter', partnerAccountId: 'acc-2',
-        youKept: false, partnerKept: false, kept: false, partnerLeftAt: null,
+        youKept: false, partnerKept: false, kept: false, partnerLeftAt: null, foundSeq: expect.any(Number),
       })
       expect(state.matching).toBe(false)
       expect(state.rooms).toHaveLength(1)
@@ -300,6 +300,77 @@ describe('reducer', () => {
 
     it('has a plain message for a session that has ended', () => {
       expect(signInErrorMessage('session_expired')).toMatch(/session has ended/i)
+    })
+  })
+
+  describe('a match and its acknowledgement arriving in either order (INC-0030)', () => {
+    const found = { type: 'match_found' as const, room_id: 'room-1', partner_pseudonym: 'Kind Jay', partner_account_id: 'acc-2' }
+
+    it('searching, then found: the normal order', () => {
+      let state = reducer(initialState, { type: 'searchRequested' })
+      state = reducer(state, { type: 'frame', frame: { type: 'match_queued' } })
+      expect(state.matching).toBe(true)
+      state = reducer(state, { type: 'frame', frame: found })
+      expect(state.matching).toBe(false)
+      expect(state.currentMatch?.roomId).toBe('room-1')
+    })
+
+    it('found BEFORE the acknowledgement: the chat must survive the late "queued"', () => {
+      // The person whose Find completed the pairing, on the afternoon it went wrong:
+      // the match reached the screen ahead of "queued", which used to erase it
+      // and leave "Looking for someone" up while the partner was already chatting.
+      let state = reducer(initialState, { type: 'searchRequested' })
+      state = reducer(state, { type: 'frame', frame: found })
+      state = reducer(state, { type: 'frame', frame: { type: 'match_queued' } })
+      expect(state.currentMatch?.roomId).toBe('room-1')
+      expect(state.matching).toBe(false)
+    })
+
+    it('Next: the old chat is replaced when its end arrives, in either order', () => {
+      let base = reducer(initialState, { type: 'frame', frame: { ...found, room_id: 'old' } })
+      base = reducer(base, { type: 'searchRequested' }) // the person pressed Next
+
+      // queued, then the old chat ends: now searching
+      let a = reducer(base, { type: 'frame', frame: { type: 'match_queued' } })
+      a = reducer(a, { type: 'frame', frame: { type: 'match_ended', room_id: 'old', reason: 'you_left' } })
+      expect(a.currentMatch).toBeNull()
+      expect(a.matching).toBe(true)
+
+      // the new match first, then queued, then the old chat's end: in the new chat, searching over
+      let b = reducer(base, { type: 'frame', frame: { ...found, room_id: 'new' } })
+      b = reducer(b, { type: 'frame', frame: { type: 'match_queued' } })
+      b = reducer(b, { type: 'frame', frame: { type: 'match_ended', room_id: 'old', reason: 'you_left' } })
+      expect(b.currentMatch?.roomId).toBe('new')
+      expect(b.matching).toBe(false)
+    })
+
+    it('a search that was only just requested still shows as searching after queued', () => {
+      const state = reducer(reducer(initialState, { type: 'searchRequested' }), { type: 'frame', frame: { type: 'match_queued' } })
+      expect(state.matching).toBe(true)
+    })
+
+    it('a lost announcement is healed by asking the server which chat the person is in', () => {
+      let state = reducer(initialState, { type: 'searchRequested' })
+      state = reducer(state, { type: 'frame', frame: { type: 'match_queued' } })
+      state = reducer(state, {
+        type: 'matchReconciled',
+        rooms: [{ id: 'room-9', type: 'direct', kept: false, created_at_unix: 5, partner_pseudonym: 'Kind Jay', partner_account_id: 'acc-2' }],
+      })
+      expect(state.matching).toBe(false)
+      expect(state.currentMatch?.roomId).toBe('room-9')
+    })
+  })
+
+  describe('starting over', () => {
+    it('a new sign-in does not keep an old "session ended" message on screen', () => {
+      let state = reducer(initialState, { type: 'signInFailed', reason: 'session_expired' })
+      expect(state.lastError).toMatch(/session has ended/i)
+      state = reducer(state, { type: 'session', account, token: 'tok' })
+      expect(state.lastError).toBeNull()
+    })
+
+    it('says plainly when an account cannot be used any more', () => {
+      expect(signInErrorMessage('account_blocked')).toMatch(/can't be used/i)
     })
   })
 })

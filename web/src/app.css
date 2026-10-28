@@ -1231,3 +1231,13 @@ textarea:focus {
   color: var(--muted);
   font-weight: 800;
 }
+
+/* ---------- composer while the connection is down ---------- */
+.chat__offline {
+  padding: 0.45rem 0.9rem;
+  background: var(--card-warm);
+  border-top: 2px solid var(--ink);
+  color: var(--muted);
+  font-weight: 800;
+  font-size: 0.9rem;
+}

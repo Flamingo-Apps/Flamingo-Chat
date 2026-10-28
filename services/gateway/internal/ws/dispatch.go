@@ -287,6 +287,31 @@ func (c *conn) handleMatchCancel(ctx context.Context) {
 	c.enqueue(b)
 }
 
+// cancelSearchIfGone takes a person out of the matching queue when they have
+// left without cancelling: they closed the tab, or their connection died and
+// never came back. Without it their queue entry stays for up to ten minutes and
+// the next person to press Find is paired with someone who is not there. It
+// waits SearchAbandonGrace first, so a refresh or a dropped network that comes
+// straight back keeps its place; only an account with no connection at all
+// after that is cancelled. Cancelling is harmless if they were not searching.
+func (c *conn) cancelSearchIfGone() {
+	grace := c.deps.SearchAbandonGrace
+	if grace <= 0 {
+		return
+	}
+	accountID := c.accountID
+	time.AfterFunc(grace, func() {
+		if c.deps.Connections.Active(accountID) {
+			return
+		}
+		ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancel()
+		if _, err := c.deps.Matching.CancelMatch(ctx, &matchingv1.CancelMatchRequest{AccountId: accountID}); err != nil {
+			c.logger.Warn("cancel abandoned search", "account_id", accountID, "err", err)
+		}
+	})
+}
+
 // noActiveChat is what a person hears when they press Next or End but Chat
 // knows of no open random chat for them, say because the chat ended while they
 // were disconnected. The web app answers it by clearing its screen.
