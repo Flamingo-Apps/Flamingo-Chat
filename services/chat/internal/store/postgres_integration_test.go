@@ -17,6 +17,7 @@ import (
 	"errors"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -130,7 +131,7 @@ func TestPostgresVoteKeepRequiresEveryCurrentMember(t *testing.T) {
 	st := newTestPostgres(t)
 	ctx := context.Background()
 	roomID, a, b := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
@@ -167,7 +168,7 @@ func TestPostgresVoteKeepSoloWithinGraceWindowAfterRoomEnded(t *testing.T) {
 	st := newTestPostgres(t)
 	ctx := context.Background()
 	roomID, a, b := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	if err := st.EndDirectRoom(ctx, roomID); err != nil {
@@ -189,7 +190,7 @@ func TestPostgresVoteKeepSoloAfterGraceWindowExpiredDoesNotKeep(t *testing.T) {
 	st := newTestPostgres(t)
 	ctx := context.Background()
 	roomID, a, b := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	if err := st.EndDirectRoom(ctx, roomID); err != nil {
@@ -222,7 +223,7 @@ func TestPostgresEndDirectRoomLeavesKeptRoomsAlone(t *testing.T) {
 	st := newTestPostgres(t)
 	ctx := context.Background()
 	roomID, a, b := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	if _, err := st.VoteKeep(ctx, roomID, a); err != nil {
@@ -255,7 +256,7 @@ func TestPostgresListRoomsForAccountReturnsGroupAndKeptDirectOnly(t *testing.T) 
 	if _, err := st.CreateGroupRoom(ctx, groupID, me, "G", "LISTROOM"); err != nil {
 		t.Fatalf("create group: %v", err)
 	}
-	if _, err := st.CreateDirectRoom(ctx, keptDirectID, []string{me, other}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, keptDirectID, []string{me, other}); err != nil {
 		t.Fatalf("create kept direct: %v", err)
 	}
 	if _, err := st.VoteKeep(ctx, keptDirectID, me); err != nil {
@@ -264,7 +265,7 @@ func TestPostgresListRoomsForAccountReturnsGroupAndKeptDirectOnly(t *testing.T) 
 	if _, err := st.VoteKeep(ctx, keptDirectID, other); err != nil {
 		t.Fatalf("vote: %v", err)
 	}
-	if _, err := st.CreateDirectRoom(ctx, unkeptDirectID, []string{me, other2}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, unkeptDirectID, []string{me, other2}); err != nil {
 		t.Fatalf("create unkept direct: %v", err)
 	}
 
@@ -288,7 +289,7 @@ func TestPostgresSoloSavedChatIsListedForTheKeeperOnly(t *testing.T) {
 	st := newTestPostgres(t)
 	ctx := context.Background()
 	roomID, keeper, skipper := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	if _, err := st.CreateDirectRoom(ctx, roomID, []string{keeper, skipper}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, roomID, []string{keeper, skipper}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	if err := st.EndDirectRoom(ctx, roomID); err != nil {
@@ -315,9 +316,15 @@ func TestPostgresActiveChatListingIsBoundedAndSkipsEndedOnes(t *testing.T) {
 	me, other := uuid.NewString(), uuid.NewString()
 	fresh, stale, ended := uuid.NewString(), uuid.NewString(), uuid.NewString()
 	for _, id := range []string{fresh, stale, ended} {
-		if _, err := st.CreateDirectRoom(ctx, id, []string{me, other}); err != nil {
+		if _, _, err := st.CreateDirectRoom(ctx, id, []string{me, other}); err != nil {
 			t.Fatalf("create: %v", err)
 		}
+	}
+	// Creating each room ended the one before it (DEC-0112). Open them again to
+	// stand in for what production already holds from before that rule: several
+	// open chats for one person, left behind by closed tabs.
+	if _, err := st.pool.Exec(ctx, "UPDATE rooms SET ended_at = NULL WHERE id = ANY($1::uuid[])", []string{fresh, stale, ended}); err != nil {
+		t.Fatalf("reopen: %v", err)
 	}
 	if _, err := st.pool.Exec(ctx, "UPDATE rooms SET created_at = now() - interval '13 hours' WHERE id = $1", stale); err != nil {
 		t.Fatalf("age room: %v", err)
@@ -339,7 +346,7 @@ func TestPostgresMembershipStateAndClosingAKeptRoom(t *testing.T) {
 	st := newTestPostgres(t)
 	ctx := context.Background()
 	roomID, a, b, stranger := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
-	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 	for _, who := range []string{a, b} {
@@ -375,7 +382,7 @@ func TestPostgresListMessagesPaginatesNewestFirst(t *testing.T) {
 	st := newTestPostgres(t)
 	ctx := context.Background()
 	roomID, a, b := uuid.NewString(), uuid.NewString(), uuid.NewString()
-	if _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
+	if _, _, err := st.CreateDirectRoom(ctx, roomID, []string{a, b}); err != nil {
 		t.Fatalf("create: %v", err)
 	}
 
@@ -407,5 +414,70 @@ func TestPostgresListMessagesPaginatesNewestFirst(t *testing.T) {
 	}
 	if len(nextPage) != 1 || nextPage[0].MessageID != ids[0] {
 		t.Fatalf("expected the oldest message as the final page, got %+v", nextPage)
+	}
+}
+
+// A person is in one random chat at a time (DEC-0112): creating a new direct
+// room ends the other open, unsaved direct rooms either member is in, in the
+// same transaction, and leaves saved chats, group rooms, rooms the person has
+// already left, and strangers' chats alone.
+func TestPostgresCreateDirectRoomEndsEarlierOpenChats(t *testing.T) {
+	st := newTestPostgres(t)
+	ctx := context.Background()
+	a, b, c, d, x, y := uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString(), uuid.NewString()
+
+	create := func(members ...string) (string, []ReplacedRoom) {
+		id := uuid.NewString()
+		_, replaced, err := st.CreateDirectRoom(ctx, id, members)
+		if err != nil {
+			t.Fatalf("CreateDirectRoom(%v): %v", members, err)
+		}
+		return id, replaced
+	}
+	isEnded := func(id string) bool {
+		var endedAt *time.Time
+		if err := st.pool.QueryRow(ctx, "SELECT ended_at FROM rooms WHERE id = $1", id).Scan(&endedAt); err != nil {
+			t.Fatalf("read %s: %v", id, err)
+		}
+		return endedAt != nil
+	}
+
+	savedWithD, _ := create(a, d)
+	if _, err := st.pool.Exec(ctx, "UPDATE rooms SET kept = true WHERE id = $1", savedWithD); err != nil {
+		t.Fatalf("save: %v", err)
+	}
+	openWithB, replaced := create(a, b)
+	if len(replaced) != 0 {
+		t.Fatalf("a saved chat must not be replaced: %+v", replaced)
+	}
+	strangers, _ := create(x, y)
+	groupID := uuid.NewString()
+	if _, err := st.CreateGroupRoom(ctx, groupID, a, "g", "CODE01"); err != nil {
+		t.Fatalf("group: %v", err)
+	}
+
+	newRoom, replaced := create(a, c)
+	if len(replaced) != 1 || replaced[0].RoomID != openWithB || replaced[0].MemberAccountID != a {
+		t.Fatalf("expected exactly the open chat with b to be replaced, with a as the one who moved on: %+v", replaced)
+	}
+	if !isEnded(openWithB) {
+		t.Fatalf("the earlier open chat should be ended")
+	}
+	for name, id := range map[string]string{"the saved chat": savedWithD, "a stranger's chat": strangers, "the group room": groupID, "the new chat": newRoom} {
+		if isEnded(id) {
+			t.Fatalf("%s must not be ended", name)
+		}
+	}
+
+	// A person who already left an open chat (deleted it) is no longer in it.
+	left, _ := create(x, d)
+	if err := st.RemoveMember(ctx, left, d); err != nil {
+		t.Fatalf("leave: %v", err)
+	}
+	_, replaced = create(d, c)
+	for _, r := range replaced {
+		if r.RoomID == left && r.MemberAccountID == d {
+			t.Fatalf("a room d already left must not be ended on d's behalf: %+v", replaced)
+		}
 	}
 }

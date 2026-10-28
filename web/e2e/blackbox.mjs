@@ -25,6 +25,10 @@
 //   BB-18 stop messaging closes a saved chat for both, and the server refuses sends
 //   BB-19 deleting a chat removes it for one person, the other keeps it by name
 //   BB-20 channel limits: a guest can be in 10, and guessing invite codes is throttled
+//   BB-21 a refresh mid-chat puts the person back in it (DEC-0112)
+//   BB-22 Next still works after the gateway restarts, with no internal text on screen
+//   BB-23 a returning visitor lands straight in the app, never on the welcome screen
+//   BB-24 a verified person sees the Verified check on a phone-sized screen
 import { execFileSync } from 'node:child_process'
 import { mkdirSync, writeFileSync } from 'node:fs'
 import { chromium } from 'playwright'
@@ -62,7 +66,10 @@ function resetGuestLimiter() {
   sh('kubectl', ['exec', 'deploy/redis', '--', 'sh', '-c', "redis-cli --scan --pattern 'rl:guest_signup:*' | xargs -r redis-cli del"])
 }
 
+// ONLY=BB-21,BB-23 runs just those checks, for the ones that stand alone.
+const ONLY = process.env.ONLY?.split(',')
 async function run(id, title, fn) {
+  if (ONLY && !ONLY.includes(id)) return
   const t0 = Date.now()
   try {
     await fn()
@@ -488,6 +495,99 @@ await run('BB-15', 'the sixth guest signup from one address is refused with a cl
   assert(/too many/i.test((await last.page.locator('.error-text').textContent()) ?? ''), 'the refusal message is not clear')
   assert(await last.page.getByText("Nope, I'm new").isEnabled(), 'the button stays stuck after a refusal')
   resetGuestLimiter()
+})
+
+await run('BB-21', 'a refresh in the middle of a random chat puts the person back in it, and the chat carries on both ways (DEC-0112)', async () => {
+  resetGuestLimiter()
+  const P = await newUser(browser, 'refresher')
+  const Q = await newUser(browser, 'stayer')
+  await enterAsGuest(P)
+  await enterAsGuest(Q)
+  NAME.P = await pseudonym(P.page)
+  NAME.Q = await pseudonym(Q.page)
+  await matchPair(P, Q)
+  await say(P.page, 'hello before the refresh')
+  await Q.page.getByText('hello before the refresh', { exact: true }).waitFor()
+
+  await P.page.reload()
+  // No "Find a match" to press: the chat is simply back, with what was said.
+  await composer(P.page).waitFor({ timeout: 20_000 })
+  await P.page.getByText('hello before the refresh', { exact: true }).waitFor()
+  await P.page.locator('.chat__title', { hasText: NAME.Q }).waitFor()
+  assert((await findMatchBtn(P.page).isDisabled()), 'the person is back in the chat but can still start a second search')
+  const toQ = await arrival(P.page, Q.page, 'after the refresh, P to Q')
+  const toP = await arrival(Q.page, P.page, 'after the refresh, Q to P')
+  assert(toQ <= FAST && toP <= FAST, `after a refresh the chat took ${show(toQ)} and ${show(toP)} to deliver (should be under ${FAST / 1000}s)`)
+
+  // The one who stayed never lost their chat, and Next still means something.
+  await P.page.getByRole('button', { name: 'End', exact: true }).click()
+  await findMatchBtn(P.page).waitFor()
+  await Q.page.getByRole('heading', { name: 'Your partner left' }).waitFor()
+  await P.ctx.close()
+  await Q.ctx.close()
+})
+
+await run('BB-22', 'Next still works after the gateway restarts, and nothing internal is ever shown (DEC-0112)', async () => {
+  resetGuestLimiter()
+  const P = await newUser(browser, 'next-after-restart')
+  const Q = await newUser(browser, 'partner')
+  await enterAsGuest(P)
+  await enterAsGuest(Q)
+  await matchPair(P, Q)
+  await say(P.page, 'before the gateway restarts')
+  await Q.page.getByText('before the gateway restarts', { exact: true }).waitFor()
+
+  sh('kubectl', ['rollout', 'restart', 'deploy/gateway'])
+  sh('kubectl', ['rollout', 'status', 'deploy/gateway', '--timeout=120s'])
+  for (const u of [P, Q]) await u.page.waitForFunction(() => document.querySelector('.online')?.classList.contains('online--open'), null, { timeout: 90_000 })
+
+  // The new connection never saw the match being made. Next must still work.
+  await P.page.getByRole('button', { name: 'Next', exact: true }).click()
+  await P.page.getByText('Looking for someone...').waitFor({ timeout: 15_000 })
+  await Q.page.getByRole('heading', { name: 'Your partner left' }).waitFor({ timeout: 15_000 })
+  for (const u of [P, Q]) {
+    const shown = (await u.page.locator('.error-text').allTextContents()).join(' ')
+    assert(!/current_room_id|account_id|required|rpc error|internal/i.test(shown), `internal text on screen: ${shown}`)
+  }
+  await P.ctx.close()
+  await Q.ctx.close()
+})
+
+await run('BB-23', 'a returning visitor lands straight in the app and never sees the welcome screen, even when the server is slow', async () => {
+  resetGuestLimiter()
+  const U = await newUser(browser, 'returning')
+  await enterAsGuest(U)
+  await U.ctx.addInitScript(() => {
+    window.__sawWelcome = false
+    const look = () => {
+      if (document.body && document.body.innerText.includes('Have you been here before?')) window.__sawWelcome = true
+    }
+    new MutationObserver(look).observe(document, { childList: true, subtree: true, characterData: true })
+  })
+  const second = await U.ctx.newPage()
+  second.on('pageerror', (e) => pageErrors.push(`returning: ${e}`))
+  // The server taking two seconds to answer must not put the welcome screen up.
+  await second.route('**/v1/me', async (route) => {
+    await new Promise((r) => setTimeout(r, 2000))
+    await route.continue()
+  })
+  const t0 = Date.now()
+  await second.goto(WEB)
+  await second.locator('.profile__name').waitFor({ timeout: 10_000 })
+  const ms = Date.now() - t0
+  assert(!(await second.evaluate(() => window.__sawWelcome)), 'the welcome screen showed before the app')
+  assert(ms < 1800, `the app waited for the server before showing (${ms} ms with a 2 s delay on /v1/me)`)
+  await U.ctx.close()
+})
+
+await run('BB-24', 'a verified person sees the Verified check on a phone-sized screen, and a guest does not', async () => {
+  assert(V, 'BB-10 did not leave a verified person to look at')
+  await V.page.setViewportSize({ width: 390, height: 844 })
+  await V.page.locator('.topbar__verified').waitFor({ timeout: 5000 })
+  assert((await V.page.locator('.topbar__me').getAttribute('aria-label'))?.includes('verified'), 'the profile button does not say verified')
+  await V.page.setViewportSize({ width: 1440, height: 900 })
+  assert(M, 'BB-13 did not leave a guest on a phone')
+  assert((await M.page.locator('.topbar__verified').count()) === 0, 'a guest was shown the Verified check')
 })
 
 await run('BB-16', 'no uncaught errors in any page during the whole run', async () => {

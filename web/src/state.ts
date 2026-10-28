@@ -45,6 +45,8 @@ export interface AppState {
 // (oauth_redirect.go); anything unknown gets the same generic advice.
 export function signInErrorMessage(reason: string): string {
   switch (reason) {
+    case 'session_expired':
+      return 'Your session has ended. Please start again.'
     case 'sign_in_failed':
       return 'That Google account could not be verified. Pick your KIIT Google account and try again.'
     case 'missing_code_or_state':
@@ -71,8 +73,21 @@ export const initialState: AppState = {
   kicked: null,
 }
 
+// activeRandomChat is the random chat the server says a person is in: an open,
+// unsaved direct room, newest first. The server is the only place that knows;
+// the browser's own memory is lost on a refresh and on every reconnect.
+export function activeRandomChat(rooms: Room[]): Room | null {
+  let best: Room | null = null
+  for (const room of rooms) {
+    if (room.type !== 'direct' || room.kept || room.ended_at_unix) continue
+    if (best === null || room.created_at_unix > best.created_at_unix) best = room
+  }
+  return best
+}
+
 export type Action =
   | { type: 'session'; account: Account; token: string }
+  | { type: 'matchReconciled'; rooms: Room[] }
   | { type: 'logout' }
   | { type: 'connectionStatus'; status: ConnectionStatus }
   | { type: 'roomsLoaded'; rooms: Room[] }
@@ -219,6 +234,37 @@ export function reducer(state: AppState, action: Action): AppState {
       return applyFrame(state, action.frame)
     case 'clearError':
       return { ...state, lastError: null }
+    // The server's list of rooms is the truth about which random chat this
+    // person is in. After a refresh or a reconnect it restores the chat, or
+    // clears one that ended while they were away. A chat already on screen
+    // is kept as it is, so live details (who voted to keep) are not lost.
+    case 'matchReconciled': {
+      const withRooms = { ...state, rooms: action.rooms }
+      const active = activeRandomChat(action.rooms)
+      if (active) {
+        if (state.currentMatch?.roomId === active.id) return withRooms
+        return {
+          ...withRooms,
+          matching: false,
+          keepRequest: null,
+          currentMatch: {
+            roomId: active.id,
+            partnerPseudonym: active.partner_pseudonym || 'Anonymous student',
+            partnerAccountId: active.partner_account_id ?? '',
+            youKept: false,
+            partnerKept: false,
+            kept: false,
+            partnerLeftAt: null,
+          },
+        }
+      }
+      // No open chat on the server. One whose partner has just left is in its
+      // short "keep this chat?" window, which has its own timer: leave it.
+      if (state.currentMatch && state.currentMatch.partnerLeftAt === null) {
+        return { ...withRooms, currentMatch: null, keepRequest: null, lastError: 'That chat has ended.' }
+      }
+      return withRooms
+    }
     case 'signInFailed':
       return { ...state, lastError: signInErrorMessage(action.reason) }
     case 'keepRequestDismissed':

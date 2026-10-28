@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log"
 	"strings"
 	"time"
 
@@ -95,9 +96,22 @@ func (s *Server) CreateDirectRoom(ctx context.Context, req *chatv1.CreateDirectR
 		return nil, status.Error(codes.InvalidArgument, "a direct room requires exactly two members")
 	}
 
-	room, err := s.store.CreateDirectRoom(ctx, s.genID(), members)
+	room, replaced, err := s.store.CreateDirectRoom(ctx, s.genID(), members)
 	if err != nil {
 		return nil, status.Errorf(codes.Internal, "create direct room: %v", err)
+	}
+	// Earlier open chats of these two people were ended in the same
+	// transaction (DEC-0112). Tell whoever is left in them, the same way an
+	// ordinary leave does: the person who moved on gets "you left", the other
+	// gets "partner left" and can still keep the chat for a moment. The room
+	// is already ended, so a failed notice is logged, not returned: failing
+	// here would fail a match that was made correctly.
+	for _, r := range replaced {
+		if err := s.publish(ctx, r.RoomID, &eventsv1.ChatEvent_RoomEnded{
+			RoomEnded: &eventsv1.RoomEnded{RoomId: r.RoomID, Reason: "replaced", EndedByAccountId: r.MemberAccountID},
+		}); err != nil {
+			log.Printf("chat: could not announce that room %s ended: %v", r.RoomID, err)
+		}
 	}
 	return &chatv1.CreateDirectRoomResponse{Room: toProtoRoom(room)}, nil
 }

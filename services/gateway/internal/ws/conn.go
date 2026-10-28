@@ -104,9 +104,10 @@ type conn struct {
 	subscribed map[string]bool
 
 	// currentMatchRoomID is the direct room a match_found told this
-	// connection about, if any - match_end has no room_id of its own
-	// (docs/ARCHITECTURE.md §5.2), so this is what a client's bare
-	// match_end acts on. Guarded by mu since it's written from the
+	// connection about, if any. It is only a hint for keeping the room's
+	// subscription (refreshRooms) and is lost on every reconnect, so nothing
+	// that must be right may depend on it: Next and End ask Chat instead
+	// (activeDirectRoom, DEC-0112). Guarded by mu since it's written from the
 	// Redis-subscription goroutine and read from the client-frame one.
 	mu                 sync.Mutex
 	currentMatchRoomID string
@@ -361,7 +362,28 @@ func (c *conn) sendError(code codes.Code, message, clientMsgID string) {
 	c.enqueue(b)
 }
 
+// genericFailure is what a person sees for anything that is not theirs to fix.
+const genericFailure = "Something went wrong. Please try again."
+
+// userFacing says whether a downstream service's error message is written for
+// the person using the app (a closed chat, a missing permission, a clash).
+// Anything else, above all InvalidArgument ("account_id and current_room_id
+// are required") and Internal, describes a fault between our own services and
+// must not reach the screen (DEC-0112).
+func userFacing(code codes.Code) bool {
+	switch code {
+	case codes.FailedPrecondition, codes.ResourceExhausted, codes.PermissionDenied, codes.NotFound, codes.AlreadyExists, codes.Unauthenticated:
+		return true
+	}
+	return false
+}
+
 func (c *conn) sendErrorFromStatus(err error, clientMsgID string) {
 	st, _ := status.FromError(err)
-	c.sendError(st.Code(), st.Message(), clientMsgID)
+	if userFacing(st.Code()) {
+		c.sendError(st.Code(), st.Message(), clientMsgID)
+		return
+	}
+	c.logger.Warn("request failed", "account_id", c.accountID, "code", st.Code().String(), "err", st.Message())
+	c.sendError(st.Code(), genericFailure, clientMsgID)
 }

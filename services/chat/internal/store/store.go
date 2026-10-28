@@ -39,6 +39,14 @@ const VoteKeepGraceWindow = 30 * time.Second
 // would be listed, and listened to, forever. A real chat lasts minutes.
 const ActiveDirectRoomWindow = 12 * time.Hour
 
+// ReplacedRoom is an open direct room that CreateDirectRoom ended because one
+// of its members was matched into a new chat. MemberAccountID is that member
+// (one of the new room's two), who is treated as the one who left it.
+type ReplacedRoom struct {
+	RoomID          string
+	MemberAccountID string
+}
+
 // Room is Chat's persistence-layer view of a room. Deliberately separate
 // from the generated chatv1.Room protobuf type, the same separation
 // identity's store.Account keeps from identityv1.Account.
@@ -84,7 +92,12 @@ type RoomStore interface {
 	// CreateDirectRoom creates a new direct room with exactly the given
 	// members already joined, as one atomic operation - called only by
 	// Matching when it pairs two users (DEC-0044).
-	CreateDirectRoom(ctx context.Context, id string, memberAccountIDs []string) (Room, error)
+	//
+	// In the same transaction it ends every other open, unsaved direct room
+	// either member is still in, so a person is in at most one random chat at
+	// a time (DEC-0112). Those rooms are returned so the caller can tell the
+	// people left behind. A saved (kept) chat is never touched.
+	CreateDirectRoom(ctx context.Context, id string, memberAccountIDs []string) (Room, []ReplacedRoom, error)
 
 	// GetRoom fetches a room by ID. Returns ErrNotFound if it doesn't
 	// exist.

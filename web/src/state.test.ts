@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { initialState, reducer, signInErrorMessage } from './state'
-import type { Account, Message } from './types'
+import { activeRandomChat, initialState, reducer, signInErrorMessage } from './state'
+import type { Account, Message, Room } from './types'
 
 const account: Account = {
   id: 'acc-1',
@@ -208,6 +208,98 @@ describe('reducer', () => {
       let state = reducer(initialState, { type: 'signInFailed', reason: 'google_exchange_failed' })
       state = reducer(state, { type: 'clearError' })
       expect(state.lastError).toBeNull()
+    })
+  })
+
+  describe('restoring the random chat from the server after a refresh or a reconnect (DEC-0112)', () => {
+    const room = (overrides: Partial<Room> = {}): Room => ({
+      id: 'room-1',
+      type: 'direct',
+      kept: false,
+      created_at_unix: 100,
+      partner_pseudonym: 'Quiet Otter',
+      partner_account_id: 'acc-2',
+      ...overrides,
+    })
+
+    it('picks the open, unsaved direct chat, newest first, and ignores everything else', () => {
+      const rooms = [
+        room({ id: 'saved', kept: true, created_at_unix: 900 }),
+        room({ id: 'ended', ended_at_unix: 50, created_at_unix: 800 }),
+        room({ id: 'group', type: 'group', created_at_unix: 700 }),
+        room({ id: 'older', created_at_unix: 100 }),
+        room({ id: 'newer', created_at_unix: 200 }),
+      ]
+      expect(activeRandomChat(rooms)?.id).toBe('newer')
+      expect(activeRandomChat([room({ kept: true })])).toBeNull()
+    })
+
+    it('puts someone back in their chat after a refresh', () => {
+      const state = reducer(initialState, { type: 'matchReconciled', rooms: [room()] })
+      expect(state.currentMatch).toEqual({
+        roomId: 'room-1', partnerPseudonym: 'Quiet Otter', partnerAccountId: 'acc-2',
+        youKept: false, partnerKept: false, kept: false, partnerLeftAt: null,
+      })
+      expect(state.matching).toBe(false)
+      expect(state.rooms).toHaveLength(1)
+    })
+
+    it('keeps a chat that is already on screen exactly as it is, so live details are not lost', () => {
+      let state = reducer(initialState, {
+        type: 'frame',
+        frame: { type: 'match_found', room_id: 'room-1', partner_pseudonym: 'Quiet Otter', partner_account_id: 'acc-2' },
+      })
+      state = reducer(state, { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: false, kept: false } })
+      const after = reducer(state, { type: 'matchReconciled', rooms: [room()] })
+      expect(after.currentMatch?.youKept).toBe(true)
+    })
+
+    it('clears a chat that ended while the person was away, and says so', () => {
+      let state = reducer(initialState, {
+        type: 'frame',
+        frame: { type: 'match_found', room_id: 'room-1', partner_pseudonym: 'Quiet Otter', partner_account_id: 'acc-2' },
+      })
+      state = reducer(state, { type: 'matchReconciled', rooms: [] })
+      expect(state.currentMatch).toBeNull()
+      expect(state.lastError).toBe('That chat has ended.')
+    })
+
+    it('leaves the short "keep this chat?" window alone when the partner has just left', () => {
+      let state = reducer(initialState, {
+        type: 'frame',
+        frame: { type: 'match_found', room_id: 'room-1', partner_pseudonym: 'Quiet Otter', partner_account_id: 'acc-2' },
+      })
+      state = reducer(state, { type: 'frame', frame: { type: 'match_ended', room_id: 'room-1', reason: 'partner_left' } })
+      const after = reducer(state, { type: 'matchReconciled', rooms: [] })
+      expect(after.currentMatch?.roomId).toBe('room-1')
+      expect(after.lastError).toBeNull()
+    })
+
+    it('switches to the chat the server names when it differs from the one on screen', () => {
+      let state = reducer(initialState, {
+        type: 'frame',
+        frame: { type: 'match_found', room_id: 'old', partner_pseudonym: 'Old Fox', partner_account_id: 'acc-9' },
+      })
+      state = reducer(state, { type: 'matchReconciled', rooms: [room({ id: 'new' })] })
+      expect(state.currentMatch?.roomId).toBe('new')
+    })
+
+    it('stops showing "looking for a match" when the server says they are already in a chat', () => {
+      let state = reducer(initialState, { type: 'frame', frame: { type: 'match_queued' } })
+      state = reducer(state, { type: 'matchReconciled', rooms: [room()] })
+      expect(state.matching).toBe(false)
+      expect(state.currentMatch?.roomId).toBe('room-1')
+    })
+
+    it('does nothing to a search in progress when there is no open chat', () => {
+      let state = reducer(initialState, { type: 'frame', frame: { type: 'match_queued' } })
+      state = reducer(state, { type: 'matchReconciled', rooms: [] })
+      expect(state.matching).toBe(true)
+      expect(state.lastError).toBeNull()
+    })
+
+    it('has a plain message for a session that has ended', () => {
+      expect(signInErrorMessage('session_expired')).toMatch(/session has ended/i)
     })
   })
 })

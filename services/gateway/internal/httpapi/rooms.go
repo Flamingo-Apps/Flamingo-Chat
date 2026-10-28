@@ -25,6 +25,9 @@ type roomResponse struct {
 	// PartnerPseudonym is the other person's anonymous name in a direct
 	// room, so a saved chat is listed under it (DEC-0106).
 	PartnerPseudonym string `json:"partner_pseudonym,omitempty"`
+	// PartnerAccountID lets the web app act on the other person (report them)
+	// in a chat it restored from this list rather than from a live match_found.
+	PartnerAccountID string `json:"partner_account_id,omitempty"`
 }
 
 func toRoomResponse(r *chatv1.Room) roomResponse {
@@ -74,12 +77,24 @@ func (s *Server) handleListRooms(w http.ResponseWriter, r *http.Request, account
 	for i, room := range resp.GetRooms() {
 		rooms[i] = toRoomResponse(room)
 		if room.GetType() == chatv1.RoomType_ROOM_TYPE_DIRECT {
+			rooms[i].PartnerAccountID = partnerAccountID(room, accountID)
 			rooms[i].PartnerPseudonym = s.partnerPseudonym(r, room, accountID)
 		}
 	}
 	writeJSON(w, http.StatusOK, struct {
 		Rooms []roomResponse `json:"rooms"`
 	}{rooms})
+}
+
+// partnerAccountID is the other member of a direct room, or "" when there is
+// none to name.
+func partnerAccountID(room *chatv1.Room, accountID string) string {
+	for _, id := range room.GetMemberAccountIds() {
+		if id != accountID {
+			return id
+		}
+	}
+	return ""
 }
 
 // partnerPseudonym is the anonymous name of the other member of a direct room,

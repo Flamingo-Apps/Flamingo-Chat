@@ -232,8 +232,8 @@ Client to server:
 | `send_message` | `room_id`, `client_msg_id`, `body` |
 | `match_request` | `preference`: `any`, `male` or `female` |
 | `match_cancel` | none |
-| `match_next` | none (end the current random chat and queue again) |
-| `match_end` | none |
+| `match_next` | none (end the person's current random chat and queue again; the gateway asks Chat which chat that is, DEC-0112) |
+| `match_end` | none (the same: ends the chat Chat reports as theirs) |
 | `keep_chat` | `room_id` |
 | `sync_rooms` | none (listen to my rooms now: sent after creating or joining a room over HTTP, DEC-0106) |
 | `ping` | none |
@@ -254,10 +254,12 @@ Server to client:
 | `room_joined`, `room_left` | `room_id` |
 | `presence` | `total`, `guests`, `male`, `female` |
 | `kicked` | `reason` |
-| `error` | `code`, `message`, optional `client_msg_id` |
+| `error` | `code`, `message`, optional `client_msg_id`. The message is written for the person only for the codes `failedprecondition`, `resourceexhausted`, `permissiondenied`, `notfound`, `alreadyexists` and `unauthenticated`; any other code carries a generic "Something went wrong" and the detail goes to the log (DEC-0112) |
 | `pong` | none |
 
-Clients reconnect with exponential backoff and jitter, send `ping` every 25 seconds, and after reconnecting load messages newer than the last `message_id` they saw in each open room.
+Clients reconnect with exponential backoff and jitter, send `ping` every 25 seconds, and after reconnecting load messages newer than the last `message_id` they saw in each open room. The backoff starts over only after a connection has stayed up for ten seconds, and a failed socket starts exactly one reconnect.
+
+**Which chat am I in (DEC-0112).** The answer lives in Chat's database, never in a connection's or a browser's memory, because both are lost on a refresh or a reconnect and `match_found` is not replayed. A person is in at most one open, unsaved random chat: creating a direct room ends any other one either member is still in, in the same transaction, and announces it with `match_ended` like any other leave. `match_next` and `match_end` ask Chat for the caller's open, unsaved direct room (newest first) every time. The web app asks the same question, `GET /v1/rooms`, each time its socket opens (first load and every reconnect) and shows the answer: it restores the chat after a refresh, and clears one that ended while the person was away, unless a live event about the chat arrived while the list was loading. For a direct room the list also carries `partner_pseudonym` and `partner_account_id`. Not yet done: telling the other person when someone's tab closes without a leave (a disconnect grace period).
 
 ### 5.3 gRPC changes (Proposed; built, pending review - DEC-0054)
 
@@ -382,7 +384,7 @@ How to use it: a pull request that touches `web/` states which rows it touches, 
 | F-01 | Ask "Have you been here before?"; a new visitor goes straight in as a guest with a server-chosen name, no form | BB-01, BB-02 |
 | F-02 | Keep the session across a reload, and let a returning person sign in with Google | BB-02, BB-10 (local fake Google) |
 | F-03 | Say so when a Google sign-in comes back with an error, instead of landing back as a guest in silence | state.test.ts; **gap** in BB (the local fake never fails) |
-| F-04 | Show "Verified" for a verified account, on desktop (sidebar) and on phone (check on the avatar) | BB-10 (desktop); **gap** on phone |
+| F-04 | Show "Verified" for a verified account, on desktop (sidebar) and on phone (check on the avatar) | BB-10 (desktop), BB-24 (phone) |
 | F-05 | Open the identity prompt when someone reaches for a locked feature, with Google behind the "Get your identity" panel and a preview of what others would see | BB-03, BB-11 |
 | F-06 | Ask for gender once after a first sign-in, and refuse a second change | BB-10 |
 | F-07 | Have Mochi introduce herself once, not on every reload | BB-02 |
@@ -394,7 +396,7 @@ How to use it: a pull request that touches `web/` states which rows it touches, 
 | F-13 | When the partner leaves, let the one who stayed save the chat read-only under the partner's name; the one who left gets nothing | BB-06, state.test.ts |
 | F-14 | Ask the other person to keep a chat (25 s, default "keep chatting"); a mutual keep moves it to both Inboxes under each other's names | BB-17, state.test.ts |
 | F-15 | Let a person stop messaging a saved chat (closes it for both) or delete it (for them only) | BB-18, BB-19 |
-| F-16 | Offer Next, End and Report in the chat header | **gap** (BB never presses Next or Report) |
+| F-16 | Offer Next, End and Report in the chat header | End: BB-06, BB-21; Next: BB-22; **gap** Report |
 | F-17 | Create a channel, join by invite code, talk both ways, leave, and not lose the first messages | BB-08 |
 | F-18 | Stop a guest at 10 channels and throttle invite-code guessing | BB-20 |
 | F-19 | Show a live online count | BB-09 |
@@ -404,6 +406,10 @@ How to use it: a pull request that touches `web/` states which rows it touches, 
 | F-23 | Throw no uncaught errors in any page | BB-16 |
 | F-24 | Work with the keyboard alone on the first visit | BB-02 |
 | F-25 | Let a person sign out, with the right warning for a guest and for a verified account | **gap** |
+| F-26 | Put a person back in their random chat after a refresh, with what was said, and let it carry on both ways | BB-21, state.test.ts |
+| F-27 | Keep Next and End working after a reconnect, and never show internal error text | BB-22, dispatch_test.go, state.test.ts |
+| F-28 | Open a returning person straight into the app, never the welcome screen, even when the server is slow; sign out only when the server refuses the session, not when it cannot be reached | BB-23, session.test.ts |
+| F-29 | Retry a dropped connection with a growing wait, with one socket at a time | ws.test.ts |
 
 ## 11. Testing (unit/integration tests Agreed and built; the end-to-end smoke test built, pending review - DEC-0087, DEC-0088)
 

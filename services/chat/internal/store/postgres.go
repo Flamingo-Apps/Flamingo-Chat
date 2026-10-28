@@ -68,28 +68,60 @@ func (p *Postgres) CreateGroupRoom(ctx context.Context, id, ownerAccountID, name
 	return room, nil
 }
 
-func (p *Postgres) CreateDirectRoom(ctx context.Context, id string, memberAccountIDs []string) (Room, error) {
+func (p *Postgres) CreateDirectRoom(ctx context.Context, id string, memberAccountIDs []string) (Room, []ReplacedRoom, error) {
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
-		return Room{}, fmt.Errorf("store: create direct room: begin: %w", err)
+		return Room{}, nil, fmt.Errorf("store: create direct room: begin: %w", err)
 	}
 	defer func() { _ = tx.Rollback(ctx) }()
 
 	q := `INSERT INTO rooms (id, type) VALUES ($1, $2) RETURNING ` + roomColumns
 	room, err := scanRoom(tx.QueryRow(ctx, q, id, chatv1.RoomType_ROOM_TYPE_DIRECT))
 	if err != nil {
-		return Room{}, fmt.Errorf("store: create direct room: %w", err)
+		return Room{}, nil, fmt.Errorf("store: create direct room: %w", err)
 	}
 
 	for _, accountID := range memberAccountIDs {
 		if _, err := tx.Exec(ctx, `INSERT INTO room_members (room_id, account_id) VALUES ($1, $2)`, id, accountID); err != nil {
-			return Room{}, fmt.Errorf("store: create direct room: add member: %w", err)
+			return Room{}, nil, fmt.Errorf("store: create direct room: add member: %w", err)
 		}
 	}
-	if err := tx.Commit(ctx); err != nil {
-		return Room{}, fmt.Errorf("store: create direct room: commit: %w", err)
+
+	// One random chat at a time: end any other open, unsaved direct room that
+	// either member is still in. A tab closed mid-chat never ended its room,
+	// so without this a person could be in two at once and nothing would say
+	// which one Next or End meant (DEC-0112). The member is picked per room so
+	// the caller can say who left.
+	rows, err := tx.Query(ctx, `
+		UPDATE rooms r SET ended_at = now()
+		WHERE r.type = $2 AND r.ended_at IS NULL AND NOT r.kept AND r.id <> $1
+		  AND EXISTS (SELECT 1 FROM room_members m WHERE m.room_id = r.id AND m.account_id = ANY($3::uuid[]) AND m.left_at IS NULL)
+		RETURNING r.id,
+		  (SELECT m.account_id FROM room_members m
+		    WHERE m.room_id = r.id AND m.account_id = ANY($3::uuid[]) AND m.left_at IS NULL
+		    ORDER BY m.account_id LIMIT 1)`,
+		id, chatv1.RoomType_ROOM_TYPE_DIRECT, memberAccountIDs)
+	if err != nil {
+		return Room{}, nil, fmt.Errorf("store: create direct room: end earlier rooms: %w", err)
 	}
-	return room, nil
+	var replaced []ReplacedRoom
+	for rows.Next() {
+		var r ReplacedRoom
+		if err := rows.Scan(&r.RoomID, &r.MemberAccountID); err != nil {
+			rows.Close()
+			return Room{}, nil, fmt.Errorf("store: create direct room: scan earlier room: %w", err)
+		}
+		replaced = append(replaced, r)
+	}
+	rows.Close()
+	if err := rows.Err(); err != nil {
+		return Room{}, nil, fmt.Errorf("store: create direct room: end earlier rooms: %w", err)
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return Room{}, nil, fmt.Errorf("store: create direct room: commit: %w", err)
+	}
+	return room, replaced, nil
 }
 
 func (p *Postgres) GetRoom(ctx context.Context, id string) (Room, error) {

@@ -71,13 +71,28 @@ func (f *fakeStore) CreateGroupRoom(_ context.Context, id, ownerAccountID, name,
 	return room, nil
 }
 
-func (f *fakeStore) CreateDirectRoom(_ context.Context, id string, memberAccountIDs []string) (store.Room, error) {
+func (f *fakeStore) CreateDirectRoom(_ context.Context, id string, memberAccountIDs []string) (store.Room, []store.ReplacedRoom, error) {
+	var replaced []store.ReplacedRoom
+	for roomID, room := range f.rooms {
+		if room.Type != roomTypeDirect || room.Kept || room.EndedAt != nil {
+			continue
+		}
+		for _, accountID := range memberAccountIDs {
+			if f.members[roomID][accountID] {
+				now := time.Now()
+				room.EndedAt = &now
+				f.rooms[roomID] = room
+				replaced = append(replaced, store.ReplacedRoom{RoomID: roomID, MemberAccountID: accountID})
+				break
+			}
+		}
+	}
 	room := store.Room{ID: id, Type: roomTypeDirect, CreatedAt: time.Now()}
 	f.rooms[id] = room
 	for _, accountID := range memberAccountIDs {
 		f.addMemberLocked(id, accountID)
 	}
-	return room, nil
+	return room, replaced, nil
 }
 
 func (f *fakeStore) GetRoom(_ context.Context, id string) (store.Room, error) {
