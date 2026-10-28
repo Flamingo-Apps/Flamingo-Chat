@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { initialState, reducer } from './state'
+import { initialState, reducer, signInErrorMessage } from './state'
 import type { Account, Message } from './types'
 
 const account: Account = {
@@ -188,6 +188,26 @@ describe('reducer', () => {
       let state = reducer(matched(), { type: 'frame', frame: { type: 'keep_status', room_id: 'room-1', you: true, partner: true, kept: true } })
       state = reducer(state, { type: 'savedMatchDismissed' })
       expect(state.savedMatch).toBeNull()
+    })
+  })
+
+  describe('a Google sign-in that came back with an error', () => {
+    it('shows a message instead of failing silently', () => {
+      const state = reducer(initialState, { type: 'signInFailed', reason: 'sign_in_failed' })
+      expect(state.lastError).toMatch(/KIIT Google account/)
+    })
+
+    it('has plain advice for every reason the gateway can send, and for an unknown one', () => {
+      for (const reason of ['sign_in_failed', 'missing_code_or_state', 'invalid_or_expired_state', 'google_exchange_failed', 'something_new']) {
+        expect(signInErrorMessage(reason)).not.toBe('')
+      }
+      expect(signInErrorMessage('something_new')).toMatch(/try again/i)
+    })
+
+    it('can be dismissed like any other error', () => {
+      let state = reducer(initialState, { type: 'signInFailed', reason: 'google_exchange_failed' })
+      state = reducer(state, { type: 'clearError' })
+      expect(state.lastError).toBeNull()
     })
   })
 })

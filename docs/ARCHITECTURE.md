@@ -371,6 +371,40 @@ Look: a light "pop brutal" theme (cream paper, thick ink outlines, hard offset s
 - **Online count:** the number beside the green dot is the `presence` frame the gateway already pushes, and before the first one arrives the public `GET /v1/presence`. No backend change.
 - Run it without the whole local stack: `npm run dev:mock` and `npm run dev` in `web/`. The mock gateway is a stand-in for working on the UI, not a model of the real gateway's rules.
 
+### 10.1 Frontend requirements checklist (Proposed, DEC-0111)
+
+A redesign can quietly drop a feature, because nothing fails when something is missing. This list is the memory of what the web app must keep doing. Each row names what guards it: a black-box check (BB-nn, `web/e2e/blackbox.mjs`, run with `npm run test:blackbox` against the local stack) or a unit test. A row marked **gap** has no automated guard and is checked by hand until one is written.
+
+How to use it: a pull request that touches `web/` states which rows it touches, runs `npm run test:blackbox`, and looks at the phone layout (width under 900 px) as well as the desktop one. When a feature is added or changed, its row is added or changed in the same pull request. Finding a lost feature adds a row.
+
+| # | The app must | Guard |
+|---|---|---|
+| F-01 | Ask "Have you been here before?"; a new visitor goes straight in as a guest with a server-chosen name, no form | BB-01, BB-02 |
+| F-02 | Keep the session across a reload, and let a returning person sign in with Google | BB-02, BB-10 (local fake Google) |
+| F-03 | Say so when a Google sign-in comes back with an error, instead of landing back as a guest in silence | state.test.ts; **gap** in BB (the local fake never fails) |
+| F-04 | Show "Verified" for a verified account, on desktop (sidebar) and on phone (check on the avatar) | BB-10 (desktop); **gap** on phone |
+| F-05 | Open the identity prompt when someone reaches for a locked feature, with Google behind the "Get your identity" panel and a preview of what others would see | BB-03, BB-11 |
+| F-06 | Ask for gender once after a first sign-in, and refuse a second change | BB-10 |
+| F-07 | Have Mochi introduce herself once, not on every reload | BB-02 |
+| F-08 | Remove a banned person and keep them out | BB-14 |
+| F-09 | Show a clear message when guest signups are rate limited, and not leave the page stuck | BB-15 |
+| F-10 | Match two people and let them chat both ways, each seeing the other's anonymous name | BB-04 |
+| F-11 | Clear the screen at once when a search is cancelled, and still match afterwards | BB-07, state.test.ts |
+| F-12 | Lock the gender filters for guests, and open the identity card instead | BB-11 |
+| F-13 | When the partner leaves, let the one who stayed save the chat read-only under the partner's name; the one who left gets nothing | BB-06, state.test.ts |
+| F-14 | Ask the other person to keep a chat (25 s, default "keep chatting"); a mutual keep moves it to both Inboxes under each other's names | BB-17, state.test.ts |
+| F-15 | Let a person stop messaging a saved chat (closes it for both) or delete it (for them only) | BB-18, BB-19 |
+| F-16 | Offer Next, End and Report in the chat header | **gap** (BB never presses Next or Report) |
+| F-17 | Create a channel, join by invite code, talk both ways, leave, and not lose the first messages | BB-08 |
+| F-18 | Stop a guest at 10 channels and throttle invite-code guessing | BB-20 |
+| F-19 | Show a live online count | BB-09 |
+| F-20 | Reconnect by itself after a gateway restart, reload missed messages and not duplicate any | BB-12, ws.test.ts, state.test.ts |
+| F-21 | Work on a phone: bottom navigation, no sideways scroll, a back button in a conversation, the composer in view | BB-13 |
+| F-22 | Handle odd input: blanks, markup shown as text, very long words, a 2,000-character cap, a rapid burst kept in order | BB-05 |
+| F-23 | Throw no uncaught errors in any page | BB-16 |
+| F-24 | Work with the keyboard alone on the first visit | BB-02 |
+| F-25 | Let a person sign out, with the right warning for a guest and for a verified account | **gap** |
+
 ## 11. Testing (unit/integration tests Agreed and built; the end-to-end smoke test built, pending review - DEC-0087, DEC-0088)
 
 - **Unit tests:** business logic against in-memory fakes of each repository and client interface, as Identity does now. Run in CI with the race detector.

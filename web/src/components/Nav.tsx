@@ -76,8 +76,13 @@ export function MobileTopBar({ onProfile }: { onProfile: () => void }) {
     <header className="topbar">
       <Brand />
       <OnlineBadge />
-      <button className="topbar__me" onClick={onProfile} aria-label="Your profile">
+      <button className="topbar__me" onClick={onProfile} aria-label={state.account.google_linked ? 'Your profile (verified)' : 'Your profile'}>
         <Avatar name={state.account.pseudonym} size={36} />
+        {state.account.google_linked && (
+          <span className="topbar__verified" title="Verified">
+            <CheckBadgeIcon />
+          </span>
+        )}
       </button>
     </header>
   )

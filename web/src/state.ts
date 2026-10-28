@@ -40,6 +40,22 @@ export interface AppState {
   kicked: string | null
 }
 
+// What to tell someone when the Google redirect (DEC-0092) comes back with an
+// #auth_error reason instead of a session. The reasons are the gateway's own
+// (oauth_redirect.go); anything unknown gets the same generic advice.
+export function signInErrorMessage(reason: string): string {
+  switch (reason) {
+    case 'sign_in_failed':
+      return 'That Google account could not be verified. Pick your KIIT Google account and try again.'
+    case 'missing_code_or_state':
+    case 'invalid_or_expired_state':
+    case 'google_exchange_failed':
+      return 'Google sign-in was interrupted or took too long. Please try again.'
+    default:
+      return 'Google sign-in did not work. Please try again.'
+  }
+}
+
 export const initialState: AppState = {
   account: null,
   token: null,
@@ -64,6 +80,7 @@ export type Action =
   | { type: 'accountUpdated'; account: Account }
   | { type: 'frame'; frame: ServerFrame }
   | { type: 'clearError' }
+  | { type: 'signInFailed'; reason: string }
   | { type: 'graceWindowExpired'; roomId: string }
   | { type: 'keepRequestDismissed' }
   | { type: 'savedMatchDismissed' }
@@ -202,6 +219,8 @@ export function reducer(state: AppState, action: Action): AppState {
       return applyFrame(state, action.frame)
     case 'clearError':
       return { ...state, lastError: null }
+    case 'signInFailed':
+      return { ...state, lastError: signInErrorMessage(action.reason) }
     case 'keepRequestDismissed':
       return { ...state, keepRequest: null }
     case 'savedMatchDismissed':
