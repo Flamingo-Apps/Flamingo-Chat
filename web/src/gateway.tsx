@@ -66,14 +66,23 @@ export function GatewayProvider({ children }: { children: ReactNode }) {
   // any server and never appears in access logs, unlike the rest of the
   // URL - see oauth_redirect.go's own comment on this same choice.
   useEffect(() => {
-    const hashToken = new URLSearchParams(window.location.hash.slice(1)).get('auth_token')
+    const hashParams = new URLSearchParams(window.location.hash.slice(1))
+    const hashToken = hashParams.get('auth_token')
+    const hashError = hashParams.get('auth_error')
     if (hashToken) {
       history.replaceState(null, '', window.location.pathname + window.location.search)
       api
         .getMe(hashToken)
         .then((account) => login(account, hashToken))
-        .catch(() => {})
+        .catch(() => dispatch({ type: 'signInFailed', reason: 'sign_in_failed' }))
       return
+    }
+    // The redirect came back without a session: say so, rather than landing
+    // the person back where they were as if nothing had been tried. Then carry
+    // on below, since a saved guest session may still be valid.
+    if (hashError) {
+      history.replaceState(null, '', window.location.pathname + window.location.search)
+      dispatch({ type: 'signInFailed', reason: hashError })
     }
     const saved = localStorage.getItem(SESSION_STORAGE_KEY)
     if (!saved) return

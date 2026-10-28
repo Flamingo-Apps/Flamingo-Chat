@@ -65,6 +65,11 @@ export function WelcomeScreen() {
           </div>
         )}
         {error && <p className="error-text">{error}</p>}
+        {state.lastError && (
+          <p className="error-text" role="alert">
+            {state.lastError}
+          </p>
+        )}
       </div>
 
       <div className="welcome__art" aria-hidden="true">
