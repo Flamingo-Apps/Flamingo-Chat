@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../api'
+import { friendlyError } from '../api'
 import { EmptyChat, Workspace } from '../components/Workspace'
 import { useGateway } from '../gateway'
 import { ChatView } from './ChatView'
@@ -29,7 +30,7 @@ export function ChannelsScreen() {
       await loadRooms()
       setSelectedRoomId(room.id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyError(err))
     }
   }
 
@@ -44,7 +45,7 @@ export function ChannelsScreen() {
       await loadRooms()
       setSelectedRoomId(room.id)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyError(err))
     }
   }
 

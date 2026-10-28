@@ -1,12 +1,13 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import * as api from '../api'
+import { friendlyError } from '../api'
 import { FlagIcon, HeartIcon, LockIcon, PowerIcon, SkipIcon } from '../components/Icons'
 import { Mascot } from '../components/Mascot'
 import { Modal } from '../components/Modal'
 import { EmptyChat, Workspace } from '../components/Workspace'
 import { useGateway } from '../gateway'
 import { GRACE_WINDOW_MS } from '../state'
-import type { Preference } from '../types'
+import type { ClientFrame, Preference } from '../types'
 import { useUi } from '../ui'
 import { ChatView } from './ChatView'
 
@@ -17,12 +18,27 @@ const CHOICES: { value: Preference; label: string }[] = [
 ]
 
 export function RandomScreen() {
-  const { state, send, dismissKeepRequest, dismissSavedMatch } = useGateway()
+  const { state, send, matchRestoring, dismissKeepRequest, dismissSavedMatch } = useGateway()
   const { askForIdentity, openInbox } = useUi()
   const [preference, setPreference] = useState<Preference>('any')
   const [reportOpen, setReportOpen] = useState(false)
   const account = state.account
   const match = state.currentMatch
+  // Until the server has said which chat this person is in, do not offer to
+  // start a new one: right after a reload they may be mid-chat.
+  const restoringChat = matchRestoring && !match && !state.matching && !state.savedMatch
+  const online = state.connectionStatus === 'open'
+  // After a press, ignore further presses for a moment. A double click used to
+  // send two requests, and a double Next skipped the partner just found.
+  const [busy, setBusy] = useState(false)
+  const busyTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => void (busyTimer.current && clearTimeout(busyTimer.current)), [])
+  function act(frame: ClientFrame) {
+    if (busy || !online) return
+    if (!send(frame)) return
+    setBusy(true)
+    busyTimer.current = setTimeout(() => setBusy(false), 1500)
+  }
 
   // Gender-filtered matching needs a verified account with a chosen
   // gender (services/matching/internal/server/server.go's
@@ -61,13 +77,13 @@ export function RandomScreen() {
             <span className="spinner" />
             <span>Looking for someone...</span>
           </div>
-          <button className="btn btn--ghost" onClick={() => send({ type: 'match_cancel' })}>
+          <button className="btn btn--ghost" disabled={!online} onClick={() => send({ type: 'match_cancel' })}>
             Cancel
           </button>
         </div>
       ) : (
-        <button className="btn btn--big" disabled={Boolean(match)} onClick={() => send({ type: 'match_request', preference })}>
-          Find a match
+        <button className="btn btn--big" disabled={Boolean(match) || restoringChat || busy || !online} onClick={() => act({ type: 'match_request', preference })}>
+          {restoringChat ? 'Getting your chat...' : online ? 'Find a match' : 'Reconnecting...'}
         </button>
       )}
       {state.lastError && (
@@ -89,13 +105,13 @@ export function RandomScreen() {
         subtitle="Anonymous student"
         headerExtra={
           <>
-            <button className="btn btn--sm btn--ghost" disabled={match.youKept} onClick={() => send({ type: 'keep_chat', room_id: match.roomId })}>
+            <button className="btn btn--sm btn--ghost" disabled={match.youKept || busy || !online} onClick={() => act({ type: 'keep_chat', room_id: match.roomId })}>
               <HeartIcon /> {match.youKept ? 'Waiting...' : 'Keep'}
             </button>
-            <button className="btn btn--sm btn--ghost" onClick={() => send({ type: 'match_next' })}>
+            <button className="btn btn--sm btn--ghost" disabled={busy || !online} onClick={() => act({ type: 'match_next' })}>
               <SkipIcon /> Next
             </button>
-            <button className="btn btn--sm btn--ghost" onClick={() => send({ type: 'match_end' })}>
+            <button className="btn btn--sm btn--ghost" disabled={busy || !online} onClick={() => act({ type: 'match_end' })}>
               <PowerIcon /> End
             </button>
             <button className="btn btn--sm btn--ghost" onClick={() => setReportOpen(true)}>
@@ -129,6 +145,8 @@ export function RandomScreen() {
         </div>
       </EmptyChat>
     )
+  } else if (restoringChat) {
+    chat = <EmptyChat mood="search" title="Getting your chat" text="One moment..." />
   } else if (state.matching) {
     chat = (
       <EmptyChat mood="search" title="Finding someone for you" text="Hang tight, this only takes a few seconds.">
@@ -154,13 +172,19 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
   const { state } = useGateway()
   const [reason, setReason] = useState('')
   const [submitted, setSubmitted] = useState(false)
+  const [failed, setFailed] = useState<string | null>(null)
   const match = state.currentMatch
 
   async function submit(e: React.FormEvent) {
     e.preventDefault()
     if (!state.token || !match) return
-    await api.fileReport(state.token, match.partnerAccountId, reason, match.roomId)
-    setSubmitted(true)
+    setFailed(null)
+    try {
+      await api.fileReport(state.token, match.partnerAccountId, reason, match.roomId)
+      setSubmitted(true)
+    } catch (err) {
+      setFailed(friendlyError(err))
+    }
   }
 
   return (
@@ -177,6 +201,11 @@ function ReportDialog({ onClose }: { onClose: () => void }) {
           <h2>Report this person</h2>
           <p>Tell us what happened. Only our safety team sees this.</p>
           <textarea value={reason} onChange={(e) => setReason(e.target.value)} placeholder="What happened?" required rows={4} />
+          {failed && (
+            <p className="error-text" role="alert">
+              {failed}
+            </p>
+          )}
           <div className="modal__actions">
             <button className="btn" type="submit">
               Send report

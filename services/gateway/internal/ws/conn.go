@@ -61,6 +61,14 @@ type Deps struct {
 	// batched Heartbeat needs to see every connection at once
 	// (docs/ARCHITECTURE.md §3.4).
 	PresenceRegistry *presence.Registry
+
+	// Connections counts each account's live connections, so a search left
+	// behind by someone who has gone can be cancelled (see cancelSearchIfGone).
+	Connections *Connections
+	// SearchAbandonGrace is how long after an account's last connection closes
+	// its search is cancelled, unless it comes back first. Zero turns the
+	// cancel off. It is long enough for a refresh or a network blip.
+	SearchAbandonGrace time.Duration
 }
 
 // Sessions is the subset of internal/session.Signer this package depends
@@ -145,6 +153,12 @@ func (c *conn) run(ctx context.Context) {
 		return
 	}
 	defer c.deps.PresenceRegistry.Remove(c.accountID)
+	c.deps.Connections.Open(c.accountID)
+	defer func() {
+		if c.deps.Connections.Close(c.accountID) == 0 {
+			c.cancelSearchIfGone()
+		}
+	}()
 	defer func() {
 		if c.pubsub != nil {
 			_ = c.pubsub.Close()

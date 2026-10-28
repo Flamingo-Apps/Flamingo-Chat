@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import * as api from '../api'
+import { friendlyError } from '../api'
 import { Avatar } from '../components/Avatar'
 import { ConfirmDialog } from '../components/ConfirmDialog'
 import { EmptyChat, Workspace } from '../components/Workspace'
@@ -41,7 +42,7 @@ export function InboxScreen({ initialRoomId }: { initialRoomId?: string | null }
       await loadRooms()
       setConfirm(null)
     } catch (err) {
-      setError(err instanceof Error ? err.message : String(err))
+      setError(friendlyError(err))
       setConfirm(null)
     } finally {
       setBusy(false)

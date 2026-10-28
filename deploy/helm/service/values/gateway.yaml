@@ -35,6 +35,10 @@ env:
   GOOGLE_CLIENT_SECRET: ""
   GOOGLE_REDIRECT_URI: "http://localhost:8080/v1/auth/google/callback"
   FRONTEND_URL: "http://localhost:8000"
+  # How long after someone's last connection closes their search is cancelled
+  # (production uses the code's default of 20 seconds). Short here so the
+  # black-box tests do not wait (DEC-0114).
+  SEARCH_ABANDON_GRACE_SECONDS: "3"
   # Local development only (DEC-0049, mirrored as DEC-0092) - never set
   # this outside a local cluster.
   DEV_FAKE_GOOGLE: "1"
