@@ -50,7 +50,7 @@ jobs:
           npm run build
 
       - name: Install the Vercel CLI
-        run: npm install --global vercel@64.0.2
+        run: npm install --global vercel@65.5.0
 
       # Run from the repository root: the project's Root Directory setting
       # (web) is applied by Vercel itself.
