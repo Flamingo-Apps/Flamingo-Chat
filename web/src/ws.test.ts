@@ -131,4 +131,62 @@ describe('GatewayConnection', () => {
     conn.send({ type: 'ping' })
     expect(sock.sent).toEqual([])
   })
+
+  it('keeps backing off when a connection drops straight after logging in (no retry every second)', () => {
+    const conn = new GatewayConnection('tok', { onFrame: vi.fn(), onStatusChange: vi.fn() }, factory)
+    conn.connect()
+    const loginAndDrop = () => {
+      const sock = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
+      sock.simulateOpen()
+      sock.simulateMessage({ type: 'auth_ok', account: { id: 'a' } })
+      sock.simulateServerClose()
+    }
+    loginAndDrop() // first drop: next try within about a second
+    vi.advanceTimersByTime(1_400)
+    expect(FakeWebSocket.instances.length).toBe(2)
+
+    loginAndDrop() // dropped again straight after login: the wait must have grown
+    vi.advanceTimersByTime(1_400)
+    expect(FakeWebSocket.instances.length).toBe(2)
+    vi.advanceTimersByTime(1_500)
+    expect(FakeWebSocket.instances.length).toBe(3)
+  })
+
+  it('starts the backoff over once a connection has stayed up for a while', () => {
+    const conn = new GatewayConnection('tok', { onFrame: vi.fn(), onStatusChange: vi.fn() }, factory)
+    conn.connect()
+    // Fail twice quickly so the attempt count is above zero.
+    for (let i = 0; i < 2; i++) {
+      FakeWebSocket.instances[FakeWebSocket.instances.length - 1].simulateServerClose()
+      vi.advanceTimersByTime(5_000)
+    }
+    const sock = FakeWebSocket.instances[FakeWebSocket.instances.length - 1]
+    sock.simulateOpen()
+    sock.simulateMessage({ type: 'auth_ok', account: { id: 'a' } })
+    vi.advanceTimersByTime(11_000) // healthy for longer than the stable period
+    const before = FakeWebSocket.instances.length
+    sock.simulateServerClose()
+    vi.advanceTimersByTime(1_400) // back to the first, short wait
+    expect(FakeWebSocket.instances.length).toBe(before + 1)
+  })
+
+  it('reconnects once, with one socket, when a failed socket fires both error and close', () => {
+    const conn = new GatewayConnection('tok', { onFrame: vi.fn(), onStatusChange: vi.fn() }, factory)
+    conn.connect()
+    const sock = FakeWebSocket.instances[0]
+    sock.onerror?.()
+    sock.onclose?.()
+    vi.advanceTimersByTime(60_000)
+    expect(FakeWebSocket.instances.length).toBe(2)
+  })
+
+  it('closes the old socket instead of leaving it alive when it opens a new one', () => {
+    const conn = new GatewayConnection('tok', { onFrame: vi.fn(), onStatusChange: vi.fn() }, factory)
+    conn.connect()
+    const first = FakeWebSocket.instances[0]
+    first.simulateOpen()
+    conn.connect() // e.g. the same connection asked to start again
+    expect(first.readyState).toBe(3)
+    expect(FakeWebSocket.instances.length).toBe(2)
+  })
 })

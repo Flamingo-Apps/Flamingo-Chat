@@ -143,6 +143,17 @@ func TestHandleMatchRequestUsesTheAccountsOwnAttributes(t *testing.T) {
 	}
 }
 
+// chatWithActiveRoom is a Chat that reports one open, unsaved direct room for
+// the account: what Chat's database says a person in a random chat looks like.
+func chatWithActiveRoom(roomID string) *fakeChat {
+	return &fakeChat{listMyRooms: func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+		return &chatv1.ListMyRoomsResponse{Rooms: []*chatv1.Room{
+			{Id: "group-1", Type: chatv1.RoomType_ROOM_TYPE_GROUP, CreatedAtUnix: 999},
+			{Id: roomID, Type: chatv1.RoomType_ROOM_TYPE_DIRECT, CreatedAtUnix: 100},
+		}}, nil
+	}}
+}
+
 func TestHandleMatchCancelAndNextAndEnd(t *testing.T) {
 	var gotCancel, gotNext bool
 	matching := &fakeMatching{
@@ -158,7 +169,7 @@ func TestHandleMatchCancelAndNextAndEnd(t *testing.T) {
 			return &matchingv1.NextResponse{Queued: true}, nil
 		},
 	}
-	c := newTestConn(&fakeIdentity{}, &fakeChat{}, matching)
+	c := newTestConn(&fakeIdentity{}, chatWithActiveRoom("room-current"), matching)
 
 	c.dispatch(context.Background(), []byte(`{"type":"match_cancel"}`))
 	if !gotCancel {
@@ -168,7 +179,6 @@ func TestHandleMatchCancelAndNextAndEnd(t *testing.T) {
 		t.Fatalf("expected a match_cancelled frame after a successful cancel, got %+v", frame)
 	}
 
-	c.setCurrentMatchRoom("room-current")
 	c.dispatch(context.Background(), []byte(`{"type":"match_next"}`))
 	if !gotNext {
 		t.Fatalf("expected Next to be called")
@@ -230,8 +240,7 @@ func TestHandleMatchNextSendsNoFrameWhenNotReQueued(t *testing.T) {
 			return &matchingv1.NextResponse{Queued: false}, nil
 		},
 	}
-	c := newTestConn(&fakeIdentity{}, &fakeChat{}, matching)
-	c.setCurrentMatchRoom("room-current")
+	c := newTestConn(&fakeIdentity{}, chatWithActiveRoom("room-current"), matching)
 
 	c.dispatch(context.Background(), []byte(`{"type":"match_next"}`))
 	select {
@@ -250,18 +259,114 @@ func TestHandleMatchEndWithNoCurrentMatchReturnsAnError(t *testing.T) {
 	}
 }
 
-func TestHandleMatchEndUsesTheTrackedRoom(t *testing.T) {
+func TestHandleMatchEndUsesTheActiveRoomFromChat(t *testing.T) {
 	var gotRoomID string
-	chat := &fakeChat{endDirectRoom: func(_ context.Context, req *chatv1.EndDirectRoomRequest) (*chatv1.EndDirectRoomResponse, error) {
+	chat := chatWithActiveRoom("room-current")
+	chat.endDirectRoom = func(_ context.Context, req *chatv1.EndDirectRoomRequest) (*chatv1.EndDirectRoomResponse, error) {
 		gotRoomID = req.GetRoomId()
 		return &chatv1.EndDirectRoomResponse{}, nil
-	}}
+	}
 	c := newTestConn(&fakeIdentity{}, chat, &fakeMatching{})
-	c.setCurrentMatchRoom("room-current")
 
 	c.dispatch(context.Background(), []byte(`{"type":"match_end"}`))
 	if gotRoomID != "room-current" {
-		t.Fatalf("expected EndDirectRoom to be called with the tracked room, got %q", gotRoomID)
+		t.Fatalf("expected EndDirectRoom to be called with the room Chat reports, got %q", gotRoomID)
+	}
+}
+
+// The bug behind DEC-0112: a reconnect gives a connection that never saw the
+// match_found, so its own memory of the room is empty. Next and End must still
+// work, because the room is in the database and Chat can say so.
+func TestNextAndEndWorkOnAFreshConnectionThatNeverSawMatchFound(t *testing.T) {
+	var nextRoom, endRoom string
+	chat := chatWithActiveRoom("room-9")
+	chat.endDirectRoom = func(_ context.Context, req *chatv1.EndDirectRoomRequest) (*chatv1.EndDirectRoomResponse, error) {
+		endRoom = req.GetRoomId()
+		return &chatv1.EndDirectRoomResponse{}, nil
+	}
+	matching := &fakeMatching{next: func(_ context.Context, req *matchingv1.NextRequest) (*matchingv1.NextResponse, error) {
+		nextRoom = req.GetCurrentRoomId()
+		return &matchingv1.NextResponse{Queued: true}, nil
+	}}
+	c := newTestConn(&fakeIdentity{}, chat, matching)
+	if c.getCurrentMatchRoom() != "" {
+		t.Fatalf("test setup: a fresh connection must start with no remembered room")
+	}
+
+	c.dispatch(context.Background(), []byte(`{"type":"match_next"}`))
+	c.dispatch(context.Background(), []byte(`{"type":"match_end"}`))
+	if nextRoom != "room-9" || endRoom != "room-9" {
+		t.Fatalf("expected both to act on room-9, got next=%q end=%q", nextRoom, endRoom)
+	}
+}
+
+func TestNextWithNoActiveChatSaysSoAndNeverCallsMatching(t *testing.T) {
+	called := false
+	matching := &fakeMatching{next: func(context.Context, *matchingv1.NextRequest) (*matchingv1.NextResponse, error) {
+		called = true
+		return &matchingv1.NextResponse{}, nil
+	}}
+	c := newTestConn(&fakeIdentity{}, &fakeChat{}, matching)
+
+	c.dispatch(context.Background(), []byte(`{"type":"match_next"}`))
+	frame := c.nextFrame(t)
+	if frame["type"] != "error" || frame["code"] != "failedprecondition" || frame["message"] != noActiveChat {
+		t.Fatalf("expected the friendly 'already ended' error, got %+v", frame)
+	}
+	if called {
+		t.Fatalf("Matching.Next must not be called without a room: it rejects an empty room id")
+	}
+}
+
+func TestActiveDirectRoomPicksTheNewestOpenUnsavedChat(t *testing.T) {
+	chat := &fakeChat{listMyRooms: func(context.Context, *chatv1.ListMyRoomsRequest) (*chatv1.ListMyRoomsResponse, error) {
+		return &chatv1.ListMyRoomsResponse{Rooms: []*chatv1.Room{
+			{Id: "saved", Type: chatv1.RoomType_ROOM_TYPE_DIRECT, Kept: true, CreatedAtUnix: 500},
+			{Id: "ended", Type: chatv1.RoomType_ROOM_TYPE_DIRECT, EndedAtUnix: 400, CreatedAtUnix: 400},
+			{Id: "older-open", Type: chatv1.RoomType_ROOM_TYPE_DIRECT, CreatedAtUnix: 100},
+			{Id: "newer-open", Type: chatv1.RoomType_ROOM_TYPE_DIRECT, CreatedAtUnix: 200},
+			{Id: "a-group", Type: chatv1.RoomType_ROOM_TYPE_GROUP, CreatedAtUnix: 900},
+		}}, nil
+	}}
+	c := newTestConn(&fakeIdentity{}, chat, &fakeMatching{})
+	got, err := c.activeDirectRoom(context.Background())
+	if err != nil || got != "newer-open" {
+		t.Fatalf("expected newer-open, got %q (err %v)", got, err)
+	}
+}
+
+// What a person sees is never an internal message (DEC-0112).
+func TestErrorsFromOtherServicesReachThePersonOnlyWhenTheyAreMeantForThem(t *testing.T) {
+	cases := []struct {
+		err      error
+		wantMsg  string
+		wantCode string
+	}{
+		{status.Error(codes.InvalidArgument, "account_id and current_room_id are required"), genericFailure, "invalidargument"},
+		{status.Error(codes.Internal, "pairing lookup: redis: connection refused"), genericFailure, "internal"},
+		{status.Error(codes.Unavailable, "dial tcp 10.0.0.1:50051: connect: refused"), genericFailure, "unavailable"},
+		{status.Error(codes.FailedPrecondition, "this conversation is closed"), "this conversation is closed", "failedprecondition"},
+		{status.Error(codes.PermissionDenied, "gender-filtered matching requires a verified account with a chosen gender"), "gender-filtered matching requires a verified account with a chosen gender", "permissiondenied"},
+	}
+	for _, tc := range cases {
+		c := newTestConn(&fakeIdentity{}, &fakeChat{}, &fakeMatching{})
+		c.sendErrorFromStatus(tc.err, "")
+		frame := c.nextFrame(t)
+		if frame["message"] != tc.wantMsg || frame["code"] != tc.wantCode {
+			t.Errorf("%v: got code=%v message=%v, want code=%s message=%q", tc.err, frame["code"], frame["message"], tc.wantCode, tc.wantMsg)
+		}
+	}
+}
+
+func TestMatchNextWhenMatchingFailsInternallyShowsNothingInternal(t *testing.T) {
+	matching := &fakeMatching{next: func(context.Context, *matchingv1.NextRequest) (*matchingv1.NextResponse, error) {
+		return nil, status.Error(codes.InvalidArgument, "account_id and current_room_id are required")
+	}}
+	c := newTestConn(&fakeIdentity{}, chatWithActiveRoom("room-1"), matching)
+	c.dispatch(context.Background(), []byte(`{"type":"match_next"}`))
+	frame := c.nextFrame(t)
+	if frame["message"] != genericFailure {
+		t.Fatalf("expected the generic message, got %+v", frame)
 	}
 }
 
@@ -280,6 +385,19 @@ func TestTrackMatchRoomClearsOnEnded(t *testing.T) {
 	c.trackMatchRoom(context.Background(), ended)
 	if got := c.getCurrentMatchRoom(); got != "" {
 		t.Fatalf("expected the tracked room to be cleared, got %q", got)
+	}
+}
+
+// A late match_ended for an earlier chat must not erase the room the connection
+// has since been matched into (the two events travel on different partitions).
+func TestTrackMatchRoomIgnoresTheEndOfADifferentRoom(t *testing.T) {
+	c := newTestConn(&fakeIdentity{}, &fakeChat{}, &fakeMatching{})
+	c.setCurrentMatchRoom("room-new")
+
+	ended, _ := withType("match_ended", matchEndedFrame{RoomID: "room-old"})
+	c.trackMatchRoom(context.Background(), ended)
+	if got := c.getCurrentMatchRoom(); got != "room-new" {
+		t.Fatalf("the newer room must survive the older one ending, got %q", got)
 	}
 }
 

@@ -1216,3 +1216,18 @@ textarea:focus {
     transition: none !important;
   }
 }
+
+/* ---------- splash: while a saved session is being checked ---------- */
+.splash {
+  min-height: 100vh;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1rem;
+  background: var(--paper);
+}
+.splash__text {
+  margin: 0;
+  color: var(--muted);
+  font-weight: 800;
+}

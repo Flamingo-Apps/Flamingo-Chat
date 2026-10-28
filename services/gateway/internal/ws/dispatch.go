@@ -287,13 +287,49 @@ func (c *conn) handleMatchCancel(ctx context.Context) {
 	c.enqueue(b)
 }
 
+// noActiveChat is what a person hears when they press Next or End but Chat
+// knows of no open random chat for them, say because the chat ended while they
+// were disconnected. The web app answers it by clearing its screen.
+const noActiveChat = "That chat has already ended."
+
+// activeDirectRoom is the random chat this account is in right now: the open,
+// unsaved direct room, newest first. It is asked of Chat, which reads the
+// database, every time it is needed and is never remembered per connection.
+// A remembered copy was lost on every reconnect (a new connection starts
+// blank and match_found is not replayed), after which Next and End failed
+// with a raw error while the chat itself still worked (DEC-0112).
+func (c *conn) activeDirectRoom(ctx context.Context) (string, error) {
+	resp, err := c.deps.Chat.ListMyRooms(ctx, &chatv1.ListMyRoomsRequest{AccountId: c.accountID})
+	if err != nil {
+		return "", err
+	}
+	var best *chatv1.Room
+	for _, room := range resp.GetRooms() {
+		if room.GetType() != chatv1.RoomType_ROOM_TYPE_DIRECT || room.GetKept() || room.GetEndedAtUnix() != 0 {
+			continue
+		}
+		if best == nil || room.GetCreatedAtUnix() > best.GetCreatedAtUnix() {
+			best = room
+		}
+	}
+	return best.GetId(), nil
+}
+
 // handleMatchNext mirrors handleMatchRequest's match_queued
 // acknowledgement (DEC-0080) - without it, a client that called Next had
 // no way to tell "ended and re-queued" apart from "ended and now stuck",
 // since match_ended (the room ending) and match_queued (having rejoined
 // the queue) are two separate, independent facts.
 func (c *conn) handleMatchNext(ctx context.Context) {
-	roomID := c.getCurrentMatchRoom()
+	roomID, err := c.activeDirectRoom(ctx)
+	if err != nil {
+		c.sendErrorFromStatus(err, "")
+		return
+	}
+	if roomID == "" {
+		c.sendError(codes.FailedPrecondition, noActiveChat, "")
+		return
+	}
 	resp, err := c.deps.Matching.Next(ctx, &matchingv1.NextRequest{AccountId: c.accountID, CurrentRoomId: roomID})
 	if err != nil {
 		c.sendErrorFromStatus(err, "")
@@ -305,13 +341,16 @@ func (c *conn) handleMatchNext(ctx context.Context) {
 	}
 }
 
-// handleMatchEnd ends the connection's current direct room directly
-// through Chat, since docs/ARCHITECTURE.md §5.2 gives match_end no
-// room_id of its own to act on - see currentMatchRoomID's doc comment.
+// handleMatchEnd ends the person's current random chat through Chat, since
+// docs/ARCHITECTURE.md section 5.2 gives match_end no room_id of its own.
 func (c *conn) handleMatchEnd(ctx context.Context) {
-	roomID := c.getCurrentMatchRoom()
+	roomID, err := c.activeDirectRoom(ctx)
+	if err != nil {
+		c.sendErrorFromStatus(err, "")
+		return
+	}
 	if roomID == "" {
-		c.sendError(codes.FailedPrecondition, "no active match to end", "")
+		c.sendError(codes.FailedPrecondition, noActiveChat, "")
 		return
 	}
 	if _, err := c.deps.Chat.EndDirectRoom(ctx, &chatv1.EndDirectRoomRequest{RoomId: roomID, AccountId: c.accountID, Reason: "ended"}); err != nil {
@@ -336,7 +375,12 @@ func (c *conn) trackMatchRoom(ctx context.Context, frame []byte) {
 		c.setCurrentMatchRoom(env.RoomID)
 		c.subscribeToNewRoom(ctx, env.RoomID)
 	case "match_ended":
-		c.setCurrentMatchRoom("")
+		// Only the room this connection is tracking: an earlier chat's
+		// match_ended can arrive after the new match_found (the two travel on
+		// different Kafka partitions), and must not erase the new one.
+		if c.getCurrentMatchRoom() == env.RoomID {
+			c.setCurrentMatchRoom("")
+		}
 	}
 }
 

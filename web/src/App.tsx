@@ -5,6 +5,7 @@ import { IdentityCard } from './components/IdentityCard'
 import { Mascot } from './components/Mascot'
 import { MeetMochi } from './components/MeetMochi'
 import { Modal } from './components/Modal'
+import { Splash } from './components/Splash'
 import { BottomNav, MobileTopBar, Sidebar, type Screen } from './components/Nav'
 import { GatewayProvider, useGateway } from './gateway'
 import { ChannelsScreen } from './screens/ChannelsScreen'
@@ -27,7 +28,7 @@ function hasMetMochi(): boolean {
 }
 
 function Main() {
-  const { state, logout } = useGateway()
+  const { state, restoring, logout } = useGateway()
   const [screen, setScreen] = useState<Screen>('random')
   const [dialog, setDialog] = useState<Dialog>(null)
   const [genderSnoozed, setGenderSnoozed] = useState(false)
@@ -52,7 +53,7 @@ function Main() {
     [account?.google_linked],
   )
 
-  if (!account) return <WelcomeScreen />
+  if (!account) return restoring ? <Splash /> : <WelcomeScreen />
 
   const closeGender = () => {
     setGenderSnoozed(true)

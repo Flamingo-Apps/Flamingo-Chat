@@ -2,6 +2,7 @@ package server
 
 import (
 	"context"
+	"errors"
 	"testing"
 
 	"google.golang.org/grpc/codes"
@@ -83,6 +84,75 @@ func TestCreateDirectRoom(t *testing.T) {
 	}
 	if len(prod.published) != 0 {
 		t.Fatalf("expected CreateDirectRoom to publish no events (Matching's MatchFound covers it), got %d", len(prod.published))
+	}
+}
+
+// A person is in one random chat at a time (DEC-0112). Matching someone new
+// ends the earlier open chat, tells the person left behind, and leaves a saved
+// chat alone.
+func TestCreateDirectRoomEndsTheEarlierOpenChatOfEitherPerson(t *testing.T) {
+	s, st, prod := newTestServer("room-1", "room-2", "event-1")
+	ctx := context.Background()
+
+	// a and b chat; a (say, after a refresh) is then matched with c.
+	if _, err := s.CreateDirectRoom(ctx, &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "b"}}); err != nil {
+		t.Fatalf("first room: %v", err)
+	}
+	if _, err := s.CreateDirectRoom(ctx, &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "c"}}); err != nil {
+		t.Fatalf("second room: %v", err)
+	}
+
+	if st.rooms["room-1"].EndedAt == nil {
+		t.Fatalf("the earlier chat of a should have ended")
+	}
+	if _, ok := st.rooms["room-2"]; !ok || st.rooms["room-2"].EndedAt != nil {
+		t.Fatalf("the new chat must exist and stay open")
+	}
+	if len(prod.published) != 1 {
+		t.Fatalf("expected one room-ended event for the chat left behind, got %d", len(prod.published))
+	}
+	ended := prod.published[0].GetRoomEnded()
+	if ended.GetRoomId() != "room-1" || ended.GetEndedByAccountId() != "a" {
+		t.Fatalf("room-ended should name the abandoned room and the person who moved on: %+v", ended)
+	}
+}
+
+func TestCreateDirectRoomLeavesASavedChatAlone(t *testing.T) {
+	s, st, prod := newTestServer("room-1", "room-2")
+	ctx := context.Background()
+
+	if _, err := s.CreateDirectRoom(ctx, &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "b"}}); err != nil {
+		t.Fatalf("first room: %v", err)
+	}
+	saved := st.rooms["room-1"]
+	saved.Kept = true
+	st.rooms["room-1"] = saved
+
+	if _, err := s.CreateDirectRoom(ctx, &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "c"}}); err != nil {
+		t.Fatalf("second room: %v", err)
+	}
+	if st.rooms["room-1"].EndedAt != nil {
+		t.Fatalf("a saved chat must never be ended by a new match")
+	}
+	if len(prod.published) != 0 {
+		t.Fatalf("no event expected, got %d", len(prod.published))
+	}
+}
+
+func TestCreateDirectRoomStillSucceedsWhenTheNoticeCannotBePublished(t *testing.T) {
+	s, st, prod := newTestServer("room-1", "room-2", "event-1")
+	ctx := context.Background()
+	if _, err := s.CreateDirectRoom(ctx, &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "b"}}); err != nil {
+		t.Fatalf("first room: %v", err)
+	}
+	prod.err = errors.New("kafka is down")
+
+	resp, err := s.CreateDirectRoom(ctx, &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"a", "c"}})
+	if err != nil {
+		t.Fatalf("a missed notice must not fail a correctly made match: %v", err)
+	}
+	if resp.GetRoom().GetId() != "room-2" || st.rooms["room-1"].EndedAt == nil {
+		t.Fatalf("the new room should exist and the old one be ended")
 	}
 }
 
@@ -171,14 +241,16 @@ func TestListMyRooms(t *testing.T) {
 	if _, err := s.CreateDirectRoom(context.Background(), &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"me", "other"}}); err != nil {
 		t.Fatalf("create direct: %v", err)
 	}
-	if _, err := s.CreateDirectRoom(context.Background(), &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"me", "other2"}}); err != nil {
-		t.Fatalf("create direct 2: %v", err)
-	}
 	if _, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "direct-1", AccountId: "me"}); err != nil {
 		t.Fatalf("vote: %v", err)
 	}
 	if _, err := s.VoteKeep(context.Background(), &chatv1.VoteKeepRequest{RoomId: "direct-1", AccountId: "other"}); err != nil {
 		t.Fatalf("vote: %v", err)
+	}
+	// Saved first: a new match ends an earlier unsaved chat but never a saved
+	// one (DEC-0112), so this is how a person comes to have both.
+	if _, err := s.CreateDirectRoom(context.Background(), &chatv1.CreateDirectRoomRequest{MemberAccountIds: []string{"me", "other2"}}); err != nil {
+		t.Fatalf("create direct 2: %v", err)
 	}
 
 	resp, err := s.ListMyRooms(context.Background(), &chatv1.ListMyRoomsRequest{AccountId: "me"})

@@ -23,8 +23,10 @@ export interface Room {
   created_at_unix: number
   // Set once the room is closed: it can be read but nobody can send to it.
   ended_at_unix?: number
-  // Direct rooms: the other person's anonymous name.
+  // Direct rooms: the other person's anonymous name, and their account id
+  // (so a chat restored from the rooms list can still be reported).
   partner_pseudonym?: string
+  partner_account_id?: string
 }
 
 export interface Message {

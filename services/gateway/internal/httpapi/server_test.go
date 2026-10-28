@@ -338,8 +338,13 @@ func TestHandleListRoomsNamesTheOtherPersonInADirectRoom(t *testing.T) {
 	if resp.Rooms[0].PartnerPseudonym != "Quiet Otter" || resp.Rooms[0].EndedAtUnix != 50 {
 		t.Fatalf("expected the direct room to carry the other person's name and its closed time, got %+v", resp.Rooms[0])
 	}
-	if resp.Rooms[1].PartnerPseudonym != "" {
+	if resp.Rooms[1].PartnerPseudonym != "" || resp.Rooms[1].PartnerAccountID != "" {
 		t.Fatalf("a group room has no single other person, got %+v", resp.Rooms[1])
+	}
+	// The web app restores a random chat from this list after a reload, and
+	// needs the other person's id to report them (DEC-0112).
+	if resp.Rooms[0].PartnerAccountID != "acc-2" {
+		t.Fatalf("expected the direct room to name the other person's account id, got %+v", resp.Rooms[0])
 	}
 }
 
