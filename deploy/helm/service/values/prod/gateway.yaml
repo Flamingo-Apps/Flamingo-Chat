@@ -25,6 +25,9 @@ env:
   # Cloudflare Tunnel is the only way in (gateway's Service is ClusterIP),
   # so Cloudflare's header can be trusted for the client's real IP.
   CLIENT_IP_HEADER: "CF-Connecting-IP"
-  WS_ORIGIN_PATTERNS: "flamingo-chat-seven.vercel.app"
-  FRONTEND_URL: "https://flamingo-chat-seven.vercel.app"
+  # The app is served at flamingo-chat4.vercel.app (DEC-0113). The older
+  # flamingo-chat-seven.vercel.app address still reaches the same project, so
+  # it stays allowed for the WebSocket and CORS until nobody uses it.
+  WS_ORIGIN_PATTERNS: "flamingo-chat4.vercel.app,flamingo-chat-seven.vercel.app"
+  FRONTEND_URL: "https://flamingo-chat4.vercel.app"
   GOOGLE_REDIRECT_URI: "https://flamingo-api.aranyadutta.dev/v1/auth/google/callback"
