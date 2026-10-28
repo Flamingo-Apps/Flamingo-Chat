@@ -57,8 +57,17 @@ jobs:
       - name: Pull the project's settings and environment variables
         run: vercel pull --yes --environment=production --token=${{ secrets.VERCEL_TOKEN }}
 
+      # Temporary: the first deploy failed with "Project not found" at the
+      # deploy step although pull and build found the project. Prints only
+      # key names, never the ids, since this log is public.
+      - name: Show how the project is linked
+        run: |
+          ls -la .vercel || true
+          jq '{keys: keys, settings: ((.settings // {}) | {rootDirectory, framework, buildCommand, outputDirectory})}' .vercel/project.json || true
+          ls -la web/.vercel 2>&1 || true
+
       - name: Build
         run: vercel build --prod --token=${{ secrets.VERCEL_TOKEN }}
 
       - name: Deploy
-        run: vercel deploy --prebuilt --prod --token=${{ secrets.VERCEL_TOKEN }}
+        run: vercel deploy --prebuilt --prod --debug --token=${{ secrets.VERCEL_TOKEN }}
