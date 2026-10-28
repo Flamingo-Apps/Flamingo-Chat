@@ -1,0 +1,6 @@
+# flamingo.aranyadutta.dev/app is the one address to give out for the app
+# (a resume, a post). It forwards to wherever the app is served now, so a move
+# means changing this line, not every place the link was shared. 302, not 301:
+# a permanent redirect is cached by browsers and could not be changed later.
+/app https://flamingo-chat4.vercel.app 302
+/app/ https://flamingo-chat4.vercel.app 302
