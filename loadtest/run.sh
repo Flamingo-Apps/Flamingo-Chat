@@ -101,7 +101,12 @@ spec:
         - name: script
           configMap: { name: loadtest-script }
 YAML
-	kubectl wait --for=condition=complete "job/$job" --timeout=$((ramp + hold + 240))s >/dev/null 2>&1 || echo "  (level $level did not complete cleanly; reading what it logged)"
+	# k6 exits non-zero when one of its own thresholds is crossed, which makes
+	# the Job "Failed" rather than "Complete"; waiting only for Complete would
+	# sit out the whole timeout. So stop waiting at either outcome.
+	deadline=$(($(date +%s) + ramp + hold + 240))
+	until [ -n "$(kubectl get "job/$job" -o jsonpath='{.status.succeeded}{.status.failed}')" ] || [ "$(date +%s)" -ge "$deadline" ]; do sleep 5; done
+	[ -n "$(kubectl get "job/$job" -o jsonpath='{.status.failed}')" ] && echo "  (level $level crossed one of k6's thresholds; the result is still read)"
 	ended=$(date -u +%s)
 	kubectl logs "job/$job" > "$results/$stamp-$env_name-$level.log" 2>&1 || true
 	sed -n '/===SUMMARY-JSON===/{n;p}' "$results/$stamp-$env_name-$level.log" > "/tmp/$job.json"

@@ -36,6 +36,9 @@ const matchWait = new Trend('match_wait_ms', true)
 const sent = new Counter('msgs_sent')
 const received = new Counter('msgs_received')
 const frameErrors = new Counter('frame_errors')
+// A send that reached a chat the partner had just closed: the server is right to
+// refuse it. It is the end-of-session race of this script, not a backend fault.
+const closedSends = new Counter('sends_to_closed_chat')
 const sessionMatched = new Rate('session_matched')
 const signupFailed = new Counter('signup_failed')
 const connectFailed = new Counter('ws_connect_failed')
@@ -138,7 +141,8 @@ export default function () {
           if (f.reason === 'partner_left') socket.setTimeout(() => socket.close(), 100)
           break
         case 'error':
-          frameErrors.add(1)
+          if (typeof f.message === 'string' && f.message.includes('conversation is closed')) closedSends.add(1)
+          else frameErrors.add(1)
           break
       }
     })
@@ -162,7 +166,7 @@ export function handleSummary(data) {
     msg_latency_ms: { avg: m('msg_latency_ms', 'avg'), med: m('msg_latency_ms', 'med'), p90: m('msg_latency_ms', 'p(90)'), p95: m('msg_latency_ms', 'p(95)'), p99: m('msg_latency_ms', 'p(99)'), max: m('msg_latency_ms', 'max') },
     match_wait_ms: { med: m('match_wait_ms', 'med'), p95: m('match_wait_ms', 'p(95)') },
     sessions_matched_rate: m('session_matched', 'rate'),
-    errors: { frame_errors: m('frame_errors', 'count'), signup_failed: m('signup_failed', 'count'), ws_connect_failed: m('ws_connect_failed', 'count'), http_req_failed_rate: m('http_req_failed', 'rate') },
+    errors: { frame_errors: m('frame_errors', 'count'), sends_to_closed_chat: m('sends_to_closed_chat', 'count'), signup_failed: m('signup_failed', 'count'), ws_connect_failed: m('ws_connect_failed', 'count'), http_req_failed_rate: m('http_req_failed', 'rate') },
     thresholds: Object.fromEntries(Object.entries(data.metrics).filter(([, v]) => v.thresholds).map(([k, v]) => [k, Object.values(v.thresholds).every((t) => t.ok)])),
   }
   return { stdout: `\n===SUMMARY-JSON===\n${JSON.stringify(out)}\n` }
