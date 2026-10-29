@@ -1,0 +1,200 @@
+{
+  "collected_utc": "2026-10-29",
+  "about": "The machine and software the 2026-10-28 load test ran on (results in the files beside this one). Read from the live cluster and Google Cloud after the test; the cluster has not been rebuilt since it was created on 2026-10-24, and the node was created 2026-10-26 (a node auto-upgrade). Account, project and address identifiers are left out on purpose.",
+  "how_collected": {
+    "cluster": "gcloud container clusters describe <cluster> --zone asia-south1-a",
+    "vm": "gcloud compute instances describe <node> --zone asia-south1-a (cpuPlatform, disks, scheduling)",
+    "node": "kubectl get node -o json (labels, nodeInfo, capacity, allocatable)",
+    "volumes": "kubectl get pvc,storageclass; gcloud compute disks list",
+    "workloads": "kubectl get pods -o json (images, requests, limits)",
+    "monitoring": "kubectl get prometheus (retention, scrape interval)",
+    "docs_checked_2026-10-29": [
+      "https://docs.cloud.google.com/compute/docs/cpu-platforms (Broadwell: Intel Xeon E5 v4, E5-2696V4, base 2.2 GHz, all-core turbo 2.8 GHz, single-core turbo 3.7 GHz; supported by E2 and N1; 'each hardware thread is called a virtual CPU (vCPU)')",
+      "https://docs.cloud.google.com/compute/docs/general-purpose-machines (e2-standard-2 is 2 vCPUs and 8 GB; E2 offers Intel and AMD EPYC processors and 'the processor is selected for you at the time of VM creation')"
+    ]
+  },
+  "google_cloud": {
+    "product": "Google Kubernetes Engine, Standard mode (not Autopilot), zonal cluster",
+    "region": "asia-south1 (Mumbai)",
+    "zone": "asia-south1-a",
+    "kubernetes_version": "1.36.4-gke.2046003 (control plane and node)",
+    "release_channel": "REGULAR",
+    "networking": "VPC-native (alias IPs), default network and subnet, IPv4 only; NodeLocal DNS cache enabled; network policy disabled; nothing in the cluster has a public address, the only way in is a Cloudflare Tunnel (not used by the load test)",
+    "node_pools": 1,
+    "nodes": 1,
+    "autoscaling": "none (the pool cannot add nodes)",
+    "auto_upgrade": true,
+    "auto_repair": true,
+    "maintenance_window": "daily, 21:30 UTC for 4 hours (03:00 to 07:00 IST)",
+    "logging_and_monitoring": "system components only; the cluster runs its own Prometheus, Grafana, Loki and Alloy"
+  },
+  "node": {
+    "machine_type": "e2-standard-2",
+    "vcpus": 2,
+    "memory_kib": 8135296,
+    "memory_gib": 7.76,
+    "cpu_platform": "Intel Broadwell (as reported by Compute Engine; the exact processor inside the VM was not read)",
+    "provisioning": "STANDARD (not Spot or preemptible), on host maintenance MIGRATE, automatic restart on",
+    "shielded_vm": "integrity monitoring and vTPM on, secure boot off",
+    "os": "Container-Optimized OS from Google",
+    "kernel": "6.12.105+",
+    "container_runtime": "containerd 2.2.7",
+    "kubelet": "v1.36.4-gke.2046003",
+    "architecture": "amd64",
+    "boot_disk": "50 GB pd-standard",
+    "allocatable": {
+      "cpu_millicores": 1930,
+      "memory_kib": 6170240,
+      "memory_gib": 5.88,
+      "pods": 110
+    },
+    "reserved_by_gke_and_system": "about 70 millicores of CPU and 1.87 GiB of memory (capacity minus allocatable)"
+  },
+  "volumes": {
+    "storage_class": "standard-rwo (pd.csi.storage.gke.io, type pd-balanced)",
+    "claims": [
+      {
+        "for": "kafka",
+        "size_gib": 10
+      },
+      {
+        "for": "postgres",
+        "size_gib": 10
+      },
+      {
+        "for": "prometheus",
+        "size_gib": 10
+      },
+      {
+        "for": "loki",
+        "size_gib": 5
+      }
+    ]
+  },
+  "software": {
+    "services": "8 Go services, Go toolchain 1.27.3 (golang:1.27.3-bookworm), go.mod 'go 1.27.2', static binaries in gcr.io/distroless/static-debian12:nonroot",
+    "tested_commit": "b093bac45f0bebe44fd2b31f96b12635de588ecd (all eight service images)",
+    "postgres": "16-alpine, one instance, default settings",
+    "kafka": "4.3.1, KRaft, one node (broker and controller), heap -Xmx512M -Xms512M, three topics of 3 partitions with replication factor 1",
+    "redis": "7-alpine, one instance",
+    "load_generator": "grafana/k6:2.3.0",
+    "monitoring": {
+      "prometheus": "v3.15.0 (scrape and rule interval 30 s, retention 15 days or 8 GiB)",
+      "grafana": "13.2.4",
+      "loki": "3.6.11",
+      "alloy": "v1.21.0",
+      "node_exporter": "v1.12.1",
+      "kube_state_metrics": "v2.20.0"
+    },
+    "tunnel": "cloudflared 2026.10.2 (two replicas; not in the test's path)"
+  },
+  "workloads_on_the_node_during_the_test": {
+    "note": "One replica of everything. Requests and limits as deployed. No service has a CPU limit; every container has a memory limit.",
+    "rows": [
+      {
+        "name": "gateway",
+        "cpu_request": "25m",
+        "memory_request": "32Mi",
+        "memory_limit": "128Mi"
+      },
+      {
+        "name": "chat",
+        "cpu_request": "25m",
+        "memory_request": "32Mi",
+        "memory_limit": "128Mi"
+      },
+      {
+        "name": "matching",
+        "cpu_request": "25m",
+        "memory_request": "32Mi",
+        "memory_limit": "128Mi"
+      },
+      {
+        "name": "identity",
+        "cpu_request": "50m",
+        "memory_request": "48Mi",
+        "memory_limit": "192Mi"
+      },
+      {
+        "name": "presence",
+        "cpu_request": "25m",
+        "memory_request": "32Mi",
+        "memory_limit": "128Mi"
+      },
+      {
+        "name": "moderation",
+        "cpu_request": "25m",
+        "memory_request": "32Mi",
+        "memory_limit": "128Mi"
+      },
+      {
+        "name": "delivery-worker",
+        "cpu_request": "25m",
+        "memory_request": "32Mi",
+        "memory_limit": "128Mi"
+      },
+      {
+        "name": "persistence-worker",
+        "cpu_request": "25m",
+        "memory_request": "32Mi",
+        "memory_limit": "128Mi"
+      },
+      {
+        "name": "kafka",
+        "cpu_request": "100m",
+        "memory_request": "640Mi",
+        "memory_limit": "1Gi"
+      },
+      {
+        "name": "postgres",
+        "cpu_request": "50m",
+        "memory_request": "128Mi",
+        "memory_limit": "512Mi"
+      },
+      {
+        "name": "redis",
+        "cpu_request": "25m",
+        "memory_request": "32Mi",
+        "memory_limit": "128Mi"
+      },
+      {
+        "name": "prometheus",
+        "cpu_request": "100m",
+        "memory_request": "384Mi",
+        "memory_limit": "1Gi"
+      },
+      {
+        "name": "grafana",
+        "cpu_request": "50m",
+        "memory_request": "384Mi",
+        "memory_limit": "768Mi"
+      },
+      {
+        "name": "loki",
+        "cpu_request": "50m",
+        "memory_request": "128Mi",
+        "memory_limit": "256Mi"
+      },
+      {
+        "name": "alloy",
+        "cpu_request": "50m",
+        "memory_request": "128Mi",
+        "memory_limit": "256Mi"
+      },
+      {
+        "name": "k6 load generator (a Job per level)",
+        "cpu_request": "250m",
+        "memory_request": "256Mi",
+        "memory_limit": "3Gi"
+      }
+    ]
+  },
+  "test_setup": {
+    "generator": "k6 as a Kubernetes Job on the same node, calling the gateway service directly inside the cluster (no Cloudflare, no internet)",
+    "per_level": "30 s ramp up, 120 s hold, 15 s ramp down, one Job per level",
+    "virtual_user": "guest signup once, WebSocket login, random match, one message every 3 s for a 60 s session, partner times the delivery, end the chat, queue again",
+    "gateway_signup_limits": "raised to 1,000,000 for the runs and restored after",
+    "script_and_runner": "loadtest/k6/chat.js and loadtest/run.sh (the runner's wait loop was fixed between runs A and B; no measurement changed)",
+    "watchdog": "stopped the run on any pod restart, a change in node count or node memory above 93 percent; it did not fire"
+  }
+}
