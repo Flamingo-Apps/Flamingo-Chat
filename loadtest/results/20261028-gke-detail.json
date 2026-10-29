@@ -1,0 +1,1532 @@
+[
+  {
+    "result_file": "20261028T1435Z-gke-100.json",
+    "target_users": 100,
+    "window_utc": [
+      "2026-10-28T14:45:19Z",
+      "2026-10-28T14:48:39Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 1.265,
+      "busy_avg": 1.073,
+      "by_mode_peak": {
+        "iowait": 0.038,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.066,
+        "steal": 0.009,
+        "system": 0.357,
+        "user": 0.82
+      },
+      "by_mode_avg": {
+        "iowait": 0.03,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.057,
+        "steal": 0.007,
+        "system": 0.297,
+        "user": 0.682
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.538,
+        "avg": 0.41
+      },
+      "io": {
+        "peak": 0.06,
+        "avg": 0.053
+      },
+      "memory": {
+        "peak": 0.001,
+        "avg": 0.0
+      }
+    },
+    "node_memory_used_gib_peak": 3.13,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.742,
+        "read_mib_s_peak": 0.047,
+        "busy_share_peak": 0.063
+      },
+      "sdb": {
+        "write_mib_s_peak": 0.589,
+        "read_mib_s_peak": 0.001,
+        "busy_share_peak": 0.065
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.089,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.02
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.022,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.047,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.083,
+        "memory_mib_peak": 38.3
+      },
+      "chat": {
+        "cpu_cores_peak": 0.063,
+        "memory_mib_peak": 18.5
+      },
+      "matching": {
+        "cpu_cores_peak": 0.006,
+        "memory_mib_peak": 15.4
+      },
+      "identity": {
+        "cpu_cores_peak": 0.012,
+        "memory_mib_peak": 13.3
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 13.1
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 16.4
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.032,
+        "memory_mib_peak": 9.5
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.044,
+        "memory_mib_peak": 10.0
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.132,
+        "memory_mib_peak": 530.7
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.071,
+        "memory_mib_peak": 50.3
+      },
+      "redis": {
+        "cpu_cores_peak": 0.034,
+        "memory_mib_peak": 11.4
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.036,
+        "memory_mib_peak": 338.1
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.02,
+        "memory_mib_peak": 288.0
+      },
+      "loki": {
+        "cpu_cores_peak": 0.012,
+        "memory_mib_peak": 102.5
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.031,
+        "memory_mib_peak": 75.8
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.005,
+        "memory_mib_peak": 13.3
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.059,
+      "memory_mib_peak": 50.9
+    },
+    "kafka_consumer_lag_peak_messages": 0.0,
+    "gateway_goroutines_peak": 839.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 62.7,
+      "transmit": 72.6
+    },
+    "requests_in_window": {
+      "guest_signups": 63,
+      "chat_SendMessage_calls": 5588,
+      "matching_RequestMatch_calls": 289
+    }
+  },
+  {
+    "result_file": "20261028T1435Z-gke-200.json",
+    "target_users": 200,
+    "window_utc": [
+      "2026-10-28T14:51:55Z",
+      "2026-10-28T14:55:15Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 1.757,
+      "busy_avg": 1.437,
+      "by_mode_peak": {
+        "iowait": 0.035,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.096,
+        "steal": 0.009,
+        "system": 0.519,
+        "user": 1.122
+      },
+      "by_mode_avg": {
+        "iowait": 0.024,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.078,
+        "steal": 0.005,
+        "system": 0.415,
+        "user": 0.915
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.82,
+        "avg": 0.631
+      },
+      "io": {
+        "peak": 0.093,
+        "avg": 0.073
+      },
+      "memory": {
+        "peak": 0.002,
+        "avg": 0.0
+      }
+    },
+    "node_memory_used_gib_peak": 3.25,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.77,
+        "read_mib_s_peak": 0.078,
+        "busy_share_peak": 0.063
+      },
+      "sdb": {
+        "write_mib_s_peak": 1.244,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.127
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.096,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.007
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.025,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.07,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.143,
+        "memory_mib_peak": 68.1
+      },
+      "chat": {
+        "cpu_cores_peak": 0.107,
+        "memory_mib_peak": 19.3
+      },
+      "matching": {
+        "cpu_cores_peak": 0.012,
+        "memory_mib_peak": 16.1
+      },
+      "identity": {
+        "cpu_cores_peak": 0.022,
+        "memory_mib_peak": 14.5
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 13.5
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 16.5
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.059,
+        "memory_mib_peak": 10.7
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.078,
+        "memory_mib_peak": 11.5
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.131,
+        "memory_mib_peak": 539.4
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.134,
+        "memory_mib_peak": 60.5
+      },
+      "redis": {
+        "cpu_cores_peak": 0.055,
+        "memory_mib_peak": 14.4
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.041,
+        "memory_mib_peak": 340.5
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.021,
+        "memory_mib_peak": 287.0
+      },
+      "loki": {
+        "cpu_cores_peak": 0.013,
+        "memory_mib_peak": 114.0
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.041,
+        "memory_mib_peak": 77.1
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.005,
+        "memory_mib_peak": 12.9
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.104,
+      "memory_mib_peak": 91.2
+    },
+    "kafka_consumer_lag_peak_messages": 0.0,
+    "gateway_goroutines_peak": 1638.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 119.8,
+      "transmit": 139.0
+    },
+    "requests_in_window": {
+      "guest_signups": 172,
+      "chat_SendMessage_calls": 11227,
+      "matching_RequestMatch_calls": 557
+    }
+  },
+  {
+    "result_file": "20261028T1435Z-gke-25.json",
+    "target_users": 25,
+    "window_utc": [
+      "2026-10-28T14:35:30Z",
+      "2026-10-28T14:38:50Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 0.945,
+      "busy_avg": 0.747,
+      "by_mode_peak": {
+        "iowait": 0.179,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.04,
+        "steal": 0.01,
+        "system": 0.222,
+        "user": 0.5
+      },
+      "by_mode_avg": {
+        "iowait": 0.062,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.037,
+        "steal": 0.008,
+        "system": 0.19,
+        "user": 0.449
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.242,
+        "avg": 0.214
+      },
+      "io": {
+        "peak": 0.144,
+        "avg": 0.054
+      },
+      "memory": {
+        "peak": 0.014,
+        "avg": 0.003
+      }
+    },
+    "node_memory_used_gib_peak": 3.2,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 3.035,
+        "read_mib_s_peak": 0.979,
+        "busy_share_peak": 0.222
+      },
+      "sdb": {
+        "write_mib_s_peak": 0.182,
+        "read_mib_s_peak": 0.003,
+        "busy_share_peak": 0.027
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.073,
+        "read_mib_s_peak": 0.001,
+        "busy_share_peak": 0.011
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.028,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.041,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.023,
+        "memory_mib_peak": 16.7
+      },
+      "chat": {
+        "cpu_cores_peak": 0.017,
+        "memory_mib_peak": 16.4
+      },
+      "matching": {
+        "cpu_cores_peak": 0.002,
+        "memory_mib_peak": 13.6
+      },
+      "identity": {
+        "cpu_cores_peak": 0.004,
+        "memory_mib_peak": 12.0
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 13.0
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 16.5
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.01,
+        "memory_mib_peak": 11.2
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.013,
+        "memory_mib_peak": 10.9
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.064,
+        "memory_mib_peak": 515.2
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.025,
+        "memory_mib_peak": 38.3
+      },
+      "redis": {
+        "cpu_cores_peak": 0.018,
+        "memory_mib_peak": 6.9
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.038,
+        "memory_mib_peak": 323.3
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.02,
+        "memory_mib_peak": 464.7
+      },
+      "loki": {
+        "cpu_cores_peak": 0.011,
+        "memory_mib_peak": 115.0
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.013,
+        "memory_mib_peak": 64.7
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.004,
+        "memory_mib_peak": 13.7
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.02,
+      "memory_mib_peak": 20.5
+    },
+    "kafka_consumer_lag_peak_messages": 0.0,
+    "gateway_goroutines_peak": 239.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 15.6,
+      "transmit": 18.4
+    },
+    "requests_in_window": {
+      "guest_signups": 18,
+      "chat_SendMessage_calls": 1256,
+      "matching_RequestMatch_calls": 83
+    }
+  },
+  {
+    "result_file": "20261028T1435Z-gke-50.json",
+    "target_users": 50,
+    "window_utc": [
+      "2026-10-28T14:42:05Z",
+      "2026-10-28T14:45:15Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 0.911,
+      "busy_avg": 0.796,
+      "by_mode_peak": {
+        "iowait": 0.045,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.047,
+        "steal": 0.012,
+        "system": 0.248,
+        "user": 0.579
+      },
+      "by_mode_avg": {
+        "iowait": 0.033,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.042,
+        "steal": 0.008,
+        "system": 0.214,
+        "user": 0.5
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.326,
+        "avg": 0.263
+      },
+      "io": {
+        "peak": 0.043,
+        "avg": 0.039
+      },
+      "memory": {
+        "peak": 0.001,
+        "avg": 0.0
+      }
+    },
+    "node_memory_used_gib_peak": 3.09,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.756,
+        "read_mib_s_peak": 0.036,
+        "busy_share_peak": 0.072
+      },
+      "sdb": {
+        "write_mib_s_peak": 0.885,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.034
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.079,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.008
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.024,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.01,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.044,
+        "memory_mib_peak": 24.6
+      },
+      "chat": {
+        "cpu_cores_peak": 0.034,
+        "memory_mib_peak": 16.9
+      },
+      "matching": {
+        "cpu_cores_peak": 0.005,
+        "memory_mib_peak": 14.1
+      },
+      "identity": {
+        "cpu_cores_peak": 0.005,
+        "memory_mib_peak": 12.9
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 13.1
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 16.4
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.018,
+        "memory_mib_peak": 10.1
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.024,
+        "memory_mib_peak": 10.4
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.07,
+        "memory_mib_peak": 516.7
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.038,
+        "memory_mib_peak": 44.8
+      },
+      "redis": {
+        "cpu_cores_peak": 0.023,
+        "memory_mib_peak": 7.5
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.035,
+        "memory_mib_peak": 339.6
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.02,
+        "memory_mib_peak": 288.4
+      },
+      "loki": {
+        "cpu_cores_peak": 0.011,
+        "memory_mib_peak": 97.3
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.016,
+        "memory_mib_peak": 71.8
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.004,
+        "memory_mib_peak": 14.2
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.035,
+      "memory_mib_peak": 30.8
+    },
+    "kafka_consumer_lag_peak_messages": 0.0,
+    "gateway_goroutines_peak": 439.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 30.8,
+      "transmit": 36.1
+    },
+    "requests_in_window": {
+      "guest_signups": 36,
+      "chat_SendMessage_calls": 2814,
+      "matching_RequestMatch_calls": 150
+    }
+  },
+  {
+    "result_file": "20261028T1459Z-gke-300.json",
+    "target_users": 300,
+    "window_utc": [
+      "2026-10-28T14:59:39Z",
+      "2026-10-28T15:02:53Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 1.995,
+      "busy_avg": 1.705,
+      "by_mode_peak": {
+        "iowait": 0.044,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.106,
+        "steal": 0.088,
+        "system": 0.543,
+        "user": 1.3
+      },
+      "by_mode_avg": {
+        "iowait": 0.015,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.087,
+        "steal": 0.035,
+        "system": 0.457,
+        "user": 1.112
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.974,
+        "avg": 0.797
+      },
+      "io": {
+        "peak": 0.158,
+        "avg": 0.114
+      },
+      "memory": {
+        "peak": 0.001,
+        "avg": 0.001
+      }
+    },
+    "node_memory_used_gib_peak": 3.51,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.839,
+        "read_mib_s_peak": 0.142,
+        "busy_share_peak": 0.125
+      },
+      "sdb": {
+        "write_mib_s_peak": 1.53,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.201
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.102,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.01
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.962,
+        "read_mib_s_peak": 5.774,
+        "busy_share_peak": 0.047
+      },
+      "sde": {
+        "write_mib_s_peak": 0.073,
+        "read_mib_s_peak": 0.007,
+        "busy_share_peak": 0.003
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.157,
+        "memory_mib_peak": 96.2
+      },
+      "chat": {
+        "cpu_cores_peak": 0.106,
+        "memory_mib_peak": 22.9
+      },
+      "matching": {
+        "cpu_cores_peak": 0.013,
+        "memory_mib_peak": 16.9
+      },
+      "identity": {
+        "cpu_cores_peak": 0.033,
+        "memory_mib_peak": 16.1
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 13.4
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 16.6
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.06,
+        "memory_mib_peak": 10.1
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.086,
+        "memory_mib_peak": 11.5
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.142,
+        "memory_mib_peak": 557.2
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.207,
+        "memory_mib_peak": 68.9
+      },
+      "redis": {
+        "cpu_cores_peak": 0.063,
+        "memory_mib_peak": 17.7
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.143,
+        "memory_mib_peak": 379.8
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.07,
+        "memory_mib_peak": 455.0
+      },
+      "loki": {
+        "cpu_cores_peak": 0.049,
+        "memory_mib_peak": 146.0
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.044,
+        "memory_mib_peak": 83.5
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.008,
+        "memory_mib_peak": 13.2
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.134,
+      "memory_mib_peak": 133.4
+    },
+    "kafka_consumer_lag_peak_messages": 68.0,
+    "gateway_goroutines_peak": 2439.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 159.9,
+      "transmit": 195.2
+    },
+    "requests_in_window": {
+      "guest_signups": 286,
+      "chat_SendMessage_calls": 15193,
+      "matching_RequestMatch_calls": 832
+    }
+  },
+  {
+    "result_file": "20261028T1504Z-gke-200.json",
+    "target_users": 200,
+    "window_utc": [
+      "2026-10-28T15:04:57Z",
+      "2026-10-28T15:08:08Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 1.729,
+      "busy_avg": 1.44,
+      "by_mode_peak": {
+        "iowait": 0.036,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.098,
+        "steal": 0.006,
+        "system": 0.496,
+        "user": 1.141
+      },
+      "by_mode_avg": {
+        "iowait": 0.021,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.077,
+        "steal": 0.004,
+        "system": 0.408,
+        "user": 0.93
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.803,
+        "avg": 0.634
+      },
+      "io": {
+        "peak": 0.086,
+        "avg": 0.069
+      },
+      "memory": {
+        "peak": 0.002,
+        "avg": 0.001
+      }
+    },
+    "node_memory_used_gib_peak": 3.54,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.837,
+        "read_mib_s_peak": 0.053,
+        "busy_share_peak": 0.064
+      },
+      "sdb": {
+        "write_mib_s_peak": 1.139,
+        "read_mib_s_peak": 0.005,
+        "busy_share_peak": 0.125
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.098,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.017
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.021,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.066,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.139,
+        "memory_mib_peak": 67.4
+      },
+      "chat": {
+        "cpu_cores_peak": 0.107,
+        "memory_mib_peak": 22.9
+      },
+      "matching": {
+        "cpu_cores_peak": 0.011,
+        "memory_mib_peak": 19.3
+      },
+      "identity": {
+        "cpu_cores_peak": 0.028,
+        "memory_mib_peak": 16.0
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 14.3
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 16.6
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.058,
+        "memory_mib_peak": 9.8
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.077,
+        "memory_mib_peak": 11.2
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.127,
+        "memory_mib_peak": 570.2
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.142,
+        "memory_mib_peak": 82.3
+      },
+      "redis": {
+        "cpu_cores_peak": 0.054,
+        "memory_mib_peak": 17.4
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.066,
+        "memory_mib_peak": 355.7
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.054,
+        "memory_mib_peak": 498.3
+      },
+      "loki": {
+        "cpu_cores_peak": 0.024,
+        "memory_mib_peak": 144.9
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.04,
+        "memory_mib_peak": 86.5
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.006,
+        "memory_mib_peak": 13.3
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.103,
+      "memory_mib_peak": 91.8
+    },
+    "kafka_consumer_lag_peak_messages": 5.0,
+    "gateway_goroutines_peak": 1638.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 119.2,
+      "transmit": 139.7
+    },
+    "requests_in_window": {
+      "guest_signups": 142,
+      "chat_SendMessage_calls": 10565,
+      "matching_RequestMatch_calls": 603
+    }
+  },
+  {
+    "result_file": "20261028T1504Z-gke-225.json",
+    "target_users": 225,
+    "window_utc": [
+      "2026-10-28T15:08:11Z",
+      "2026-10-28T15:11:26Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 1.859,
+      "busy_avg": 1.643,
+      "by_mode_peak": {
+        "iowait": 0.029,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.1,
+        "steal": 0.022,
+        "system": 0.541,
+        "user": 1.208
+      },
+      "by_mode_avg": {
+        "iowait": 0.017,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.089,
+        "steal": 0.005,
+        "system": 0.476,
+        "user": 1.056
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.888,
+        "avg": 0.751
+      },
+      "io": {
+        "peak": 0.088,
+        "avg": 0.076
+      },
+      "memory": {
+        "peak": 0.001,
+        "avg": 0.0
+      }
+    },
+    "node_memory_used_gib_peak": 3.54,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.827,
+        "read_mib_s_peak": 0.04,
+        "busy_share_peak": 0.065
+      },
+      "sdb": {
+        "write_mib_s_peak": 1.854,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.136
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.102,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.007
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.029,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.062,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.15,
+        "memory_mib_peak": 74.3
+      },
+      "chat": {
+        "cpu_cores_peak": 0.114,
+        "memory_mib_peak": 21.0
+      },
+      "matching": {
+        "cpu_cores_peak": 0.011,
+        "memory_mib_peak": 19.2
+      },
+      "identity": {
+        "cpu_cores_peak": 0.029,
+        "memory_mib_peak": 15.9
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 14.3
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 17.1
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.064,
+        "memory_mib_peak": 9.7
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.084,
+        "memory_mib_peak": 9.9
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.138,
+        "memory_mib_peak": 581.4
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.164,
+        "memory_mib_peak": 84.9
+      },
+      "redis": {
+        "cpu_cores_peak": 0.056,
+        "memory_mib_peak": 15.4
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.044,
+        "memory_mib_peak": 346.7
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.021,
+        "memory_mib_peak": 501.6
+      },
+      "loki": {
+        "cpu_cores_peak": 0.013,
+        "memory_mib_peak": 144.9
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.054,
+        "memory_mib_peak": 86.6
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.005,
+        "memory_mib_peak": 13.1
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.113,
+      "memory_mib_peak": 102.0
+    },
+    "kafka_consumer_lag_peak_messages": 1.0,
+    "gateway_goroutines_peak": 1839.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 134.3,
+      "transmit": 157.9
+    },
+    "requests_in_window": {
+      "guest_signups": 244,
+      "chat_SendMessage_calls": 12283,
+      "matching_RequestMatch_calls": 623
+    }
+  },
+  {
+    "result_file": "20261028T1504Z-gke-250.json",
+    "target_users": 250,
+    "window_utc": [
+      "2026-10-28T15:11:29Z",
+      "2026-10-28T15:14:41Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 1.907,
+      "busy_avg": 1.725,
+      "by_mode_peak": {
+        "iowait": 0.029,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.105,
+        "steal": 0.022,
+        "system": 0.543,
+        "user": 1.242
+      },
+      "by_mode_avg": {
+        "iowait": 0.017,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.092,
+        "steal": 0.009,
+        "system": 0.494,
+        "user": 1.113
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.916,
+        "avg": 0.8
+      },
+      "io": {
+        "peak": 0.101,
+        "avg": 0.087
+      },
+      "memory": {
+        "peak": 0.001,
+        "avg": 0.0
+      }
+    },
+    "node_memory_used_gib_peak": 3.39,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.845,
+        "read_mib_s_peak": 0.024,
+        "busy_share_peak": 0.065
+      },
+      "sdb": {
+        "write_mib_s_peak": 1.601,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.152
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.103,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.014
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.029,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.038,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.154,
+        "memory_mib_peak": 77.9
+      },
+      "chat": {
+        "cpu_cores_peak": 0.116,
+        "memory_mib_peak": 21.3
+      },
+      "matching": {
+        "cpu_cores_peak": 0.013,
+        "memory_mib_peak": 19.2
+      },
+      "identity": {
+        "cpu_cores_peak": 0.039,
+        "memory_mib_peak": 16.0
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 14.1
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 17.2
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.066,
+        "memory_mib_peak": 9.7
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.09,
+        "memory_mib_peak": 10.0
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.141,
+        "memory_mib_peak": 594.4
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.187,
+        "memory_mib_peak": 92.2
+      },
+      "redis": {
+        "cpu_cores_peak": 0.061,
+        "memory_mib_peak": 16.1
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.045,
+        "memory_mib_peak": 344.6
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.021,
+        "memory_mib_peak": 346.4
+      },
+      "loki": {
+        "cpu_cores_peak": 0.014,
+        "memory_mib_peak": 122.5
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.058,
+        "memory_mib_peak": 86.8
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.006,
+        "memory_mib_peak": 13.0
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.123,
+      "memory_mib_peak": 112.0
+    },
+    "kafka_consumer_lag_peak_messages": 4.0,
+    "gateway_goroutines_peak": 2039.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 145.3,
+      "transmit": 172.0
+    },
+    "requests_in_window": {
+      "guest_signups": 187,
+      "chat_SendMessage_calls": 13356,
+      "matching_RequestMatch_calls": 704
+    }
+  },
+  {
+    "result_file": "20261028T1504Z-gke-275.json",
+    "target_users": 275,
+    "window_utc": [
+      "2026-10-28T15:14:46Z",
+      "2026-10-28T15:17:58Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 1.966,
+      "busy_avg": 1.777,
+      "by_mode_peak": {
+        "iowait": 0.032,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.11,
+        "steal": 0.008,
+        "system": 0.56,
+        "user": 1.285
+      },
+      "by_mode_avg": {
+        "iowait": 0.012,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.096,
+        "steal": 0.005,
+        "system": 0.506,
+        "user": 1.158
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.955,
+        "avg": 0.838
+      },
+      "io": {
+        "peak": 0.099,
+        "avg": 0.087
+      },
+      "memory": {
+        "peak": 0.0,
+        "avg": 0.0
+      }
+    },
+    "node_memory_used_gib_peak": 3.41,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.878,
+        "read_mib_s_peak": 0.026,
+        "busy_share_peak": 0.056
+      },
+      "sdb": {
+        "write_mib_s_peak": 2.094,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.162
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.104,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.006
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.021,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.056,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.156,
+        "memory_mib_peak": 88.0
+      },
+      "chat": {
+        "cpu_cores_peak": 0.117,
+        "memory_mib_peak": 21.4
+      },
+      "matching": {
+        "cpu_cores_peak": 0.013,
+        "memory_mib_peak": 19.2
+      },
+      "identity": {
+        "cpu_cores_peak": 0.044,
+        "memory_mib_peak": 15.5
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 14.1
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 16.8
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.066,
+        "memory_mib_peak": 10.0
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.088,
+        "memory_mib_peak": 10.1
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.145,
+        "memory_mib_peak": 605.4
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.205,
+        "memory_mib_peak": 111.5
+      },
+      "redis": {
+        "cpu_cores_peak": 0.065,
+        "memory_mib_peak": 17.3
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.044,
+        "memory_mib_peak": 352.2
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.021,
+        "memory_mib_peak": 292.5
+      },
+      "loki": {
+        "cpu_cores_peak": 0.014,
+        "memory_mib_peak": 122.5
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.06,
+        "memory_mib_peak": 86.9
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.007,
+        "memory_mib_peak": 13.4
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.134,
+      "memory_mib_peak": 118.9
+    },
+    "kafka_consumer_lag_peak_messages": 15.0,
+    "gateway_goroutines_peak": 2239.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 157.6,
+      "transmit": 187.1
+    },
+    "requests_in_window": {
+      "guest_signups": 208,
+      "chat_SendMessage_calls": 14478,
+      "matching_RequestMatch_calls": 785
+    }
+  },
+  {
+    "result_file": "20261028T1519Z-gke-300.json",
+    "target_users": 300,
+    "window_utc": [
+      "2026-10-28T15:19:50Z",
+      "2026-10-28T15:23:01Z"
+    ],
+    "node_cpu_cores": {
+      "busy_peak": 1.979,
+      "busy_avg": 1.62,
+      "by_mode_peak": {
+        "iowait": 0.133,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.108,
+        "steal": 0.003,
+        "system": 0.564,
+        "user": 1.303
+      },
+      "by_mode_avg": {
+        "iowait": 0.026,
+        "irq": 0.0,
+        "nice": 0.0,
+        "softirq": 0.085,
+        "steal": 0.002,
+        "system": 0.46,
+        "user": 1.047
+      }
+    },
+    "pressure_waiting_share": {
+      "cpu": {
+        "peak": 0.958,
+        "avg": 0.74
+      },
+      "io": {
+        "peak": 0.109,
+        "avg": 0.091
+      },
+      "memory": {
+        "peak": 0.019,
+        "avg": 0.006
+      }
+    },
+    "node_memory_used_gib_peak": 3.47,
+    "disks_peak": {
+      "sda": {
+        "write_mib_s_peak": 0.856,
+        "read_mib_s_peak": 0.254,
+        "busy_share_peak": 0.156
+      },
+      "sdb": {
+        "write_mib_s_peak": 2.202,
+        "read_mib_s_peak": 0.001,
+        "busy_share_peak": 0.153
+      },
+      "sdc": {
+        "write_mib_s_peak": 0.106,
+        "read_mib_s_peak": 0.0,
+        "busy_share_peak": 0.019
+      },
+      "sdd": {
+        "write_mib_s_peak": 0.155,
+        "read_mib_s_peak": 0.001,
+        "busy_share_peak": 0.001
+      },
+      "sde": {
+        "write_mib_s_peak": 0.069,
+        "read_mib_s_peak": 0.002,
+        "busy_share_peak": 0.001
+      }
+    },
+    "containers": {
+      "gateway": {
+        "cpu_cores_peak": 0.156,
+        "memory_mib_peak": 95.2
+      },
+      "chat": {
+        "cpu_cores_peak": 0.115,
+        "memory_mib_peak": 21.5
+      },
+      "matching": {
+        "cpu_cores_peak": 0.015,
+        "memory_mib_peak": 19.0
+      },
+      "identity": {
+        "cpu_cores_peak": 0.036,
+        "memory_mib_peak": 15.4
+      },
+      "presence": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 14.5
+      },
+      "moderation": {
+        "cpu_cores_peak": 0.001,
+        "memory_mib_peak": 16.8
+      },
+      "delivery-worker": {
+        "cpu_cores_peak": 0.067,
+        "memory_mib_peak": 11.6
+      },
+      "persistence-worker": {
+        "cpu_cores_peak": 0.089,
+        "memory_mib_peak": 12.1
+      },
+      "kafka": {
+        "cpu_cores_peak": 0.149,
+        "memory_mib_peak": 621.6
+      },
+      "postgres": {
+        "cpu_cores_peak": 0.216,
+        "memory_mib_peak": 114.0
+      },
+      "redis": {
+        "cpu_cores_peak": 0.066,
+        "memory_mib_peak": 19.1
+      },
+      "prometheus": {
+        "cpu_cores_peak": 0.041,
+        "memory_mib_peak": 347.7
+      },
+      "grafana": {
+        "cpu_cores_peak": 0.019,
+        "memory_mib_peak": 298.8
+      },
+      "loki": {
+        "cpu_cores_peak": 0.015,
+        "memory_mib_peak": 130.1
+      },
+      "alloy": {
+        "cpu_cores_peak": 0.05,
+        "memory_mib_peak": 87.1
+      },
+      "node-exporter": {
+        "cpu_cores_peak": 0.006,
+        "memory_mib_peak": 13.7
+      }
+    },
+    "load_generator_k6": {
+      "cpu_cores_peak": 0.133,
+      "memory_mib_peak": 132.6
+    },
+    "kafka_consumer_lag_peak_messages": 6.0,
+    "gateway_goroutines_peak": 2438.0,
+    "gateway_pod_network_kib_s_peak": {
+      "receive": 169.5,
+      "transmit": 201.0
+    },
+    "requests_in_window": {
+      "guest_signups": 225,
+      "chat_SendMessage_calls": 16700,
+      "matching_RequestMatch_calls": 895
+    }
+  }
+]
