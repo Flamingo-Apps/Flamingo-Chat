@@ -24,6 +24,7 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -34,6 +35,7 @@ import (
 	chatv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/chat/v1"
 	eventsv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/events/v1"
 	identityv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/identity/v1"
+	matchingv1 "github.com/Flamingo-Apps/Flamingo-Chat/proto/gen/go/matching/v1"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/banned"
 	"github.com/Flamingo-Apps/Flamingo-Chat/services/gateway/internal/presence"
 )
@@ -422,5 +424,69 @@ func TestRefreshRoomsDoesNotUnsubscribeAnUndecidedMatch(t *testing.T) {
 	}
 	if numSub["room:"+roomID] != 1 {
 		t.Fatalf("expected the undecided match's room to still have 1 subscriber after refreshRooms, got %d - refreshRooms incorrectly unsubscribed it", numSub["room:"+roomID])
+	}
+}
+
+// A student who queues for a match and closes the tab must not stay in the
+// queue: the next person to search would be paired with someone who is not
+// there. docs/ARCHITECTURE.md section 3.2 says "the gateway calls CancelMatch
+// when a queued user disconnects"; for a long time the code did not (found by
+// the backend review, INC-0030, DEC-0114). The gateway now waits a short grace
+// period, so a refresh keeps its place, and cancels once the person is gone.
+func TestClosingTheTabWhileSearchingCancelsTheSearch(t *testing.T) {
+	redisClient := newTestRedisClient(t)
+
+	var cancelCalls atomic.Int32
+	matching := &fakeMatching{
+		requestMatch: func(context.Context, *matchingv1.RequestMatchRequest) (*matchingv1.RequestMatchResponse, error) {
+			return &matchingv1.RequestMatchResponse{Queued: true}, nil
+		},
+		cancelMatch: func(context.Context, *matchingv1.CancelMatchRequest) (*matchingv1.CancelMatchResponse, error) {
+			cancelCalls.Add(1)
+			return &matchingv1.CancelMatchResponse{Cancelled: true}, nil
+		},
+	}
+	identity := &fakeIdentity{
+		getAccount: func(_ context.Context, req *identityv1.GetAccountRequest) (*identityv1.GetAccountResponse, error) {
+			return &identityv1.GetAccountResponse{Account: &identityv1.Account{Id: req.GetAccountId(), Pseudonym: "Fox"}}, nil
+		},
+	}
+	deps := Deps{
+		Identity: identity, Chat: &fakeChat{}, Matching: matching,
+		Sessions: &fakeSessions{}, RateLimiter: &fakeRateLimiter{}, Banned: &fakeBanned{},
+		Redis: redisClient, Logger: slog.Default(), PresenceRegistry: presence.NewRegistry(),
+		Connections: NewConnections(), SearchAbandonGrace: 300 * time.Millisecond,
+	}
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { Serve(deps, nil, w, r) }))
+	defer srv.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+	defer cancel()
+	client, _, err := websocket.Dial(ctx, "ws"+strings.TrimPrefix(srv.URL, "http"), nil)
+	if err != nil {
+		t.Fatalf("Dial: %v", err)
+	}
+	write := func(s string) {
+		if err := client.Write(ctx, websocket.MessageText, []byte(s)); err != nil {
+			t.Fatalf("write %s: %v", s, err)
+		}
+	}
+	write(`{"type":"auth","token":"session-for-the-ghost-test"}`)
+	if f := readFrame(t, ctx, client); f["type"] != "auth_ok" {
+		t.Fatalf("expected auth_ok, got %v", f)
+	}
+	write(`{"type":"match_request","preference":"any"}`)
+	if f := readFrame(t, ctx, client); f["type"] != "match_queued" {
+		t.Fatalf("expected match_queued, got %v", f)
+	}
+
+	_ = client.Close(websocket.StatusNormalClosure, "tab closed")
+
+	deadline := time.Now().Add(5 * time.Second)
+	for time.Now().Before(deadline) && cancelCalls.Load() == 0 {
+		time.Sleep(50 * time.Millisecond)
+	}
+	if cancelCalls.Load() != 1 {
+		t.Fatalf("after the tab closed the gateway should cancel the search exactly once, did so %d times", cancelCalls.Load())
 	}
 }

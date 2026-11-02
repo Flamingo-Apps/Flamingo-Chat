@@ -1,7 +1,7 @@
 {
   "meta": {
     "environment": "gke",
-    "cluster": "gke_flamingo-512316_asia-south1-a_flamingo",
+    "cluster": "gke_<project>_asia-south1-a_flamingo",
     "nodes": 1,
     "node_type": "e2-standard-2",
     "node_cpu": "2",
