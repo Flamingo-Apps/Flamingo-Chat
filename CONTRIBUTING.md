@@ -65,6 +65,18 @@ Every service depends on the generated code in `proto/gen/go`, so a contract cha
 
 - Business logic is tested against in-memory fakes of its storage and provider interfaces. See `services/identity/internal/server/server_test.go`.
 - Fakes do not reproduce real database behaviour. Code that talks to a database also needs a test against the real one.
+- Tests against a real Postgres, Redis or Kafka carry the build tag `integration`, read their address from `POSTGRES_URL` or `REDIS_URL`, and default to the local Tilt stack.
+- The web app has a browser suite, `web/e2e/blackbox.mjs`, run with `npm run test:blackbox` against the local stack. It refuses to run against anything else.
+
+### Tests for known defects
+
+When a defect is found and not fixed in the same change, it still gets a test, so it cannot be forgotten and so the fix has a failing test to turn green.
+
+- The file is named `defect_<topic>_test.go`, sits in the package it tests, carries `//go:build defect`, and each test is named `TestDefect_<what goes wrong>`. Its comment says which promise in the documentation the code breaks.
+- It asserts the **correct** behaviour, so it fails while the defect exists. The `defect` tag keeps it out of the normal suite and out of CI.
+- Tests that need a database use a scratch one through `SCRATCH_POSTGRES_URL` or `SCRATCH_REDIS_ADDR` and skip when it is unset. Never point them at the development database.
+- `scripts/run-defect-tests.sh` runs them all and lists which defects are still open. The pull request that fixes a defect removes the `//go:build defect` line from its test, so the test joins the normal suite as a regression test; the script exits 1 until that is done.
+- A test that demonstrates an unfixed abuse or privacy weakness is not committed to this public repository. Keep it in `.claude/held-back-defect-tests/` (git-excluded) and add it with its fix.
 
 ## CI checks
 

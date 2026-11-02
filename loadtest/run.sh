@@ -112,7 +112,7 @@ YAML
 	sed -n '/===SUMMARY-JSON===/{n;p}' "$results/$stamp-$env_name-$level.log" > "/tmp/$job.json"
 	if [ ! -s "/tmp/$job.json" ]; then echo "  level $level: no summary in the log (see $results/$stamp-$env_name-$level.log)"; continue; fi
 	meta=$(printf '{"environment":"%s","cluster":"%s","nodes":%s,"node_type":"%s","node_cpu":"%s","node_memory":"%s","gateway_image":"%s","k6_image":"%s","started_utc":"%s","ended_utc":"%s","generator":"k6 Job inside the cluster, talking to the gateway service directly"}' \
-		"$env_name" "$ctx" "$nodes" "${node_type:-}" "$node_cpu" "$node_mem_ki" "$gateway_image" "$k6_image" "$(date -u -d @$started +%FT%TZ)" "$(date -u -d @$ended +%FT%TZ)")
+		"$env_name" "$(echo "$ctx" | sed -E "s/^gke_[^_]+_/gke_<project>_/")" "$nodes" "${node_type:-}" "$node_cpu" "$node_mem_ki" "$gateway_image" "$k6_image" "$(date -u -d @$started +%FT%TZ)" "$(date -u -d @$ended +%FT%TZ)")
 	python3 loadtest/collect.py "/tmp/$job.json" http://localhost:19099 "$started" "$ended" "$results/$stamp-$env_name-$level.json" "$meta"
 	rm -f "$results/$stamp-$env_name-$level.log"
 done

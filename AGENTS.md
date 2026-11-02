@@ -74,4 +74,5 @@ GOTOOLCHAIN=local go test ./...
 - Reach storage through a repository interface with the real implementation behind it, as `services/identity/internal/store` does. Business logic never imports a database driver.
 - Return gRPC status codes from handlers (`status.Error(codes.NotFound, ...)`). Stores return their own sentinel errors, and the handler translates them.
 - Test business logic against in-memory fakes of those interfaces. Fakes do not reproduce real database behaviour (INC-0003), so storage code also needs tests against the real database.
+- A defect found and not fixed in the same change gets a failing test under the build tag `defect` (`defect_*_test.go`, `TestDefect_...`), run by `scripts/run-defect-tests.sh`; the fix removes the tag. Never commit a runnable demonstration of an unfixed abuse or privacy weakness to this public repository: see CONTRIBUTING.md, "Tests for known defects" (DEC-0115).
 - Match the surrounding code: its naming, comment density and structure.
